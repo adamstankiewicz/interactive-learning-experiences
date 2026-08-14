@@ -1,9 +1,17 @@
 'use client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+<<<<<<< Updated upstream
 import { DragCategorize } from '@/components/widgets/DragCategorize';
 import { DragSort } from '@/components/widgets/DragSort';
+=======
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
 import { DraftMeter } from '@/components/widgets/DraftMeter';
+=======
+import { DragCategorize } from '@/components/widgets/DragCategorize';
+import { DragSort } from '@/components/widgets/DragSort';
+>>>>>>> Stashed changes
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
@@ -19,12 +27,21 @@ function render(spec: WidgetSpec) {
       return <FractionAreaModel spec={spec} />;
     case 'swiper-flashcard':
       return <SwiperFlashcard spec={spec} />;
+<<<<<<< Updated upstream
     case 'draft-meter':
       return <DraftMeter spec={spec} />;
+<<<<<<< Updated upstream
+=======
+=======
+>>>>>>> Stashed changes
     case 'drag-sort':
       return <DragSort spec={spec} />;
     case 'drag-categorize':
       return <DragCategorize spec={spec} />;
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
   }
 }
 

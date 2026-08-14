@@ -16,7 +16,11 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+<<<<<<< Updated upstream
 import { useCallback, useRef, useState } from 'react';
+=======
+import { useCallback, useState } from 'react';
+>>>>>>> Stashed changes
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,31 +53,52 @@ function DraggableChip({
   inZone,
   phase,
   isDragging,
+<<<<<<< Updated upstream
   chipRef,
+=======
+>>>>>>> Stashed changes
 }: {
   item: Item;
   inZone: boolean;
   phase: 'idle' | 'correct' | 'wrong';
   isDragging: boolean;
+<<<<<<< Updated upstream
   chipRef?: (el: HTMLDivElement | null) => void;
+=======
+>>>>>>> Stashed changes
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: item.id,
     disabled: phase !== 'idle',
   });
 
+<<<<<<< Updated upstream
   return (
     <div
       ref={(el) => {
         setNodeRef(el);
         chipRef?.(el);
       }}
+=======
+  const correct = phase !== 'idle' && item.categoryId === item.categoryId; // determined by parent
+  void correct;
+
+  return (
+    <div
+      ref={setNodeRef}
+>>>>>>> Stashed changes
       style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.35 : 1 }}
       {...attributes}
       {...listeners}
       className={`inline-flex cursor-grab select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         phase !== 'idle'
+<<<<<<< Updated upstream
           ? 'border-border bg-card text-foreground cursor-default'
+=======
+          ? inZone
+            ? 'border-border bg-card text-foreground cursor-default'
+            : 'border-border bg-card text-foreground cursor-default'
+>>>>>>> Stashed changes
           : inZone
             ? 'border-primary/40 bg-primary/10 text-foreground hover:border-primary/70'
             : 'border-border bg-card text-foreground hover:border-muted-foreground/40'
@@ -94,7 +119,10 @@ function DropZone({
   phase,
   activeId,
   isOver,
+<<<<<<< Updated upstream
   chipRefs,
+=======
+>>>>>>> Stashed changes
   children,
 }: {
   id: string;
@@ -104,7 +132,10 @@ function DropZone({
   phase: 'idle' | 'correct' | 'wrong';
   activeId: string | null;
   isOver: boolean;
+<<<<<<< Updated upstream
   chipRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
+=======
+>>>>>>> Stashed changes
   children?: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({ id });
@@ -136,7 +167,10 @@ function DropZone({
                 inZone={id !== 'bank'}
                 phase={phase}
                 isDragging={item.id === activeId}
+<<<<<<< Updated upstream
                 chipRef={(el) => { chipRefs.current[item.id] = el; }}
+=======
+>>>>>>> Stashed changes
               />
               {phase !== 'idle' && (
                 <span
@@ -173,9 +207,12 @@ export function DragCategorize({ spec, onComplete }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
+<<<<<<< Updated upstream
   // Refs to every rendered chip DOM node, keyed by item id.
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+=======
+>>>>>>> Stashed changes
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -193,6 +230,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
     ({ active, over }: DragEndEvent) => {
       setActiveId(null);
       setOverId(null);
+<<<<<<< Updated upstream
 
       const movedId = active.id as string;
       const destination = over ? String(over.id) : null;
@@ -222,6 +260,17 @@ export function DragCategorize({ spec, onComplete }: Props) {
       });
     },
     [shuffledItems],
+=======
+      if (!over) return;
+      const destination = over.id as string;
+      // 'bank' means return to bank; category ids map to columns
+      setPlacement((prev) => ({
+        ...prev,
+        [active.id as string]: destination === 'bank' ? null : destination,
+      }));
+    },
+    [],
+>>>>>>> Stashed changes
   );
 
   const handleDragCancel = useCallback(() => {
@@ -311,7 +360,10 @@ export function DragCategorize({ spec, onComplete }: Props) {
           phase={phase}
           activeId={activeId}
           isOver={overId === 'bank'}
+<<<<<<< Updated upstream
           chipRefs={chipRefs}
+=======
+>>>>>>> Stashed changes
         >
           {bankItems.length === 0 && phase === 'idle' && (
             <p className="text-xs text-muted-foreground">
@@ -332,7 +384,10 @@ export function DragCategorize({ spec, onComplete }: Props) {
               phase={phase}
               activeId={activeId}
               isOver={overId === cat.id}
+<<<<<<< Updated upstream
               chipRefs={chipRefs}
+=======
+>>>>>>> Stashed changes
             />
           ))}
         </div>
