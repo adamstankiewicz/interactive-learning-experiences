@@ -47,9 +47,9 @@ export const swiperFlashcardSpec = z.object({
     .array(
       z.object({
         question: z.string().describe('Text shown on the face of the card'),
-        leftLabel: z.string().describe('Label shown on the left swipe affordance'),
-        rightLabel: z.string().describe('Label shown on the right swipe affordance'),
-        correctDirection: z.enum(['left', 'right']).describe('Which direction is the correct answer'),
+        upLabel: z.string().describe('Label shown on the up-swipe affordance'),
+        downLabel: z.string().describe('Label shown on the down-swipe affordance'),
+        correctDirection: z.enum(['up', 'down']).describe('Which direction is the correct answer'),
         explanation: z.string().describe('Brief explanation shown after the student swipes'),
       }),
     )
@@ -58,10 +58,121 @@ export const swiperFlashcardSpec = z.object({
 
 export type SwiperFlashcardSpec = z.infer<typeof swiperFlashcardSpec>;
 
+/**
+ * Draft Meter: question, textbox, one line. The student writes; a live model
+ * call moves the line.
+ *
+ * Note what is *not* here. There is no rubric, no per-dimension weighting, no
+ * band copy — scoring lives entirely in `lib/draft-meter`, and this spec only
+ * carries what makes one instance different from another. This is also the
+ * first widget that keeps talking to the server after render, so it carries
+ * the standard with it: it is the payload the scoring call is grounded in.
+ */
+export const draftMeterSpec = z.object({
+  kind: z.literal('draft-meter'),
+  learningComponentId: z.string().nullable(),
+  question: z
+    .string()
+    .describe(
+      'The prompt the student answers. One sentence, concrete, and it must invite a position plus a reason — e.g. "Should our school start at 8:45? Say what you think — and why."',
+    ),
+  placeholder: z.string().describe('Textbox placeholder. Short and inviting, under 60 characters.'),
+  standardCode: z.string().describe('The anchor standard code, copied verbatim.'),
+  standardDescription: z.string().describe('The anchor standard wording, copied verbatim.'),
+  /**
+   * The standard, translated. Shown behind a "?" so a student can find out what
+   * they are actually being asked for — standards wording is written for adults
+   * and is useless as an explanation to the person being measured by it.
+   */
+  standardForStudents: z
+    .string()
+    .describe(
+      'The standard restated in one or two sentences a 13-year-old understands, addressed to them ("You take a side, then..."). No jargon, no standard code, no quoting the official wording.',
+    ),
+  /**
+   * An optional source the student reads before answering.
+   *
+   * This is what makes reading standards reachable. Without it, "cite textual
+   * evidence" has nothing to cite and the scorer has to take a claimed fact on
+   * trust; with it, evidence is checkable against something on screen. Null for
+   * writing standards, where the argument comes from the student's own head.
+   */
+  passage: z
+    .object({
+      source: z
+        .string()
+        .describe('Short attribution, e.g. "Frederick Douglass, 1852" or "School newspaper editorial"'),
+      text: z
+        .string()
+        .describe(
+          'The source itself, 40-120 words. Short enough to sit above a textbox and be re-read while writing.',
+        ),
+    })
+    .nullable(),
+  criteria: z
+    .array(z.string())
+    .describe(
+      'Give 2-4 short phrases naming what a strong answer contains, drawn from the standard. These ground the scoring call and are never shown to the student.',
+    ),
+});
+
+export type DraftMeterSpec = z.infer<typeof draftMeterSpec>;
+
+export const dragSortSpec = z.object({
+  kind: z.literal('drag-sort'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the list, e.g. "Order these events from earliest to latest."'),
+  items: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this item'),
+        label: z.string().describe('Text shown on the draggable chip'),
+      }),
+    )
+    .describe('Give 4-8 items. They will be shuffled before display.'),
+  correctOrder: z
+    .array(z.string())
+    .describe('Item ids in the correct order, first to last.'),
+  successMessage: z.string().describe('Shown when the student arranges all items correctly.'),
+  hint: z.string().describe('Shown after a wrong submission; names the misconception or gives a nudge.'),
+});
+
+export type DragSortSpec = z.infer<typeof dragSortSpec>;
+
+export const dragCategorizeSpec = z.object({
+  kind: z.literal('drag-categorize'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the activity, e.g. "Sort each term into the correct era."'),
+  categories: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this category'),
+        label: z.string().describe('Column heading shown to the student'),
+      }),
+    )
+    .describe('Give 2-4 categories.'),
+  items: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this item'),
+        label: z.string().describe('Text shown on the draggable chip'),
+        categoryId: z.string().describe('id of the category this item belongs to'),
+      }),
+    )
+    .describe('Give 4-10 items spread across the categories.'),
+  successMessage: z.string().describe('Shown when all items are placed correctly.'),
+  hint: z.string().describe('Shown after a wrong submission; names the misconception or gives a nudge.'),
+});
+
+export type DragCategorizeSpec = z.infer<typeof dragCategorizeSpec>;
+
 /** Discriminated union — add widget kinds here as generators are registered. */
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
+  draftMeterSpec,
+  dragSortSpec,
+  dragCategorizeSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
@@ -73,7 +184,13 @@ export const learningOutcome = z.object({
 });
 
 /** The widget kinds the registry can render. Keep in step with `widgetSpec`. */
-export const widgetKind = z.enum(['fraction-area-model', 'swiper-flashcard']);
+export const widgetKind = z.enum([
+  'fraction-area-model',
+  'swiper-flashcard',
+  'draft-meter',
+  'drag-sort',
+  'drag-categorize',
+]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 
 export const pathwayStep = z.object({
@@ -92,9 +209,17 @@ export const pathwayStep = z.object({
       'Which interactive widget the student uses to do this step. Every step gets one — this is',
       'not supporting material, it is the task.',
       '"fraction-area-model" partitions a whole into equal parts to build a target fraction —',
-      'only meaningful for fractions. "swiper-flashcard" is a two-way sort of statements',
-      '(true/false, example/non-example, prime/composite) and suits almost any subject, including',
-      'an "activate" step sorting prior statements or a "check" step sorting worked answers.',
+      'only meaningful for fractions.',
+      '"swiper-flashcard" is a binary sort of statements (true/false, example/non-example,',
+      'prime/composite) and suits almost any subject, including an "activate" step sorting prior',
+      'statements or a "check" step sorting worked answers.',
+      '"drag-sort" orders items along one dimension — chronology, magnitude, steps in a process.',
+      '"drag-categorize" sorts items into 2-4 named buckets — use this over swiper-flashcard when',
+      'there are more than two groups, e.g. sorting terms by era or by part of speech.',
+      '"draft-meter" is a short written-argument prompt, live-scored as the student types. Only for',
+      'standards about writing an argument (W, WHST) or citing textual evidence (RL/RI/RH/RST',
+      'strands 1 and 8) — it is meaningless for any other standard. It is also the heaviest',
+      'interaction: use it for at most one step in a pathway, normally "practice" or "check".',
     ].join(' '),
   ),
 });

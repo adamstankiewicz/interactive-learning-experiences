@@ -60,6 +60,8 @@ export type PathwayEvent =
    * substitution is transparent, not silent, but it isn't a failure either.
    */
   | { type: 'step-widget'; stepIndex: number; widget: WidgetSpec; note: string | null }
+  /** Persisted session id, once there is one. Telemetry attaches to it. */
+  | { type: 'session'; sessionId: string | null }
   | { type: 'error'; message: string }
   | { type: 'done' };
 

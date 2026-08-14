@@ -31,8 +31,10 @@ export type PathwayState = {
    * so there is no other reason for a key to be absent once the run finishes.
    */
   stepWidgets: Record<number, WidgetSpec>;
-  /** Why a step's widget is null, keyed the same way. */
+  /** Why a step's widget is a substitution, keyed the same way. */
   stepWidgetNotes: Record<number, string>;
+  /** Set once the run is persisted; null when there is no student to persist for. */
+  sessionId: string | null;
   error: string | null;
   /**
    * Run timing. Timestamps are taken in event handlers and passed in, so the
@@ -55,6 +57,7 @@ const initialState: PathwayState = {
   plan: null,
   stepWidgets: {},
   stepWidgetNotes: {},
+  sessionId: null,
   error: null,
   startedAt: null,
   finishedAt: null,
@@ -114,6 +117,8 @@ function reducer(state: PathwayState, action: Action): PathwayState {
           ? { ...state.stepWidgetNotes, [event.stepIndex]: event.note }
           : state.stepWidgetNotes,
       };
+    case 'session':
+      return { ...state, sessionId: event.sessionId };
     case 'error':
       return { ...state, status: 'error', error: event.message, finishedAt: action.at };
     case 'done':

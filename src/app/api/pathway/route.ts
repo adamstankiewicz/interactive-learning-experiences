@@ -1,5 +1,8 @@
-import { encodeEvent } from '@/lib/pathway/events';
+import { encodeEvent, type Anchor } from '@/lib/pathway/events';
 import { streamPathway } from '@/lib/pathway/generate';
+import type { PathwayPlan } from '@/lib/pathway/schema';
+import { supabaseAdmin, supabaseConfigured } from '@/lib/supabase/client';
+import { loadProfile } from '@/lib/student/profile';
 
 export const maxDuration = 120;
 
@@ -11,7 +14,7 @@ function errorStream(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  let body: { topic?: unknown; gradeHint?: unknown };
+  let body: { topic?: unknown; gradeHint?: unknown; studentId?: unknown };
 
   try {
     body = await request.json();
@@ -24,20 +27,52 @@ export async function POST(request: Request) {
 
   const gradeHint =
     typeof body.gradeHint === 'string' && body.gradeHint.trim() ? body.gradeHint.trim() : undefined;
+  const studentId = typeof body.studentId === 'string' && body.studentId ? body.studentId : null;
 
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const emit = (event: Parameters<typeof encodeEvent>[0]) =>
+        controller.enqueue(encoder.encode(encodeEvent(event)));
+
       try {
-        for await (const event of streamPathway(topic, gradeHint)) {
-          controller.enqueue(encoder.encode(encodeEvent(event)));
+        // Prior evidence steers the plan. With no student this is the original
+        // stateless behaviour.
+        const profile = studentId ? await loadProfile(studentId) : null;
+
+        // The pathway is assembled from the events as they pass through, so
+        // persistence needs no second run of the pipeline.
+        let anchor: Anchor | null = null;
+        let plan: PathwayPlan | null = null;
+        const stepWidgets: Record<number, unknown> = {};
+        const rejected: string[] = [];
+
+        for await (const event of streamPathway(topic, gradeHint, profile)) {
+          if (event.type === 'anchor') anchor = event.anchor;
+          if (event.type === 'plan') plan = event.plan;
+          if (event.type === 'step-widget') stepWidgets[event.stepIndex] = event.widget;
+          if (event.type === 'verdict' && !event.resolved) rejected.push(event.code);
+
+          // The session id has to reach the client before `done`, so telemetry
+          // has something to attach to.
+          if (event.type === 'done' && studentId && anchor && plan) {
+            const sessionId = await persistSession(studentId, topic, gradeHint, {
+              anchor,
+              plan,
+              stepWidgets,
+              rejected,
+            });
+            emit({ type: 'session', sessionId });
+          }
+
+          emit(event);
         }
       } catch (error) {
         // A mid-stream failure has already sent a 200, so the error has to
         // travel as an event rather than a status code.
         const message = error instanceof Error ? error.message : 'Pathway generation failed.';
-        controller.enqueue(encoder.encode(encodeEvent({ type: 'error', message })));
+        emit({ type: 'error', message });
       } finally {
         controller.close();
       }
@@ -52,4 +87,39 @@ export async function POST(request: Request) {
       'X-Accel-Buffering': 'no',
     },
   });
+}
+
+/**
+ * Best-effort: a storage failure must not lose a pathway the student is already
+ * looking at. Telemetry simply has nothing to attach itself to.
+ */
+async function persistSession(
+  studentId: string,
+  topic: string,
+  gradeHint: string | undefined,
+  result: { anchor: Anchor; plan: PathwayPlan; stepWidgets: Record<number, unknown>; rejected: string[] },
+): Promise<string | null> {
+  if (!supabaseConfigured()) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('pathway_sessions')
+      .insert({
+        student_id: studentId,
+        topic,
+        grade_hint: gradeHint ?? null,
+        anchor: result.anchor,
+        rejected_codes: result.rejected,
+        plan: result.plan,
+        step_widgets: result.stepWidgets,
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  } catch (error) {
+    console.error('[pathway] could not persist session', error);
+    return null;
+  }
 }

@@ -1,0 +1,271 @@
+'use client';
+
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useCallback, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import type { DragSortSpec } from '@/lib/pathway/schema';
+
+type Item = DragSortSpec['items'][number];
+type Props = { spec: DragSortSpec; onComplete?: (correct: boolean) => void };
+
+// Deterministic shuffle — stable across re-renders, never matches correct order.
+function shuffle(items: Item[]): Item[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const seed = copy.slice(0, i + 1).reduce((acc, it) => acc + it.id.charCodeAt(0), 0);
+    const j = seed % (i + 1);
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+  }
+  if (copy.map((it) => it.id).join() === items.map((it) => it.id).join()) {
+    copy.unshift(copy.pop()!);
+  }
+  return copy;
+}
+
+// ── Single sortable row ───────────────────────────────────────────────────────
+
+function SortableItem({
+  item,
+  index,
+  phase,
+  correctId,
+  isDragging,
+}: {
+  item: Item;
+  index: number;
+  phase: 'idle' | 'correct' | 'wrong';
+  correctId: string;
+  isDragging: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: item.id,
+    disabled: phase !== 'idle',
+  });
+
+  const isCorrectPosition = phase !== 'idle' && correctId === item.id;
+  const isWrongPosition = phase === 'wrong' && correctId !== item.id;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.35 : 1,
+      }}
+      {...attributes}
+      {...listeners}
+      className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 select-none transition-colors ${
+        phase === 'idle'
+          ? 'cursor-grab border-border bg-card hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          : isCorrectPosition
+            ? 'border-success bg-success/10 cursor-default'
+            : isWrongPosition
+              ? 'border-destructive/60 bg-destructive/5 cursor-default'
+              : 'border-border bg-card cursor-default'
+      }`}
+    >
+      {phase === 'idle' && (
+        <svg
+          className="size-4 shrink-0 text-muted-foreground/50"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <circle cx="5" cy="4" r="1.2" />
+          <circle cx="11" cy="4" r="1.2" />
+          <circle cx="5" cy="8" r="1.2" />
+          <circle cx="11" cy="8" r="1.2" />
+          <circle cx="5" cy="12" r="1.2" />
+          <circle cx="11" cy="12" r="1.2" />
+        </svg>
+      )}
+      <span
+        className={`w-5 shrink-0 text-center text-xs font-bold tabular-nums ${
+          isCorrectPosition
+            ? 'text-success'
+            : isWrongPosition
+              ? 'text-destructive'
+              : 'text-muted-foreground'
+        }`}
+      >
+        {index + 1}
+      </span>
+      <span className="text-sm font-medium">{item.label}</span>
+      {phase !== 'idle' && (
+        <span className="ml-auto text-base" aria-hidden="true">
+          {isCorrectPosition ? '✓' : isWrongPosition ? '✗' : ''}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Widget ────────────────────────────────────────────────────────────────────
+
+export function DragSort({ spec, onComplete }: Props) {
+  const [items, setItems] = useState<Item[]>(() => shuffle(spec.items));
+  const [phase, setPhase] = useState<'idle' | 'correct' | 'wrong'>('idle');
+  const [attempts, setAttempts] = useState(0);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragStart = useCallback(({ active }: DragStartEvent) => {
+    setActiveId(active.id as string);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    ({ active, over }: DragEndEvent) => {
+      setActiveId(null);
+      if (!over || active.id === over.id) return;
+      setItems((prev) => {
+        const from = prev.findIndex((it) => it.id === active.id);
+        const to = prev.findIndex((it) => it.id === over.id);
+        return arrayMove(prev, from, to);
+      });
+    },
+    [],
+  );
+
+  const handleSubmit = useCallback(() => {
+    const correct = items.map((it) => it.id).join(',') === spec.correctOrder.join(',');
+    setAttempts((a) => a + 1);
+    setPhase(correct ? 'correct' : 'wrong');
+    if (correct) onComplete?.(true);
+  }, [items, spec.correctOrder, onComplete]);
+
+  const handleTryAgain = useCallback(() => setPhase('idle'), []);
+
+  const activeItem = activeId ? items.find((it) => it.id === activeId) : null;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        accessibility={{
+          announcements: {
+            onDragStart: ({ active }) => {
+              const item = items.find((it) => it.id === active.id);
+              const idx = items.findIndex((it) => it.id === active.id);
+              return `Picked up ${item?.label}, currently at position ${idx + 1} of ${items.length}.`;
+            },
+            onDragOver: ({ active, over }) => {
+              if (!over) return;
+              const toIdx = items.findIndex((it) => it.id === over.id);
+              return `${items.find((it) => it.id === active.id)?.label} will move to position ${toIdx + 1}.`;
+            },
+            onDragEnd: ({ active, over }) => {
+              if (!over) return `${items.find((it) => it.id === active.id)?.label} was dropped.`;
+              const toIdx = items.findIndex((it) => it.id === over.id);
+              return `${items.find((it) => it.id === active.id)?.label} was placed at position ${toIdx + 1}.`;
+            },
+            onDragCancel: ({ active }) =>
+              `Drag cancelled. ${items.find((it) => it.id === active.id)?.label} returned to its original position.`,
+          },
+        }}
+      >
+        <SortableContext items={items.map((it) => it.id)} strategy={verticalListSortingStrategy}>
+          <div className="flex flex-col gap-2">
+            {items.map((item, index) => (
+              <SortableItem
+                key={item.id}
+                item={item}
+                index={index}
+                phase={phase}
+                correctId={spec.correctOrder[index] ?? ''}
+                isDragging={item.id === activeId}
+              />
+            ))}
+          </div>
+        </SortableContext>
+
+        <DragOverlay>
+          {activeItem && (
+            <div className="flex items-center gap-3 rounded-lg border-2 border-primary bg-card px-4 py-3 shadow-lg">
+              <svg
+                className="size-4 shrink-0 text-muted-foreground/50"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <circle cx="5" cy="4" r="1.2" />
+                <circle cx="11" cy="4" r="1.2" />
+                <circle cx="5" cy="8" r="1.2" />
+                <circle cx="11" cy="8" r="1.2" />
+                <circle cx="5" cy="12" r="1.2" />
+                <circle cx="11" cy="12" r="1.2" />
+              </svg>
+              <span className="w-5 shrink-0 text-center text-xs font-bold tabular-nums text-muted-foreground">
+                {items.findIndex((it) => it.id === activeItem.id) + 1}
+              </span>
+              <span className="text-sm font-medium">{activeItem.label}</span>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+
+      {phase === 'idle' && (
+        <Button size="lg" className="w-full" onClick={handleSubmit}>
+          Check order
+        </Button>
+      )}
+
+      {phase === 'wrong' && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex flex-col gap-3 py-4">
+            <p className="text-sm font-semibold text-destructive">
+              {attempts === 1 ? 'Not quite.' : 'Keep trying!'}
+            </p>
+            <p className="text-sm text-foreground">{spec.hint}</p>
+            <Button size="lg" variant="outline" className="w-full" onClick={handleTryAgain}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === 'correct' && (
+        <Card className="border-success/30 bg-success/10">
+          <CardContent className="flex flex-col gap-3 py-4">
+            <p className="text-sm font-semibold text-success">
+              {attempts === 1 ? 'Perfect order!' : 'Got it!'}
+            </p>
+            <p className="text-sm text-foreground">{spec.successMessage}</p>
+            <Button size="lg" className="w-full" onClick={() => onComplete?.(true)}>
+              Continue →
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

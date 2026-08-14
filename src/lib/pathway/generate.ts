@@ -1,74 +1,31 @@
-import { generateText, streamText, Output } from 'ai';
-import type { FlexibleSchema } from 'ai';
-
-import { pathwayModel } from '@/lib/model';
 import {
   findLearningComponents,
   findProgression,
   findStandardStatement,
   type StandardStatement,
 } from '@/lib/learning-commons/client';
+import { FRACTION_CODE, READING_EVIDENCE_CODE, WRITING_CODE } from '@/lib/pathway/coverage';
 import type { Anchor, DeepPartial, PathwayEvent } from '@/lib/pathway/events';
 import {
+  draftMeterSpec,
+  dragCategorizeSpec,
+  dragSortSpec,
   fractionAreaModelSpec,
   pathwayPlan,
   standardProposal,
   swiperFlashcardSpec,
+  type DragCategorizeSpec,
+  type DragSortSpec,
   type FractionAreaModelSpec,
   type PathwayPlan,
   type SwiperFlashcardSpec,
   type WidgetKind,
   type WidgetSpec,
 } from '@/lib/pathway/schema';
+import { generateStructured, streamStructured } from '@/lib/structured';
+import type { StudentProfile } from '@/lib/student/schema';
 
 export type { Anchor };
-
-const MODEL = pathwayModel();
-
-/**
- * Every stage here is the same shape: a schema, a system prompt, and a user
- * prompt, in and a validated object out. `generateObject` is deprecated in AI
- * SDK v7 in favour of `generateText` with an `output` spec, so that lives in
- * one place rather than being repeated at each call site.
- */
-async function generateStructured<T>(options: {
-  schema: FlexibleSchema<T>;
-  system: string;
-  prompt: string;
-}): Promise<T> {
-  const result = await generateText({
-    model: MODEL,
-    output: Output.object({ schema: options.schema }),
-    system: options.system,
-    prompt: options.prompt,
-  });
-
-  return result.output;
-}
-
-/**
- * The same call, surfaced incrementally. The plan is the slowest stage by far
- * and the only one whose intermediate state is worth showing, so it is the only
- * one that streams: each yielded object is a more complete version of the last.
- */
-async function* streamStructured<T>(options: {
-  schema: FlexibleSchema<T>;
-  system: string;
-  prompt: string;
-}): AsyncGenerator<DeepPartial<T>, T> {
-  const result = streamText({
-    model: MODEL,
-    output: Output.object({ schema: options.schema }),
-    system: options.system,
-    prompt: options.prompt,
-  });
-
-  for await (const partial of result.partialOutputStream) {
-    yield partial as DeepPartial<T>;
-  }
-
-  return (await result.output) as T;
-}
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -131,6 +88,39 @@ function normalizeFlashcards(spec: SwiperFlashcardSpec): SwiperFlashcardSpec {
 }
 
 /**
+ * Keep the puzzle solvable. `correctOrder` is prose to the model, not a
+ * validated reference — an id it drops or invents would make the widget
+ * unwinnable rather than just wrong, so missing ids are appended in list
+ * order rather than left out.
+ */
+function normalizeDragSort(spec: DragSortSpec): DragSortSpec {
+  const items = spec.items.slice(0, 8);
+  const validIds = new Set(items.map((item) => item.id));
+  const ordered = spec.correctOrder.filter((id) => validIds.has(id));
+  const missing = items.map((item) => item.id).filter((id) => !ordered.includes(id));
+
+  return { ...spec, items, correctOrder: [...ordered, ...missing] };
+}
+
+/**
+ * Same reasoning as `normalizeDragSort`: an item whose `categoryId` names a
+ * category the model didn't actually define would be permanently
+ * unplaceable. Falling back to the first category keeps every item solvable.
+ */
+function normalizeDragCategorize(spec: DragCategorizeSpec): DragCategorizeSpec {
+  const categories = spec.categories.slice(0, 4);
+  const validCategoryIds = new Set(categories.map((category) => category.id));
+
+  const items = spec.items.slice(0, 10).map((item) =>
+    validCategoryIds.has(item.categoryId) || !categories[0]
+      ? item
+      : { ...item, categoryId: categories[0].id },
+  );
+
+  return { ...spec, categories, items };
+}
+
+/**
  * Stage 1 — the model proposes standard codes for a free-text topic.
  * Nothing here is trusted; stage 2 checks every code against the graph.
  */
@@ -169,6 +159,41 @@ async function loadGraphContext(standard: StandardStatement): Promise<Anchor> {
 }
 
 /**
+ * What prior evidence says about this student, rendered for the planner.
+ *
+ * Only the weakest components are included. The profile grows without bound,
+ * and the tail of it is mastered material the planner should not spend a
+ * pathway on.
+ */
+function profileBlock(profile: StudentProfile | null): string {
+  if (!profile || profile.mastery.length === 0) {
+    return '(no prior evidence for this student — plan at grade level)';
+  }
+
+  const weakest = profile.mastery
+    .slice(0, 5)
+    .map(
+      (entry) =>
+        `- ${entry.learningComponentId}: mastery ${entry.score.toFixed(2)} over ${entry.attempts} attempts`,
+    )
+    .join('\n');
+
+  const misconceptions = profile.confirmedMisconceptions.length
+    ? profile.confirmedMisconceptions.map((m) => `- ${m}`).join('\n')
+    : '(none observed yet)';
+
+  return [
+    'Weakest learning components so far (lowest mastery first):',
+    weakest,
+    '',
+    'Misconceptions this student has actually demonstrated:',
+    misconceptions,
+    '',
+    `Overall accuracy ${(profile.pacing.accuracy * 100).toFixed(0)}%, hint rate ${profile.pacing.hintRate.toFixed(2)}.`,
+  ].join('\n');
+}
+
+/**
  * Stage 4 — author the pathway from verified facts.
  *
  * Yields partial plans as the model writes; returns the normalized final one.
@@ -178,6 +203,7 @@ async function* planPathway(
   topic: string,
   anchor: Anchor,
   gradeBand: string,
+  profile: StudentProfile | null,
 ): AsyncGenerator<DeepPartial<PathwayPlan>, PathwayPlan> {
   const componentBlock = anchor.learningComponents.length
     ? anchor.learningComponents
@@ -200,6 +226,8 @@ async function* planPathway(
       'Outcomes are observable and student-facing. Steps run activate -> model -> practice -> check',
       'and each names the outcome it advances. Misconceptions are specific and diagnosable',
       '("thinks the parts need not be equal"), never generic ("finds fractions hard").',
+      'When prior evidence is supplied, weight the pathway toward the components the student is',
+      'weakest on and directly confront misconceptions they have already demonstrated.',
     ].join(' '),
     prompt: [
       `Teacher's topic: ${topic}`,
@@ -213,6 +241,9 @@ async function* planPathway(
       'Prerequisite standards (unfinished learning to activate, not to reteach):',
       prerequisiteBlock,
       '',
+      'Prior evidence for this student:',
+      profileBlock(profile),
+      '',
       `Grade band: ${gradeBand}`,
     ].join('\n'),
   });
@@ -225,13 +256,12 @@ async function* planPathway(
  *
  * The plan chooses the kind; this configures it against the specific step it
  * serves, which is why it runs as a second pass rather than inside the plan
- * call. One model call per widget, so `normalizePlan` caps how many a pathway
- * may request.
+ * call. One model call per widget, run in parallel per step (see
+ * `streamPathway`) rather than one call for the whole pathway.
  */
-const FRACTION_CODE = /^(3|4|5)\.NF\./;
 
 /** Context every widget generator gets, regardless of kind. */
-function widgetContext(anchor: Anchor, plan: PathwayPlan, step: PathwayPlan['steps'][number]) {
+function widgetContext(anchor: Anchor, plan: PathwayPlan, step: PathwayPlan['steps'][number]): string {
   const componentBlock = anchor.learningComponents
     .map((c) => `- id: ${c.identifier}\n  skill: ${c.description}`)
     .join('\n');
@@ -248,6 +278,8 @@ function widgetContext(anchor: Anchor, plan: PathwayPlan, step: PathwayPlan['ste
     'Known misconceptions:',
     plan.misconceptions.map((m) => `- ${m}`).join('\n'),
     '',
+    `Grade band: ${plan.gradeBand}`,
+    '',
     `This widget belongs to the "${step.purpose}" step: ${step.title} — ${step.description}`,
   ].join('\n');
 }
@@ -256,6 +288,8 @@ function widgetContext(anchor: Anchor, plan: PathwayPlan, step: PathwayPlan['ste
  * Every step needs a widget, so a mismatch is resolved by substitution, not
  * omission — this is the only place `widgetKind` can differ from what the plan
  * asked for, and it always resolves to a kind that fits the standard.
+ * `swiper-flashcard` is the fallback for both gated kinds: it has no subject
+ * restriction of its own, so it always fits.
  */
 function resolveWidgetKind(
   requested: WidgetKind,
@@ -267,48 +301,167 @@ function resolveWidgetKind(
       note: `A fraction area model doesn't fit ${standardCode} — it's not a fractions standard. Built a sorting activity for this step instead.`,
     };
   }
+
+  if (
+    requested === 'draft-meter' &&
+    !(WRITING_CODE.test(standardCode) || READING_EVIDENCE_CODE.test(standardCode))
+  ) {
+    return {
+      kind: 'swiper-flashcard',
+      note: `A Draft Meter doesn't fit ${standardCode} — it scores written arguments, and this isn't a writing or reading-evidence standard. Built a sorting activity for this step instead.`,
+    };
+  }
+
   return { kind: requested, note: null };
 }
 
-async function generateStepWidget(
+async function attemptStepWidget(
   anchor: Anchor,
   plan: PathwayPlan,
   step: PathwayPlan['steps'][number],
 ): Promise<{ widget: WidgetSpec; note: string | null }> {
   const { kind, note } = resolveWidgetKind(step.widgetKind, anchor.standard.statementCode);
+  const context = widgetContext(anchor, plan, step);
 
-  if (kind === 'fraction-area-model') {
-    const spec = await generateStructured({
-      schema: fractionAreaModelSpec,
-      system: [
-        'You configure an interactive fraction area model: the student picks how many equal parts',
-        'to partition a whole into, then selects parts to build a target fraction.',
-        'Choose a numerator and denominator that make the target learning component visible —',
-        'a unit fraction (numerator 1) for partitioning skills, a non-unit fraction for composing.',
-        'Keep the denominator inside the grade-level range the standard implies.',
-        'The hint names the specific misconception a wrong answer reveals.',
-      ].join(' '),
-      prompt: widgetContext(anchor, plan, step),
-    });
+  switch (kind) {
+    case 'fraction-area-model': {
+      const spec = await generateStructured({
+        schema: fractionAreaModelSpec,
+        system: [
+          'You configure an interactive fraction area model: the student picks how many equal parts',
+          'to partition a whole into, then selects parts to build a target fraction.',
+          'Choose a numerator and denominator that make the target learning component visible —',
+          'a unit fraction (numerator 1) for partitioning skills, a non-unit fraction for composing.',
+          'Keep the denominator inside the grade-level range the standard implies.',
+          'The hint names the specific misconception a wrong answer reveals.',
+        ].join(' '),
+        prompt: context,
+      });
 
-    return { widget: normalizeWidget(spec), note };
+      return { widget: normalizeWidget(spec), note };
+    }
+
+    case 'swiper-flashcard': {
+      const spec = await generateStructured({
+        schema: swiperFlashcardSpec,
+        system: [
+          'You configure a two-way sorting activity: the student reads a statement on a card and',
+          'swipes it up or down into one of two labelled buckets.',
+          'Pick a single, consistent dichotomy for the whole set (true/false, example/non-example,',
+          'equivalent/not equivalent) and use the same two labels on every card.',
+          'Write cards that discriminate: at least one should sit on a known misconception, so a',
+          'student holding it sorts wrongly. Vary which direction is correct across the set.',
+          'Each explanation names why the answer is what it is, in one student-facing sentence.',
+        ].join(' '),
+        prompt: context,
+      });
+
+      return { widget: normalizeFlashcards(spec), note };
+    }
+
+    // The standard's wording is copied into the spec verbatim rather than
+    // regenerated: the scoring call needs the graph's text, not a paraphrase.
+    // Two modes, decided by the standard rather than by the model — see
+    // `resolveWidgetKind`, which already guarantees one of the two applies.
+    case 'draft-meter': {
+      const needsPassage = READING_EVIDENCE_CODE.test(anchor.standard.statementCode);
+
+      const mode = needsPassage
+        ? [
+            'This is a READING standard, so the widget supplies a source passage the student reads',
+            'before answering. Write it yourself: 40-120 words, age-appropriate, with a real position',
+            'or tension in it worth disagreeing about, and give it a plausible short attribution.',
+            'The question must be answerable ONLY from that passage — it asks the student to take a',
+            'position about the text and back it with something the passage actually says.',
+          ]
+        : [
+            'This is a WRITING standard, so set passage to null.',
+            'The question must be answerable in three to five sentences by a middle schooler with no',
+            'source material in front of them, and must have a real second side — a question with one',
+            'obvious answer produces no argument to measure.',
+            "Prefer something in a student's own life over an abstract civic topic.",
+          ];
+
+      const spec = await generateStructured({
+        schema: draftMeterSpec,
+        system: [
+          'You configure a Draft Meter: a question, a textbox, and one line that scores the strength',
+          'of what the student writes.',
+          ...mode,
+          'The criteria name what a strong answer contains; they ground the scorer and are never shown.',
+          'standardForStudents IS shown to the student behind a "?", so it must name what counts as',
+          'done in plain words — the point is that they can see the goalposts, not just be measured',
+          'against them.',
+        ].join(' '),
+        prompt: [
+          context,
+          '',
+          'Copy standardCode and standardDescription from the standard above exactly as given.',
+        ].join('\n'),
+      });
+
+      // The mode is the pipeline's call, not the model's — a passage on a
+      // writing standard would change the task the standard actually asks for.
+      return {
+        widget: { ...spec, criteria: spec.criteria.slice(0, 4), passage: needsPassage ? spec.passage : null },
+        note,
+      };
+    }
+
+    case 'drag-sort': {
+      const spec = await generateStructured({
+        schema: dragSortSpec,
+        system: [
+          'You configure a drag-to-reorder activity: the student arranges items into the order they',
+          'believe is correct.',
+          'Pick items with a real, teachable order along ONE dimension — chronological sequence,',
+          'magnitude, or steps in a process. Never an order guessable from surface cues alone',
+          '(alphabetical, item length) — getting it right must require understanding the content.',
+          'correctOrder must list every item id exactly once, true order first to last.',
+        ].join(' '),
+        prompt: context,
+      });
+
+      return { widget: normalizeDragSort(spec), note };
+    }
+
+    case 'drag-categorize': {
+      const spec = await generateStructured({
+        schema: dragCategorizeSpec,
+        system: [
+          'You configure a drag-to-sort activity: the student places each item into the category it',
+          'belongs in.',
+          'Choose categories that partition the items cleanly, with no item that could reasonably',
+          'belong to more than one. Spread items roughly evenly — never load one category with most',
+          'of them and leave another with one or two.',
+          "Every item's categoryId must be one of the category ids you defined.",
+        ].join(' '),
+        prompt: context,
+      });
+
+      return { widget: normalizeDragCategorize(spec), note };
+    }
   }
+}
 
-  const spec = await generateStructured({
-    schema: swiperFlashcardSpec,
-    system: [
-      'You configure a two-way sorting activity: the student reads a statement on a card and',
-      'swipes it left or right into one of two labelled buckets.',
-      'Pick a single, consistent dichotomy for the whole set (true/false, example/non-example,',
-      'equivalent/not equivalent) and use the same two labels on every card.',
-      'Write cards that discriminate: at least one should sit on a known misconception, so a',
-      'student holding it sorts wrongly. Vary which direction is correct across the set.',
-      'Each explanation names why the answer is what it is, in one student-facing sentence.',
-    ].join(' '),
-    prompt: widgetContext(anchor, plan, step),
-  });
-
-  return { widget: normalizeFlashcards(spec), note };
+/**
+ * `streamPathway` runs every step's widget concurrently via `Promise.race`,
+ * which means one rejection ends the whole run even when the other widgets
+ * already succeeded — a single model response that fails schema validation
+ * would otherwise take four good widgets down with it. One retry absorbs
+ * that: model non-compliance on structured output is usually transient, not
+ * systematic, so trying again is more useful here than surfacing the failure.
+ */
+async function generateStepWidget(
+  anchor: Anchor,
+  plan: PathwayPlan,
+  step: PathwayPlan['steps'][number],
+): Promise<{ widget: WidgetSpec; note: string | null }> {
+  try {
+    return await attemptStepWidget(anchor, plan, step);
+  } catch {
+    return attemptStepWidget(anchor, plan, step);
+  }
 }
 
 /**
@@ -322,6 +475,7 @@ async function generateStepWidget(
 export async function* streamPathway(
   topic: string,
   gradeHint?: string,
+  profile: StudentProfile | null = null,
 ): AsyncGenerator<PathwayEvent> {
   yield { type: 'stage', stage: 'propose', status: 'active' };
   const proposal = await proposeStandardCodes(topic, gradeHint);
@@ -372,7 +526,7 @@ export async function* streamPathway(
   };
 
   yield { type: 'stage', stage: 'plan', status: 'active' };
-  const planStream = planPathway(topic, anchor, proposal.gradeBand);
+  const planStream = planPathway(topic, anchor, proposal.gradeBand, profile);
   let planResult = await planStream.next();
 
   while (!planResult.done) {
@@ -384,9 +538,10 @@ export async function* streamPathway(
   yield { type: 'plan', plan };
   yield { type: 'stage', stage: 'plan', status: 'done', detail: `${plan.steps.length} steps` };
 
-  // Every step carries a widget, so this is never skipped — only how many run
-  // concurrently varies. Parallel rather than sequential: with one call per
-  // step, serializing would multiply the slowest single stage by up to 6.
+  // Every step carries a widget, so this stage is never skipped — only how
+  // many run concurrently varies. Parallel rather than sequential: with one
+  // call per step, serializing would multiply the slowest single call by up
+  // to 6.
   yield { type: 'stage', stage: 'widget', status: 'active' };
 
   const running = new Map(

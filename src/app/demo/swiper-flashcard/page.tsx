@@ -12,54 +12,53 @@ const DEMO_SPEC: SwiperFlashcardSpec = {
   learningComponentId: null,
   cards: [
     {
-      question: 'Is 7 a prime number?',
-      leftLabel: 'False',
-      rightLabel: 'True',
-      correctDirection: 'right',
-      explanation: 'Correct! 7 is prime — its only factors are 1 and 7.',
+      question: 'What landform is created when two continental plates collide head-on?',
+      upLabel: 'Mountain range',
+      downLabel: 'Ocean trench',
+      correctDirection: 'up',
+      explanation: 'When two continental plates converge, neither can subduct easily — the crust buckles and folds upward into mountain ranges. The Himalayas formed this way when India collided with Asia.',
     },
     {
-      question: 'Is 9 a prime number?',
-      leftLabel: 'False',
-      rightLabel: 'True',
-      correctDirection: 'left',
-      explanation: '9 is not prime. It equals 3 × 3, so it has a factor besides 1 and itself.',
+      question: 'What process creates new oceanic crust at a divergent boundary?',
+      upLabel: 'Subduction',
+      downLabel: 'Seafloor spreading',
+      correctDirection: 'down',
+      explanation: 'At divergent boundaries, magma wells up through the gap as plates pull apart and hardens into new oceanic crust — a process called seafloor spreading. The Mid-Atlantic Ridge is the most studied example.',
     },
     {
-      question: 'Is 2 a prime number?',
-      leftLabel: 'False',
-      rightLabel: 'True',
-      correctDirection: 'right',
-      explanation: 'Yes! 2 is the only even prime number. Its only factors are 1 and 2.',
+      question: 'What happens to the denser plate at a subduction zone?',
+      upLabel: 'It melts into the mantle',
+      downLabel: 'It rises to form mountains',
+      correctDirection: 'up',
+      explanation: 'The denser oceanic plate is forced beneath the lighter plate and sinks into the hot mantle, where it melts. This recycling of crust is why oceanic plates are much younger than continental ones.',
     },
     {
-      question: 'Is 1 a prime number?',
-      leftLabel: 'False',
-      rightLabel: 'True',
-      correctDirection: 'left',
-      explanation:
-        '1 is not prime. By definition, a prime must have exactly two distinct factors. 1 only has one factor: itself.',
+      question: 'Which type of boundary is most associated with rift valleys and mid-ocean ridges?',
+      upLabel: 'Convergent boundary',
+      downLabel: 'Divergent boundary',
+      correctDirection: 'down',
+      explanation: 'Divergent boundaries are where plates pull apart. On land this creates rift valleys like the East African Rift; under the ocean it creates mid-ocean ridges like the Mid-Atlantic Ridge.',
     },
     {
-      question: 'Is 15 a prime number?',
-      leftLabel: 'False',
-      rightLabel: 'True',
-      correctDirection: 'left',
-      explanation: '15 = 3 × 5, so it has factors besides 1 and itself. Not prime.',
+      question: 'What forms in the ocean above a subducting plate as it melts back into the mantle?',
+      upLabel: 'Volcanic island arc',
+      downLabel: 'Rift valley',
+      correctDirection: 'up',
+      explanation: 'As the subducting plate melts, magma rises through the overlying plate and erupts on the seafloor, building chains of volcanic islands — called island arcs. The Aleutian Islands and Japan are examples.',
     },
     {
-      question: 'Is 11 a prime number?',
-      leftLabel: 'False',
-      rightLabel: 'True',
-      correctDirection: 'right',
-      explanation: 'Yes — 11 is prime. No whole number between 2 and 10 divides it evenly.',
+      question: 'The San Andreas Fault is neither convergent nor divergent. What type of boundary is it?',
+      upLabel: 'Transform boundary',
+      downLabel: 'Subduction zone',
+      correctDirection: 'up',
+      explanation: 'Transform boundaries occur where plates slide horizontally past each other. No crust is created or destroyed — instead, enormous friction builds up and releases as earthquakes. The San Andreas is one of the most studied transform faults on Earth.',
     },
   ],
 };
 
 type CardResult = {
   cardIndex: number;
-  direction: 'left' | 'right';
+  direction: 'up' | 'down';
   correct: boolean;
 };
 
@@ -86,7 +85,7 @@ export default function SwiperFlashcardDemo() {
         </Link>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Swiper Flashcard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Drag a card left or right — or use the buttons — to answer. An{' '}
+          Sort each clue into the correct plate boundary type. Drag the card up or down — or use the buttons. An{' '}
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">onComplete</code>{' '}
           event fires when all cards are answered.
         </p>
