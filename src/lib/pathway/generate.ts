@@ -9,6 +9,7 @@ import {
   type StandardStatement,
 } from '@/lib/learning-commons/client';
 import type { Anchor, DeepPartial, PathwayEvent } from '@/lib/pathway/events';
+import type { StudentProfile } from '@/lib/student/schema';
 import {
   COVERAGE_SENTENCE,
   FRACTION_CODE,
@@ -151,6 +152,41 @@ async function loadGraphContext(standard: StandardStatement): Promise<Anchor> {
 }
 
 /**
+ * What prior evidence says about this student, rendered for the planner.
+ *
+ * Only the weakest components are included. The profile grows without bound,
+ * and the tail of it is mastered material the planner should not spend a
+ * pathway on.
+ */
+function profileBlock(profile: StudentProfile | null): string {
+  if (!profile || profile.mastery.length === 0) {
+    return '(no prior evidence for this student — plan at grade level)';
+  }
+
+  const weakest = profile.mastery
+    .slice(0, 5)
+    .map(
+      (entry) =>
+        `- ${entry.learningComponentId}: mastery ${entry.score.toFixed(2)} over ${entry.attempts} attempts`,
+    )
+    .join('\n');
+
+  const misconceptions = profile.confirmedMisconceptions.length
+    ? profile.confirmedMisconceptions.map((m) => `- ${m}`).join('\n')
+    : '(none observed yet)';
+
+  return [
+    'Weakest learning components so far (lowest mastery first):',
+    weakest,
+    '',
+    'Misconceptions this student has actually demonstrated:',
+    misconceptions,
+    '',
+    `Overall accuracy ${(profile.pacing.accuracy * 100).toFixed(0)}%, hint rate ${profile.pacing.hintRate.toFixed(2)}.`,
+  ].join('\n');
+}
+
+/**
  * Stage 4 — author the pathway from verified facts.
  *
  * Yields partial plans as the model writes; returns the normalized final one.
@@ -160,6 +196,7 @@ async function* planPathway(
   topic: string,
   anchor: Anchor,
   gradeBand: string,
+  profile: StudentProfile | null,
 ): AsyncGenerator<DeepPartial<PathwayPlan>, PathwayPlan> {
   const componentBlock = anchor.learningComponents.length
     ? anchor.learningComponents
@@ -182,6 +219,8 @@ async function* planPathway(
       'Outcomes are observable and student-facing. Steps run activate -> model -> practice -> check',
       'and each names the outcome it advances. Misconceptions are specific and diagnosable',
       '("thinks the parts need not be equal"), never generic ("finds fractions hard").',
+      'When prior evidence is supplied, weight the pathway toward the components the student is',
+      'weakest on and directly confront misconceptions they have already demonstrated.',
     ].join(' '),
     prompt: [
       `Teacher's topic: ${topic}`,
@@ -194,6 +233,9 @@ async function* planPathway(
       '',
       'Prerequisite standards (unfinished learning to activate, not to reteach):',
       prerequisiteBlock,
+      '',
+      'Prior evidence for this student:',
+      profileBlock(profile),
       '',
       `Grade band: ${gradeBand}`,
     ].join('\n'),
@@ -348,6 +390,7 @@ async function generateWidget(
 export async function* streamPathway(
   topic: string,
   gradeHint?: string,
+  profile: StudentProfile | null = null,
 ): AsyncGenerator<PathwayEvent> {
   yield { type: 'stage', stage: 'propose', status: 'active' };
   const proposal = await proposeStandardCodes(topic, gradeHint);
@@ -398,7 +441,7 @@ export async function* streamPathway(
   };
 
   yield { type: 'stage', stage: 'plan', status: 'active' };
-  const planStream = planPathway(topic, anchor, proposal.gradeBand);
+  const planStream = planPathway(topic, anchor, proposal.gradeBand, profile);
   let planResult = await planStream.next();
 
   while (!planResult.done) {

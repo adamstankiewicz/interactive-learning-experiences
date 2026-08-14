@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { SwiperFlashcardSpec } from '@/lib/pathway/schema';
 
 type CardData = SwiperFlashcardSpec['cards'][number];
@@ -39,6 +40,7 @@ const SWIPE_THRESHOLD = 80;
 const MAX_ROTATE = 10;
 
 export function SwiperFlashcard({ spec, onComplete }: Props) {
+  const telemetry = useWidgetTelemetry();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<CardResult[]>([]);
   const [swipeState, setSwipeState] = useState<{
@@ -154,6 +156,15 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
       if (!spec.cards[currentIndex] || swipeState) return;
       const correct = direction === spec.cards[currentIndex]!.correctDirection;
 
+      telemetry.track({
+        eventType: 'card_swiped',
+        widgetKind: spec.kind,
+        learningComponentId: spec.learningComponentId,
+        standardCode: telemetry.standardCode,
+        correct,
+        payload: { cardIndex: currentIndex, direction },
+      });
+
       flyOutStyle(direction);
       setSwipeState({ direction, phase: 'animating' });
 
@@ -170,20 +181,48 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
         setResults((prev) => [...prev, { cardIndex: currentIndex, direction, correct }]);
       }, 320);
     },
-    [currentIndex, swipeState, spec.cards, flyOutStyle, resetLabelHighlight],
+    [
+      currentIndex,
+      swipeState,
+      spec.cards,
+      spec.kind,
+      spec.learningComponentId,
+      flyOutStyle,
+      resetLabelHighlight,
+      telemetry,
+    ],
   );
 
   const handleNext = useCallback(() => {
     if (swipeState?.phase !== 'revealing') return;
     setResults((prev) => {
-      if (currentIndex + 1 === spec.cards.length) onComplete?.(prev);
+      if (currentIndex + 1 === spec.cards.length) {
+        telemetry.track({
+          eventType: 'widget_completed',
+          widgetKind: spec.kind,
+          learningComponentId: spec.learningComponentId,
+          standardCode: telemetry.standardCode,
+          correct: prev.every((entry) => entry.correct),
+          payload: { correct: prev.filter((entry) => entry.correct).length, total: prev.length },
+        });
+        telemetry.flush();
+        onComplete?.(prev);
+      }
       return prev;
     });
     setCurrentIndex((i) => i + 1);
     setSwipeState(null);
     // Defer until the next card's buttons are rendered
     requestAnimationFrame(() => firstSwipeButtonRef.current?.focus());
-  }, [swipeState, currentIndex, spec.cards.length, onComplete]);
+  }, [
+    swipeState,
+    currentIndex,
+    spec.cards.length,
+    spec.kind,
+    spec.learningComponentId,
+    onComplete,
+    telemetry,
+  ]);
 
   // Pointer events — use capture so we keep the pointer even if the user
   // moves outside the card element.

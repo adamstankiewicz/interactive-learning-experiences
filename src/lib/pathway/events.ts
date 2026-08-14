@@ -54,6 +54,8 @@ export type PathwayEvent =
   | { type: 'plan-partial'; plan: DeepPartial<PathwayPlan> }
   | { type: 'plan'; plan: PathwayPlan }
   | { type: 'widget'; widget: WidgetSpec | null; note: string | null }
+  /** Persisted session id, once there is one. Telemetry attaches to it. */
+  | { type: 'session'; sessionId: string | null }
   | { type: 'error'; message: string }
   | { type: 'done' };
 
