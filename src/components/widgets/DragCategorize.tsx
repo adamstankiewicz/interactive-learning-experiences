@@ -16,10 +16,11 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { DragCategorizeSpec } from '@/lib/pathway/schema';
 
 type Item = DragCategorizeSpec['items'][number];
@@ -173,6 +174,25 @@ export function DragCategorize({ spec, onComplete }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
+  const telemetry = useWidgetTelemetry();
+  const shownRef = useRef(false);
+  const completedRef = useRef(false);
+
+  // Guarded by a ref so a remount in development does not double-count.
+  useEffect(() => {
+    if (shownRef.current) return;
+    shownRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_shown',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: { items: spec.items.length, categories: spec.categories.length },
+    });
+  }, [telemetry, spec]);
+
   // Refs to every rendered chip DOM node, keyed by item id.
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -230,11 +250,44 @@ export function DragCategorize({ spec, onComplete }: Props) {
   }, []);
 
   const handleSubmit = useCallback(() => {
-    const correct = spec.items.every((it) => placement[it.id] === it.categoryId);
+    const misplaced = spec.items.filter((it) => placement[it.id] !== it.categoryId);
+    const correct = misplaced.length === 0;
     setAttempts((a) => a + 1);
     setPhase(correct ? 'correct' : 'wrong');
-    if (correct) onComplete?.(true);
-  }, [placement, spec.items, onComplete]);
+
+    telemetry.track({
+      eventType: 'answer_checked',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct,
+      payload: {
+        attempt: attempts + 1,
+        misplaced: misplaced.length,
+        // Which column a wrong item was dropped into is the diagnosis, so the
+        // confusion is recorded as a pair rather than as a count.
+        confusions: misplaced.map((it) => `${it.categoryId}->${placement[it.id] ?? 'unplaced'}`),
+        // The profile confirms a misconception only from a wrong answer carrying it.
+        ...(correct ? {} : { misconception: spec.hint }),
+      },
+    });
+
+    if (!correct) return;
+    onComplete?.(true);
+
+    if (completedRef.current) return;
+    completedRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_completed',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: true,
+      payload: { attempts: attempts + 1 },
+    });
+    telemetry.flush();
+  }, [placement, spec, onComplete, attempts, telemetry]);
 
   const handleTryAgain = useCallback(() => {
     setPlacement(buildInitialPlacement(spec.items));
