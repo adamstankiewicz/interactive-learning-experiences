@@ -195,9 +195,14 @@ function StepCard({
 
   return (
     <li className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-      <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:gap-4">
-        <span className="shrink-0 pt-0.5 text-xs font-medium tracking-wide text-muted-foreground uppercase sm:w-20">
-          {(purpose && PURPOSE_LABEL[purpose]) ?? purpose}
+      <div className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:gap-4">
+        <span className="shrink-0 sm:w-20">
+          {/* A filing tab, not a chip — border-left rather than a filled pill,
+              square rather than rounded-full. This is a category marker in a
+              lesson sequence, closer to a binder divider than a marketing tag. */}
+          <span className="inline-flex items-center border-l-2 border-primary bg-primary/5 py-0.5 pl-1.5 font-mono text-[10px] font-semibold tracking-widest text-primary-tint-foreground uppercase">
+            {(purpose && PURPOSE_LABEL[purpose]) ?? purpose}
+          </span>
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{step?.title}</p>
@@ -238,8 +243,15 @@ function Section({
 }) {
   return (
     <section>
+      {/* Mono is the register for anything that labels or classifies rather
+          than reads as prose — same rule the standard-code badge already
+          follows. A curriculum tool's native material is codes and
+          categories; the type system says so instead of a generic sans
+          eyebrow every SaaS product reaches for. */}
       <div className="mb-3">
-        <h3 className="font-heading text-sm font-semibold tracking-wide uppercase">{title}</h3>
+        <h3 className="font-mono text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+          {title}
+        </h3>
         {note && <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>}
       </div>
       {children}

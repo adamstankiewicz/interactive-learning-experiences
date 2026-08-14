@@ -54,7 +54,7 @@ export function PathwayBuilder() {
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-3">
-          <span className="font-heading text-sm font-semibold tracking-tight">
+          <span className="font-heading text-sm font-semibold tracking-tight text-primary">
             Pathways
           </span>
           <span className="text-xs text-muted-foreground">Standards-grounded lessons</span>
@@ -68,7 +68,7 @@ export function PathwayBuilder() {
         {!started && (
           <div className="pt-14">
             <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance">
-              Turn a topic into a lesson students can do.
+              Turn a topic into a lesson <span className="text-primary">students can do</span>.
             </h1>
             <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
               Name what you&rsquo;re teaching. We find the standard it maps to in the Learning

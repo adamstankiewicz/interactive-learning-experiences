@@ -158,8 +158,8 @@ function StatusDot({ status }: { status: StageStatus }) {
   if (status === 'active') {
     return (
       <span className={cn(base, 'relative')} aria-label="in progress">
-        <span className="absolute inline-flex size-3.5 animate-ping rounded-full bg-foreground/20" />
-        <span className="relative size-2 rounded-full bg-foreground" />
+        <span className="absolute inline-flex size-3.5 animate-ping rounded-full bg-primary/25" />
+        <span className="relative size-2 rounded-full bg-primary" />
       </span>
     );
   }
