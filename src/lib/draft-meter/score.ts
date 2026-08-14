@@ -6,9 +6,14 @@ import {
   type ScoreRequest,
   type ScoreResult,
 } from '@/lib/draft-meter/schema';
+import { scoringModel } from '@/lib/model';
 import { generateStructured } from '@/lib/structured';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+// Resolved once, lazily: this runs on every debounce, not once per lesson.
+let cachedModel: ReturnType<typeof scoringModel> | null = null;
+const model = () => (cachedModel ??= scoringModel());
 
 /**
  * Score one draft. A single model call — never a local heuristic, and never a
@@ -26,6 +31,7 @@ export async function scoreDraft(input: ScoreRequest): Promise<ScoreResult> {
     prompt: buildScoringPrompt(input),
     // Determinism matters more than variety here — see the note in structured.ts.
     temperature: 0,
+    model: model(),
   });
 
   // The schema can't express these bounds (see the note there), so clamp here
