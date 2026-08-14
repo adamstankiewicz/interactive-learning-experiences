@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -48,6 +49,7 @@ const ARROWS: Record<string, { direction: Direction; delta: number }> = {
 };
 
 export function Crossword({ spec }: { spec: CrosswordSpec }) {
+  const telemetry = useWidgetTelemetry();
   const layout = useMemo(() => layoutCrossword(spec.entries), [spec.entries]);
 
   /** Which entries pass through each cell — a cell has an across, a down, or both. */
@@ -88,6 +90,25 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
   });
 
   const inputs = useRef(new Map<string, HTMLInputElement | null>());
+  /** How many answers the student gave up on, reported when the puzzle is solved. */
+  const revealedRef = useRef(0);
+  const shownRef = useRef(false);
+
+  // The denominator for every other event: how many students saw the puzzle at
+  // all. Guarded by a ref so a remount in development does not double-count.
+  useEffect(() => {
+    if (shownRef.current) return;
+    shownRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_shown',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: { answers: layout.entries.length, rows: layout.rows, cols: layout.cols },
+    });
+  }, [telemetry, spec, layout]);
 
   const at = cursor ? cellEntries.get(cellKey(cursor.row, cursor.col)) : undefined;
   const activeEntry = (cursor && at ? (at[cursor.direction] ?? at.across ?? at.down) : null) ?? null;
@@ -247,10 +268,45 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
       }
       return next;
     });
+
+    const solvedNow = layout.entries.filter((entry) => answerOf(entry) === entry.answer).length;
+    const finished = solvedNow === layout.entries.length;
+
+    telemetry.track({
+      eventType: 'answer_checked',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: finished,
+      payload: { solved: solvedNow, total: layout.entries.length, wrongSquares },
+    });
+
+    if (finished) {
+      telemetry.track({
+        eventType: 'widget_completed',
+        widgetKind: spec.kind,
+        learningComponentId: spec.learningComponentId,
+        standardCode: telemetry.standardCode,
+        correct: true,
+        payload: { answers: layout.entries.length, revealed: revealedRef.current },
+      });
+      telemetry.flush();
+    }
   }
 
   function revealActiveEntry() {
     if (!activeEntry) return;
+
+    // Giving up on a clue is the clearest "stuck" signal this widget has.
+    revealedRef.current += 1;
+    telemetry.track({
+      eventType: 'hint_requested',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: { answer: entryKey(activeEntry), length: activeEntry.answer.length },
+    });
 
     setChecked(false);
     setLetters((previous) => {
