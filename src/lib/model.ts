@@ -17,30 +17,33 @@ import type { LanguageModel } from 'ai';
  */
 
 /**
- * Two roles, because they have opposite requirements.
+ * Two roles, so the scoring model can be changed without touching the pathway.
  *
- * `pathway` runs once per lesson and is worth a big model. `scoring` runs every
- * time a student pauses typing, against a budget measured in the seconds they
- * are willing to watch a bar pulse — it is a small structured judgement, which
- * is exactly what the fast tier is for.
+ * Both default to the same model. Scoring was moved to Haiku and moved back:
+ * it was roughly 1.3s faster, but graded a shade harsher on borderline drafts
+ * (58 where Sonnet gave 68 on the same response), and the wait turned out not
+ * to be the cost it looked like — a couple of seconds is thinking time for
+ * someone mid-sentence, not dead air. Speed was the wrong thing to optimise.
+ *
+ * The seam stays because the knob is worth having; only the default changed.
  */
 type Role = 'pathway' | 'scoring';
 
 const DEFAULTS: Record<string, Record<Role, string>> = {
   anthropic: {
     pathway: 'claude-opus-5',
-    scoring: 'claude-haiku-4-5-20251001',
+    scoring: 'claude-opus-5',
   },
   openrouter: {
     pathway: 'anthropic/claude-opus-5',
-    scoring: 'anthropic/claude-haiku-4.5',
+    scoring: 'anthropic/claude-opus-5',
   },
   bedrock: {
     // Bedrock access is granted per model per account, and Opus-tier is
     // commonly not enabled — Sonnet is the safer default. Override with
     // BEDROCK_MODEL_ID / BEDROCK_SCORING_MODEL_ID.
     pathway: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
-    scoring: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+    scoring: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
   },
 };
 
@@ -54,11 +57,9 @@ function modelId(provider: string, role: Role): string {
   const fromEnv = process.env[OVERRIDE[provider][role]];
   if (fromEnv) return fromEnv;
 
-  // Note for Bedrock: model access is granted per account and per region, so
-  // the Haiku default 403s on every keystroke if it isn't enabled. There is no
-  // automatic fallback — it would silently triple scoring latency, which is the
-  // problem the split exists to solve. Point *_SCORING_MODEL_ID at the pathway
-  // model instead, deliberately.
+  // Set *_SCORING_MODEL_ID to try a faster tier for scoring. On Bedrock,
+  // model access is per account and per region, so an id that isn't enabled
+  // 403s on every keystroke rather than degrading.
   return DEFAULTS[provider][role];
 }
 
