@@ -1,4 +1,5 @@
-import { generateObject } from 'ai';
+import { generateText, Output } from 'ai';
+import type { FlexibleSchema } from 'ai';
 
 import { pathwayModel } from '@/lib/model';
 import {
@@ -18,6 +19,27 @@ import {
 } from '@/lib/pathway/schema';
 
 const MODEL = pathwayModel();
+
+/**
+ * Every stage here is the same shape: a schema, a system prompt, and a user
+ * prompt, in and a validated object out. `generateObject` is deprecated in AI
+ * SDK v7 in favour of `generateText` with an `output` spec, so that lives in
+ * one place rather than being repeated at each call site.
+ */
+async function generateStructured<T>(options: {
+  schema: FlexibleSchema<T>;
+  system: string;
+  prompt: string;
+}): Promise<T> {
+  const result = await generateText({
+    model: MODEL,
+    output: Output.object({ schema: options.schema }),
+    system: options.system,
+    prompt: options.prompt,
+  });
+
+  return result.output;
+}
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -86,8 +108,7 @@ export type PathwayResult = {
  * Nothing here is trusted; stage 2 checks every code against the graph.
  */
 async function proposeStandardCodes(topic: string, gradeHint?: string) {
-  const { object } = await generateObject({
-    model: MODEL,
+  return generateStructured({
     schema: standardProposal,
     system: [
       'You map a teaching topic to Common Core standard codes.',
@@ -100,8 +121,6 @@ async function proposeStandardCodes(topic: string, gradeHint?: string) {
       ? `Topic: ${topic}\nGrade level: ${gradeHint}`
       : `Topic: ${topic}\nGrade level: infer the most typical one.`,
   });
-
-  return object;
 }
 
 /**
@@ -145,8 +164,7 @@ async function planPathway(topic: string, anchor: Anchor, gradeBand: string): Pr
         .join('\n')
     : '(no prerequisite standards published)';
 
-  const { object } = await generateObject({
-    model: MODEL,
+  const plan = await generateStructured({
     schema: pathwayPlan,
     system: [
       'You design a short student learning pathway from authoritative standards data.',
@@ -172,7 +190,7 @@ async function planPathway(topic: string, anchor: Anchor, gradeBand: string): Pr
     ].join('\n'),
   });
 
-  return normalizePlan(object);
+  return normalizePlan(plan);
 }
 
 /**
@@ -199,8 +217,7 @@ async function generateWidget(
     .map((c) => `- id: ${c.identifier}\n  skill: ${c.description}`)
     .join('\n');
 
-  const { object } = await generateObject({
-    model: MODEL,
+  const spec = await generateStructured({
     schema: fractionAreaModelSpec,
     system: [
       'You configure an interactive fraction area model: the student picks how many equal parts',
@@ -226,7 +243,7 @@ async function generateWidget(
     ].join('\n'),
   });
 
-  return { widget: normalizeWidget(object), note: null };
+  return { widget: normalizeWidget(spec), note: null };
 }
 
 /** The whole pipeline: topic in, graph-grounded pathway plus one widget out. */
