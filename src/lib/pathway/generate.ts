@@ -79,48 +79,88 @@ function normalizeWidget(spec: FractionAreaModelSpec): FractionAreaModelSpec {
 }
 
 /**
- * Trim the card set to the count the prompt asks for.
+ * Trim the card set and drop degenerate cards. Deliberately does not touch
+ * `correctDirection` on a surviving card — a set that is all one direction is
+ * gameable, and the system prompt asks the model to vary it, but the
+ * direction is a fact about the card's text, so "fixing" it here would make
+ * the widget mark true statements false.
  *
- * Deliberately does not touch `correctDirection`. A set that is all one
- * direction is gameable, and the system prompt asks the model to vary it — but
- * the direction is a fact about the card's text, so "fixing" it here would
- * make the widget mark true statements false.
+ * `swiper-flashcard` is the universal fallback every other kind lands on when
+ * it can't produce something valid (see `attemptStepWidget`), so unlike the
+ * other normalizers below, this one can never itself return nothing — it
+ * takes whatever survives filtering, even a thin deck, because there is no
+ * further fallback to hand the step to.
  */
 function normalizeFlashcards(spec: SwiperFlashcardSpec): SwiperFlashcardSpec {
-  return { ...spec, cards: spec.cards.slice(0, 8) };
+  // A card whose two affordances read the same gives the student nothing to
+  // decide between, so it is dropped rather than shown as an unanswerable swipe.
+  const cards = spec.cards
+    .filter((card) => card.question.trim() && card.upLabel.trim() !== card.downLabel.trim())
+    .slice(0, 8);
+
+  return { ...spec, cards: cards.length > 0 ? cards : spec.cards.slice(0, 8) };
 }
 
 /**
- * Keep the puzzle solvable. `correctOrder` is prose to the model, not a
- * validated reference — an id it drops or invents would make the widget
- * unwinnable rather than just wrong, so missing ids are appended in list
- * order rather than left out.
+ * `DragSort` decides correctness by comparing the student's order against
+ * `correctOrder` position for position, so the two lists have to describe the
+ * same set. The authored sequence is the source of truth for order; items are
+ * then re-derived from it so the two lists agree by construction, rather than
+ * inventing a position for an item the model left out of `correctOrder`.
+ *
+ * Returns null when too little survives to be a real ordering task — the
+ * caller falls back to a flashcard deck instead of shipping a two-item sort.
  */
-function normalizeDragSort(spec: DragSortSpec): DragSortSpec {
-  const items = spec.items.slice(0, 8);
-  const validIds = new Set(items.map((item) => item.id));
-  const ordered = spec.correctOrder.filter((id) => validIds.has(id));
-  const missing = items.map((item) => item.id).filter((id) => !ordered.includes(id));
+const MIN_DRAG_SORT_ITEMS = 4;
 
-  return { ...spec, items, correctOrder: [...ordered, ...missing] };
+function normalizeDragSort(spec: DragSortSpec): DragSortSpec | null {
+  const byId = new Map<string, DragSortSpec['items'][number]>();
+  for (const item of spec.items) {
+    if (item.id.trim() && !byId.has(item.id)) byId.set(item.id, item);
+  }
+
+  const order: string[] = [];
+  const seen = new Set<string>();
+  for (const id of spec.correctOrder) {
+    if (byId.has(id) && !seen.has(id)) {
+      seen.add(id);
+      order.push(id);
+    }
+  }
+
+  const kept = order.slice(0, 8);
+  if (kept.length < MIN_DRAG_SORT_ITEMS) return null;
+
+  return { ...spec, items: kept.map((id) => byId.get(id)!), correctOrder: kept };
 }
 
 /**
- * Same reasoning as `normalizeDragSort`: an item whose `categoryId` names a
- * category the model didn't actually define would be permanently
- * unplaceable. Falling back to the first category keeps every item solvable.
+ * `DragCategorize` marks an item correct when its resting column matches
+ * `categoryId`, so an item pointing at a column that was never authored can
+ * never be placed correctly — those items are dropped, then any column left
+ * holding nothing goes with them (a column with nothing in it is a distractor
+ * the student can never satisfy). With fewer than two filled columns there is
+ * no sorting decision left, so this returns null and the caller falls back.
  */
-function normalizeDragCategorize(spec: DragCategorizeSpec): DragCategorizeSpec {
-  const categories = spec.categories.slice(0, 4);
-  const validCategoryIds = new Set(categories.map((category) => category.id));
+const MIN_DRAG_CATEGORIZE_ITEMS = 4;
 
-  const items = spec.items.slice(0, 10).map((item) =>
-    validCategoryIds.has(item.categoryId) || !categories[0]
-      ? item
-      : { ...item, categoryId: categories[0].id },
-  );
+function normalizeDragCategorize(spec: DragCategorizeSpec): DragCategorizeSpec | null {
+  const categories = spec.categories
+    .filter((category, index, all) => category.id.trim() && all.findIndex((c) => c.id === category.id) === index)
+    .slice(0, 4);
 
-  return { ...spec, categories, items };
+  const categoryIds = new Set(categories.map((category) => category.id));
+  const items = spec.items
+    .filter((item, index, all) => item.id.trim() && all.findIndex((i) => i.id === item.id) === index)
+    .filter((item) => categoryIds.has(item.categoryId))
+    .slice(0, 10);
+
+  const used = new Set(items.map((item) => item.categoryId));
+  const keptCategories = categories.filter((category) => used.has(category.id));
+
+  if (keptCategories.length < 2 || items.length < MIN_DRAG_CATEGORIZE_ITEMS) return null;
+
+  return { ...spec, categories: keptCategories, items };
 }
 
 /**
@@ -128,8 +168,8 @@ function normalizeDragCategorize(spec: DragCategorizeSpec): DragCategorizeSpec {
  * terms, `layoutCrossword` decides which of them earn a square, and anything
  * that cannot cross what is already on the grid is dropped here rather than
  * shipped as a clue pointing at nothing. Ported from Bethany's pathway-level
- * crossword generator — the interlocking algorithm and its rules are unchanged,
- * only the call site (per-step now, not once per pathway) differs.
+ * crossword generator — the interlocking algorithm and its rules are
+ * unchanged, only the call site (per-step now, not once per pathway) differs.
  */
 const MIN_CROSSWORD_ENTRIES = 5;
 const MAX_CROSSWORD_ENTRIES = 18;
@@ -366,29 +406,27 @@ function resolveWidgetKind(
 }
 
 /**
- * A crossword can legitimately come back too sparse to interlock (see
- * `normalizeCrossword`) — the one widget kind whose *normalization*, not just
- * its subject-match, can fail. When that happens the step still needs
- * something, so it falls back the same way a subject mismatch does.
- */
-/**
- * Broken out because it has two call sites: the normal `swiper-flashcard`
- * case below, and the crossword case's own fallback when too few terms
- * interlock to make a puzzle (see `normalizeCrossword`). Swiper-flashcard has
- * no subject restriction of its own, which is what makes it a safe landing
- * spot for either kind of failure.
+ * Broken out because it has multiple call sites: the normal `swiper-flashcard`
+ * case below, and the fallback every other kind reaches for when its own
+ * normalization comes back empty (too few crossword terms interlocked, too
+ * few drag-sort items survived, fewer than two drag-categorize columns ended
+ * up filled). Swiper-flashcard has no subject restriction of its own, which
+ * is what makes it a safe landing spot for any of those failures.
  */
 async function generateSwiperFlashcard(context: string): Promise<SwiperFlashcardSpec> {
   const spec = await generateStructured({
     schema: swiperFlashcardSpec,
     system: [
-      'You configure a two-way sorting activity: the student reads a statement on a card and',
-      'swipes it up or down into one of two labelled buckets.',
-      'Pick a single, consistent dichotomy for the whole set (true/false, example/non-example,',
-      'equivalent/not equivalent) and use the same two labels on every card.',
-      'Write cards that discriminate: at least one should sit on a known misconception, so a',
-      'student holding it sorts wrongly. Vary which direction is correct across the set.',
-      'Each explanation names why the answer is what it is, in one student-facing sentence.',
+      'You write a deck of swipeable judgement cards. Each card states one claim about the',
+      'standard, and the student swipes to accept or reject it.',
+      'Write 6 cards. Roughly half should be true, in no fixed pattern, so the deck cannot be',
+      'passed by alternating.',
+      'Every false card must be a claim a student who holds one of the listed misconceptions',
+      'would actually accept — not an obvious absurdity, and never a trick of wording.',
+      'The up and down labels are the two judgements themselves, phrased for the content',
+      '(for example "Always true" and "Not always"), never the literal words "up" and "down".',
+      'The explanation says why in one sentence a student at this grade band would follow, and',
+      'names the misconception when the card was built from one.',
     ].join(' '),
     prompt: context,
   });
@@ -478,34 +516,62 @@ async function attemptStepWidget(
       const spec = await generateStructured({
         schema: dragSortSpec,
         system: [
-          'You configure a drag-to-reorder activity: the student arranges items into the order they',
-          'believe is correct.',
-          'Pick items with a real, teachable order along ONE dimension — chronological sequence,',
-          'magnitude, or steps in a process. Never an order guessable from surface cues alone',
-          '(alphabetical, item length) — getting it right must require understanding the content.',
-          'correctOrder must list every item id exactly once, true order first to last.',
+          'You configure a drag-to-order activity: the student arranges chips into a single',
+          'correct sequence.',
+          'Give 5 items. The ordering must be genuinely determined by the content — a sequence of',
+          'events, steps, magnitudes, or stages — never a matter of taste or style.',
+          'Ids are short, stable, lowercase slugs. correctOrder lists every item id exactly once,',
+          'in the correct order.',
+          'Labels are self-contained: a student must be able to place a chip without having seen',
+          'the others, so no label may refer to "the next one" or "the previous step".',
+          'The hint names the misconception a wrong ordering reveals rather than giving the answer.',
         ].join(' '),
         prompt: context,
       });
 
-      return { widget: normalizeDragSort(spec), note };
+      const widget = normalizeDragSort(spec);
+      if (widget) return { widget, note };
+
+      return {
+        widget: await generateSwiperFlashcard(context),
+        note: [
+          note,
+          "The ordering activity didn't have enough items with a definite position — built a sorting activity for this step instead.",
+        ]
+          .filter(Boolean)
+          .join(' '),
+      };
     }
 
     case 'drag-categorize': {
       const spec = await generateStructured({
         schema: dragCategorizeSpec,
         system: [
-          'You configure a drag-to-sort activity: the student places each item into the category it',
-          'belongs in.',
-          'Choose categories that partition the items cleanly, with no item that could reasonably',
-          'belong to more than one. Spread items roughly evenly — never load one category with most',
-          'of them and leave another with one or two.',
-          "Every item's categoryId must be one of the category ids you defined.",
+          'You configure a drag-to-sort activity: the student drops each chip into the column it',
+          'belongs to.',
+          'Give 3 categories and 6 items spread across them, with at least one item per category.',
+          'Each item belongs in exactly one category, and categoryId must match one of the',
+          'category ids you defined. Ids are short, stable, lowercase slugs.',
+          'The categories are the distinction the standard actually turns on, and the items are',
+          'chosen so that the borderline ones separate students who hold a listed misconception',
+          'from students who do not.',
+          'The hint names that misconception rather than giving the answer.',
         ].join(' '),
         prompt: context,
       });
 
-      return { widget: normalizeDragCategorize(spec), note };
+      const widget = normalizeDragCategorize(spec);
+      if (widget) return { widget, note };
+
+      return {
+        widget: await generateSwiperFlashcard(context),
+        note: [
+          note,
+          "The sorting activity didn't resolve into at least two filled categories — built a swipe activity for this step instead.",
+        ]
+          .filter(Boolean)
+          .join(' '),
+      };
     }
 
     case 'crossword': {

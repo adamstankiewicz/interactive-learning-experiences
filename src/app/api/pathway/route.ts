@@ -102,7 +102,13 @@ async function persistSession(
   if (!supabaseConfigured()) return null;
 
   try {
-    const { data, error } = await supabaseAdmin()
+    const db = supabaseAdmin();
+
+    // The id comes from the browser's localStorage and can outlive the row it
+    // referred to. Reinstate it rather than losing the session to a foreign key.
+    await db.from('students').upsert({ id: studentId }, { onConflict: 'id', ignoreDuplicates: true });
+
+    const { data, error } = await db
       .from('pathway_sessions')
       .insert({
         student_id: studentId,
