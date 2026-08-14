@@ -25,6 +25,8 @@ export type PathwayState = {
   plan: DeepPartial<PathwayPlan> | null;
   widget: WidgetSpec | null;
   widgetNote: string | null;
+  /** Set once the run is persisted; null when there is no student to persist for. */
+  sessionId: string | null;
   error: string | null;
   /**
    * Run timing. Timestamps are taken in event handlers and passed in, so the
@@ -46,6 +48,7 @@ const initialState: PathwayState = {
   plan: null,
   widget: null,
   widgetNote: null,
+  sessionId: null,
   error: null,
   startedAt: null,
   finishedAt: null,
@@ -99,6 +102,8 @@ function reducer(state: PathwayState, action: Action): PathwayState {
       return { ...state, plan: event.plan };
     case 'widget':
       return { ...state, widget: event.widget, widgetNote: event.note };
+    case 'session':
+      return { ...state, sessionId: event.sessionId };
     case 'error':
       return { ...state, status: 'error', error: event.message, finishedAt: action.at };
     case 'done':
