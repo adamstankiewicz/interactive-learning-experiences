@@ -23,8 +23,10 @@ export type PathwayState = {
   anchor: Anchor | null;
   /** Partial while the model writes, replaced by the validated plan at the end. */
   plan: DeepPartial<PathwayPlan> | null;
-  widget: WidgetSpec | null;
-  widgetNote: string | null;
+  /** Appended to as each generator reports in, so widgets render as they land. */
+  widgets: WidgetSpec[];
+  /** Why a generator produced nothing — surfaced, not hidden. */
+  widgetNotes: string[];
   /** Set once the run is persisted; null when there is no student to persist for. */
   sessionId: string | null;
   error: string | null;
@@ -46,8 +48,8 @@ const initialState: PathwayState = {
   verdicts: {},
   anchor: null,
   plan: null,
-  widget: null,
-  widgetNote: null,
+  widgets: [],
+  widgetNotes: [],
   sessionId: null,
   error: null,
   startedAt: null,
@@ -101,7 +103,12 @@ function reducer(state: PathwayState, action: Action): PathwayState {
     case 'plan':
       return { ...state, plan: event.plan };
     case 'widget':
-      return { ...state, widget: event.widget, widgetNote: event.note };
+      // One event per generator, so both lists grow rather than being replaced.
+      return {
+        ...state,
+        widgets: event.widget ? [...state.widgets, event.widget] : state.widgets,
+        widgetNotes: event.note ? [...state.widgetNotes, event.note] : state.widgetNotes,
+      };
     case 'session':
       return { ...state, sessionId: event.sessionId };
     case 'error':

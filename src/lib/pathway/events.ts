@@ -35,7 +35,7 @@ export const STAGES = [
   { id: 'verify', label: 'Verifying against the graph', active: 'Checking each code for a real match' },
   { id: 'graph', label: 'Loading the standard’s spine', active: 'Fetching learning components and prerequisites' },
   { id: 'plan', label: 'Planning the pathway', active: 'Writing outcomes, misconceptions and steps' },
-  { id: 'widget', label: 'Building the widget', active: 'Configuring an interactive model' },
+  { id: 'widget', label: 'Building the widgets', active: 'Configuring the interactive activities' },
 ] as const;
 
 export type StageId = (typeof STAGES)[number]['id'];
@@ -53,6 +53,12 @@ export type PathwayEvent =
   /** Successive partial plans as the model writes it. Each supersedes the last. */
   | { type: 'plan-partial'; plan: DeepPartial<PathwayPlan> }
   | { type: 'plan'; plan: PathwayPlan }
+  /**
+   * One generator's result. Several arrive per run — one per registered
+   * generator — each as it finishes, so a widget appears the moment it is
+   * ready rather than when the slowest one is. A generator that declined
+   * sends its reason instead of a spec.
+   */
   | { type: 'widget'; widget: WidgetSpec | null; note: string | null }
   /** Persisted session id, once there is one. Telemetry attaches to it. */
   | { type: 'session'; sessionId: string | null }

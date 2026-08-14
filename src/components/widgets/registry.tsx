@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Crossword } from '@/components/widgets/Crossword';
 import { DragCategorize } from '@/components/widgets/DragCategorize';
 import { DragSort } from '@/components/widgets/DragSort';
 import { DraftMeter } from '@/components/widgets/DraftMeter';
@@ -25,6 +26,8 @@ function render(spec: WidgetSpec) {
       return <DragSort spec={spec} />;
     case 'drag-categorize':
       return <DragCategorize spec={spec} />;
+    case 'crossword':
+      return <Crossword spec={spec} />;
   }
 }
 

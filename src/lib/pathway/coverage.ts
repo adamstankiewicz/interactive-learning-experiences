@@ -27,8 +27,15 @@ export const WRITING_CODE = /^W(HST)?\./;
  */
 export const READING_EVIDENCE_CODE = /^(RL|RI|RH|RST)\.[0-9-]+\.(1|8)$/;
 
-/** True when some generator can serve this standard. */
-export function hasGeneratorFor(statementCode: string): boolean {
+/**
+ * True when a generator tied to particular content can serve this standard.
+ *
+ * The crossword is deliberately not counted here. It works from whatever
+ * vocabulary a standard carries, so it serves all of them and would make this
+ * predicate constantly true — what callers actually want to know is whether
+ * anything beyond the vocabulary puzzle applies.
+ */
+export function hasContentGeneratorFor(statementCode: string): boolean {
   return (
     FRACTION_CODE.test(statementCode) ||
     WRITING_CODE.test(statementCode) ||
@@ -39,3 +46,10 @@ export function hasGeneratorFor(statementCode: string): boolean {
 /** Prose list of what is registered, for the note when nothing matches. */
 export const COVERAGE_SENTENCE =
   'fraction area models (3–5.NF) and short written argument (W, WHST, and RL/RI/RH/RST strands 1 and 8)';
+
+/**
+ * The crossword has no gate: every standard is taught through words, and the
+ * puzzle is built from whichever ones the standard and its prerequisites use.
+ * Named rather than left implicit so this file still lists every generator.
+ */
+export const CROSSWORD_SERVES_EVERY_STANDARD = true;
