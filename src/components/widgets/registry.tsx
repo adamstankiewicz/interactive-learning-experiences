@@ -1,6 +1,8 @@
 'use client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DragCategorize } from '@/components/widgets/DragCategorize';
+import { DragSort } from '@/components/widgets/DragSort';
 import { DraftMeter } from '@/components/widgets/DraftMeter';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
@@ -19,6 +21,10 @@ function render(spec: WidgetSpec) {
       return <SwiperFlashcard spec={spec} />;
     case 'draft-meter':
       return <DraftMeter spec={spec} />;
+    case 'drag-sort':
+      return <DragSort spec={spec} />;
+    case 'drag-categorize':
+      return <DragCategorize spec={spec} />;
   }
 }
 
