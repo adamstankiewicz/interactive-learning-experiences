@@ -58,10 +58,71 @@ export const swiperFlashcardSpec = z.object({
 
 export type SwiperFlashcardSpec = z.infer<typeof swiperFlashcardSpec>;
 
+/**
+ * Draft Meter: question, textbox, one line. The student writes; a live model
+ * call moves the line.
+ *
+ * Note what is *not* here. There is no rubric, no per-dimension weighting, no
+ * band copy — scoring lives entirely in `lib/draft-meter`, and this spec only
+ * carries what makes one instance different from another. This is also the
+ * first widget that keeps talking to the server after render, so it carries
+ * the standard with it: it is the payload the scoring call is grounded in.
+ */
+export const draftMeterSpec = z.object({
+  kind: z.literal('draft-meter'),
+  learningComponentId: z.string().nullable(),
+  question: z
+    .string()
+    .describe(
+      'The prompt the student answers. One sentence, concrete, and it must invite a position plus a reason — e.g. "Should our school start at 8:45? Say what you think — and why."',
+    ),
+  placeholder: z.string().describe('Textbox placeholder. Short and inviting, under 60 characters.'),
+  standardCode: z.string().describe('The anchor standard code, copied verbatim.'),
+  standardDescription: z.string().describe('The anchor standard wording, copied verbatim.'),
+  /**
+   * The standard, translated. Shown behind a "?" so a student can find out what
+   * they are actually being asked for — standards wording is written for adults
+   * and is useless as an explanation to the person being measured by it.
+   */
+  standardForStudents: z
+    .string()
+    .describe(
+      'The standard restated in one or two sentences a 13-year-old understands, addressed to them ("You take a side, then..."). No jargon, no standard code, no quoting the official wording.',
+    ),
+  /**
+   * An optional source the student reads before answering.
+   *
+   * This is what makes reading standards reachable. Without it, "cite textual
+   * evidence" has nothing to cite and the scorer has to take a claimed fact on
+   * trust; with it, evidence is checkable against something on screen. Null for
+   * writing standards, where the argument comes from the student's own head.
+   */
+  passage: z
+    .object({
+      source: z
+        .string()
+        .describe('Short attribution, e.g. "Frederick Douglass, 1852" or "School newspaper editorial"'),
+      text: z
+        .string()
+        .describe(
+          'The source itself, 40-120 words. Short enough to sit above a textbox and be re-read while writing.',
+        ),
+    })
+    .nullable(),
+  criteria: z
+    .array(z.string())
+    .describe(
+      'Give 2-4 short phrases naming what a strong answer contains, drawn from the standard. These ground the scoring call and are never shown to the student.',
+    ),
+});
+
+export type DraftMeterSpec = z.infer<typeof draftMeterSpec>;
+
 /** Discriminated union — add widget kinds here as generators are registered. */
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
+  draftMeterSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 

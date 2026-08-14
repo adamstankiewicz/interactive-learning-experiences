@@ -3,7 +3,7 @@ import type {
   ProgressionStandard,
   StandardStatement,
 } from '@/lib/learning-commons/client';
-import type { FractionAreaModelSpec, PathwayPlan } from '@/lib/pathway/schema';
+import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
 
 /**
  * The wire protocol between the pipeline and the UI.
@@ -53,7 +53,7 @@ export type PathwayEvent =
   /** Successive partial plans as the model writes it. Each supersedes the last. */
   | { type: 'plan-partial'; plan: DeepPartial<PathwayPlan> }
   | { type: 'plan'; plan: PathwayPlan }
-  | { type: 'widget'; widget: FractionAreaModelSpec | null; note: string | null }
+  | { type: 'widget'; widget: WidgetSpec | null; note: string | null }
   | { type: 'error'; message: string }
   | { type: 'done' };
 

@@ -10,7 +10,7 @@ import {
   type PathwayEvent,
   type StageId,
 } from '@/lib/pathway/events';
-import type { FractionAreaModelSpec, PathwayPlan } from '@/lib/pathway/schema';
+import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
 
 export type StageStatus = 'pending' | 'active' | 'done' | 'skipped';
 
@@ -23,7 +23,7 @@ export type PathwayState = {
   anchor: Anchor | null;
   /** Partial while the model writes, replaced by the validated plan at the end. */
   plan: DeepPartial<PathwayPlan> | null;
-  widget: FractionAreaModelSpec | null;
+  widget: WidgetSpec | null;
   widgetNote: string | null;
   error: string | null;
   /**
