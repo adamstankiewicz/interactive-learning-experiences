@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { STAGES } from '@/lib/pathway/events';
 import type { PathwayState, StageStatus } from '@/lib/pathway/use-pathway-stream';
 
@@ -40,7 +41,10 @@ export function ActivityTrail({ state }: { state: PathwayState }) {
     >
       <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
         <ChevronDown
-          className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`}
+          className={cn(
+            'size-4 shrink-0 text-muted-foreground transition-transform',
+            !open && '-rotate-90',
+          )}
         />
         <span className="font-heading text-sm font-medium">
           {streaming ? 'Building the pathway' : state.status === 'error' ? 'Stopped' : 'Built the pathway'}
@@ -68,13 +72,14 @@ export function ActivityTrail({ state }: { state: PathwayState }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <span
-                      className={`text-sm ${
+                      className={cn(
+                        'text-sm',
                         entry.status === 'pending'
                           ? 'text-muted-foreground/50'
                           : entry.status === 'active'
                             ? 'font-medium'
-                            : 'text-muted-foreground'
-                      }`}
+                            : 'text-muted-foreground',
+                      )}
                     >
                       {stage.label}
                     </span>
@@ -138,28 +143,28 @@ function StatusDot({ status }: { status: StageStatus }) {
 
   if (status === 'done') {
     return (
-      <span className={`${base} bg-success/15 text-success`} aria-label="done">
+      <span className={cn(base, 'bg-success/15 text-success')} aria-label="done">
         <Check className="size-2.5" aria-hidden />
       </span>
     );
   }
   if (status === 'skipped') {
     return (
-      <span className={`${base} bg-muted text-muted-foreground`} aria-label="skipped">
+      <span className={cn(base, 'bg-muted text-muted-foreground')} aria-label="skipped">
         <Minus className="size-2.5" aria-hidden />
       </span>
     );
   }
   if (status === 'active') {
     return (
-      <span className={`${base} relative`} aria-label="in progress">
+      <span className={cn(base, 'relative')} aria-label="in progress">
         <span className="absolute inline-flex size-3.5 animate-ping rounded-full bg-foreground/20" />
         <span className="relative size-2 rounded-full bg-foreground" />
       </span>
     );
   }
   return (
-    <span className={`${base} border border-muted-foreground/30`} aria-label="pending" />
+    <span className={cn(base, 'border border-muted-foreground/30')} aria-label="pending" />
   );
 }
 

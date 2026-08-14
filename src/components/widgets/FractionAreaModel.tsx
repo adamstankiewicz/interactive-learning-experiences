@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
 import type { FractionAreaModelSpec } from '@/lib/pathway/schema';
 
 /**
@@ -136,11 +137,10 @@ function BarModel({ parts, selected, onToggle }: ModelProps) {
           onClick={() => onToggle(index)}
           aria-label={`Part ${index + 1}`}
           aria-pressed={selected.has(index)}
-          className={`flex-1 border-r-2 border-foreground transition last:border-r-0 focus-visible:z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
-            selected.has(index)
-              ? 'bg-selected hover:bg-selected/80'
-              : 'bg-card hover:bg-muted'
-          }`}
+          className={cn(
+            'flex-1 border-r-2 border-foreground transition last:border-r-0 focus-visible:z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+            selected.has(index) ? 'bg-selected hover:bg-selected/80' : 'bg-card hover:bg-muted',
+          )}
         />
       ))}
     </div>
@@ -186,9 +186,10 @@ function CircleModel({ parts, selected, onToggle }: ModelProps) {
                   onToggle(index);
                 }
               }}
-              className={`cursor-pointer transition focus-visible:outline-2 focus-visible:outline-ring ${
-                selected.has(index) ? 'fill-selected' : 'fill-card'
-              }`}
+              className={cn(
+                'cursor-pointer transition focus-visible:outline-2 focus-visible:outline-ring',
+                selected.has(index) ? 'fill-selected' : 'fill-card',
+              )}
               stroke="currentColor"
               strokeWidth={2}
             />

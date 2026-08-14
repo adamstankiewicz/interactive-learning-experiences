@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import type { SwiperFlashcardSpec } from '@/lib/pathway/schema';
 
 type CardData = SwiperFlashcardSpec['cards'][number];
@@ -198,13 +199,14 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
       <div className="relative flex items-stretch justify-center gap-3">
         {/* Left label */}
         <div
-          className={`flex w-16 shrink-0 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold leading-tight transition-colors duration-150 ${
+          className={cn(
+            'flex w-16 shrink-0 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold leading-tight transition-colors duration-150',
             isSwipingLeft
               ? 'border-destructive text-destructive'
               : isSwipingRight
                 ? 'border-muted-foreground/20 text-muted-foreground/20'
-                : 'border-muted-foreground/40 text-muted-foreground'
-          }`}
+                : 'border-muted-foreground/40 text-muted-foreground',
+          )}
           aria-hidden="true"
         >
           {card.leftLabel}
@@ -237,13 +239,14 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
 
         {/* Right label */}
         <div
-          className={`flex w-16 shrink-0 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold leading-tight transition-colors duration-150 ${
+          className={cn(
+            'flex w-16 shrink-0 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold leading-tight transition-colors duration-150',
             isSwipingRight
               ? 'border-success text-success'
               : isSwipingLeft
                 ? 'border-muted-foreground/20 text-muted-foreground/20'
-                : 'border-muted-foreground/40 text-muted-foreground'
-          }`}
+                : 'border-muted-foreground/40 text-muted-foreground',
+          )}
           aria-hidden="true"
         >
           {card.rightLabel}

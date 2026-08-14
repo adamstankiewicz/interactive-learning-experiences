@@ -1,0 +1,245 @@
+'use client';
+
+import { ChevronDown, Sparkles } from 'lucide-react';
+
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { WidgetRenderer } from '@/components/widgets/registry';
+import { plainMath } from '@/lib/learning-commons/format';
+import type { Anchor, DeepPartial } from '@/lib/pathway/events';
+import type { PathwayPlan } from '@/lib/pathway/schema';
+import type { PathwayState } from '@/lib/pathway/use-pathway-stream';
+import { cn } from '@/lib/utils';
+
+const PURPOSE_LABEL: Record<string, string> = {
+  activate: 'Activate',
+  model: 'Model',
+  practice: 'Practice',
+  check: 'Check',
+};
+
+type PartialStep = DeepPartial<PathwayPlan>['steps'] extends (infer S)[] | undefined ? S : never;
+
+/**
+ * The generated pathway, as the artifact a teacher actually reads.
+ *
+ * Ordering is deliberate and differs from the pipeline's: the lesson leads, and
+ * the standards provenance that justifies it sits one disclosure away. A
+ * teacher opens this to teach, not to audit the knowledge graph — but the audit
+ * has to stay one click from the claim it supports.
+ */
+export function PathwayDocument({ state }: { state: PathwayState }) {
+  const { anchor, plan } = state;
+  if (!anchor) return null;
+
+  const rejectedCodes = Object.entries(state.verdicts)
+    .filter(([, resolved]) => !resolved)
+    .map(([code]) => code);
+
+  return (
+    <article className="mt-8 space-y-10">
+      <DocumentHeader
+        anchor={anchor}
+        plan={plan}
+        rejectedCodes={rejectedCodes}
+        topic={state.topic}
+      />
+
+      {Boolean(plan?.steps?.length) && (
+        <Section title="The pathway" note="Each step, in order, with its interaction">
+          <ol className="space-y-4">
+            {plan?.steps?.map((step, index) => (
+              <StepCard key={index} step={step} index={index} state={state} />
+            ))}
+          </ol>
+        </Section>
+      )}
+
+      {Boolean(plan?.outcomes?.length) && (
+        <Section
+          title="What students will be able to do"
+          note={
+            anchor.learningComponents.length
+              ? `Grounded in ${anchor.learningComponents.length} learning components from the graph`
+              : 'This standard has no published learning components'
+          }
+        >
+          <ol className="space-y-3">
+            {plan?.outcomes?.map((outcome, index) => (
+              <li key={index}>
+                <Card size="sm">
+                  <CardContent>
+                    <p className="text-sm font-medium">{outcome?.statement}</p>
+                    {outcome?.evidence && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        You&rsquo;ll know they have it when: {outcome.evidence}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </li>
+            ))}
+          </ol>
+        </Section>
+      )}
+
+      {Boolean(plan?.misconceptions?.length) && (
+        <Section title="Watch for" note="Specific, diagnosable misconceptions">
+          <ul className="space-y-2">
+            {plan?.misconceptions?.map((misconception, index) => (
+              <li key={index} className="flex gap-2.5 text-sm">
+                <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-warning" />
+                {misconception}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {anchor.prerequisites.length > 0 && (
+        <Section
+          title="Prior knowledge to activate"
+          note="Earlier standards this one builds on — activate, don't reteach"
+        >
+          <ul className="space-y-2.5">
+            {anchor.prerequisites.map((prerequisite) => (
+              <li key={prerequisite.caseIdentifierUUID} className="text-sm">
+                <Badge variant="outline" className="mr-2 font-mono">
+                  {prerequisite.statementCode}
+                </Badge>
+                {plainMath(prerequisite.description)}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </article>
+  );
+}
+
+function DocumentHeader({
+  anchor,
+  plan,
+  rejectedCodes,
+  topic,
+}: {
+  anchor: Anchor;
+  plan: DeepPartial<PathwayPlan> | null;
+  rejectedCodes: string[];
+  topic: string;
+}) {
+  const { standard } = anchor;
+
+  return (
+    <header>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge className="font-mono">{standard.statementCode}</Badge>
+        <span className="text-xs text-muted-foreground">
+          {standard.academicSubject} · Grade {standard.gradeLevels.join(', ')} · {standard.jurisdiction}
+        </span>
+      </div>
+
+      <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight">{topic}</h2>
+
+      {plan?.bigIdea && (
+        <p className="mt-2 text-base leading-relaxed text-muted-foreground">{plan.bigIdea}</p>
+      )}
+
+      {/* The provenance is the product's whole claim, so it stays reachable —
+          but a teacher planning a lesson does not need it open by default. */}
+      <Collapsible className="mt-4">
+        <CollapsibleTrigger className="group/why flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]/why:rotate-180" />
+          Why this standard
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 border-l-2 border-border pl-3 text-sm text-muted-foreground">
+            <p className="leading-relaxed">{plainMath(standard.description)}</p>
+            <p className="mt-2 text-xs">
+              Matched against the Learning Commons graph.
+              {rejectedCodes.length > 0 && (
+                <> Rejected before this one: {rejectedCodes.join(', ')}.</>
+              )}
+            </p>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </header>
+  );
+}
+
+/**
+ * A step and the interaction it asked for.
+ *
+ * The plan names a `widgetKind` before the spec exists, so a step can advertise
+ * a pending interaction — the placeholder is real information, not a spinner.
+ */
+function StepCard({
+  step,
+  index,
+  state,
+}: {
+  step: PartialStep;
+  index: number;
+  state: PathwayState;
+}) {
+  const purpose = step?.purpose;
+  const widget = state.stepWidgets[index];
+  const note = state.stepWidgetNotes[index];
+  const pending = Boolean(step?.widgetKind) && widget === undefined;
+
+  return (
+    <li className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+      <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:gap-4">
+        <span className="shrink-0 pt-0.5 text-xs font-medium tracking-wide text-muted-foreground uppercase sm:w-20">
+          {(purpose && PURPOSE_LABEL[purpose]) ?? purpose}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{step?.title}</p>
+          {step?.description && (
+            <p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p>
+          )}
+        </div>
+      </div>
+
+      {(widget || pending || note) && (
+        <div className={cn('border-t border-border bg-muted/30 px-4 py-4', 'sm:pl-24')}>
+          {widget ? (
+            <WidgetRenderer spec={widget} />
+          ) : pending ? (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Sparkles className="size-3.5 animate-pulse" aria-hidden />
+              Building the interaction for this step…
+            </p>
+          ) : (
+            <Alert variant="warning">
+              <AlertDescription>{note}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-3">
+        <h3 className="font-heading text-sm font-semibold tracking-wide uppercase">{title}</h3>
+        {note && <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}

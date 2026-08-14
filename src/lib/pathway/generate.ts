@@ -13,8 +13,12 @@ import {
   fractionAreaModelSpec,
   pathwayPlan,
   standardProposal,
+  swiperFlashcardSpec,
   type FractionAreaModelSpec,
   type PathwayPlan,
+  type SwiperFlashcardSpec,
+  type WidgetKind,
+  type WidgetSpec,
 } from '@/lib/pathway/schema';
 
 export type { Anchor };
@@ -72,6 +76,10 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
  * Enforce the bounds the schema can't express (see the note in `schema.ts`).
  * The model is asked for these counts in prose and usually complies; this is
  * the backstop that keeps a chatty response from failing the whole request.
+ *
+ * Every step carries a widget by design, so the step cap (6) is the widget
+ * cap too — there is no separate limit to enforce, only the outcome
+ * cross-reference to keep in range once outcomes are trimmed.
  */
 function normalizePlan(plan: PathwayPlan): PathwayPlan {
   const outcomes = plan.outcomes.slice(0, 5);
@@ -83,7 +91,6 @@ function normalizePlan(plan: PathwayPlan): PathwayPlan {
     misconceptions: plan.misconceptions.slice(0, 4),
     steps: plan.steps.slice(0, 6).map((step) => ({
       ...step,
-      // A step pointing past the trimmed outcomes would break the UI's cross-reference.
       outcomeIndex: clamp(step.outcomeIndex, 0, Math.max(outcomes.length - 1, 0)),
     })),
   };
@@ -111,16 +118,17 @@ function normalizeWidget(spec: FractionAreaModelSpec): FractionAreaModelSpec {
   };
 }
 
-export type PathwayResult = {
-  topic: string;
-  anchor: Anchor;
-  /** Codes the model proposed that the graph rejected — surfaced, not hidden. */
-  rejectedCodes: string[];
-  plan: PathwayPlan;
-  widget: FractionAreaModelSpec | null;
-  /** Why no widget, when widget is null. */
-  widgetNote: string | null;
-};
+/**
+ * Trim the card set to the count the prompt asks for.
+ *
+ * Deliberately does not touch `correctDirection`. A set that is all one
+ * direction is gameable, and the system prompt asks the model to vary it — but
+ * the direction is a fact about the card's text, so "fixing" it here would
+ * make the widget mark true statements false.
+ */
+function normalizeFlashcards(spec: SwiperFlashcardSpec): SwiperFlashcardSpec {
+  return { ...spec, cards: spec.cards.slice(0, 8) };
+}
 
 /**
  * Stage 1 — the model proposes standard codes for a free-text topic.
@@ -213,56 +221,94 @@ async function* planPathway(
 }
 
 /**
- * Stage 5 — generate the one widget we have a generator for.
+ * Stage 5 — configure the widget each step asked for.
  *
- * The registry has exactly one entry today. Rather than force every topic
- * through a fraction model, this gates on the standard actually being about
- * fractions and returns a note otherwise — the honest shape of a first step.
+ * The plan chooses the kind; this configures it against the specific step it
+ * serves, which is why it runs as a second pass rather than inside the plan
+ * call. One model call per widget, so `normalizePlan` caps how many a pathway
+ * may request.
  */
 const FRACTION_CODE = /^(3|4|5)\.NF\./;
 
-async function generateWidget(
-  anchor: Anchor,
-  plan: PathwayPlan,
-): Promise<{ widget: FractionAreaModelSpec | null; note: string | null }> {
-  if (!FRACTION_CODE.test(anchor.standard.statementCode)) {
-    return {
-      widget: null,
-      note: `No widget generator is registered for ${anchor.standard.statementCode} yet. The only generator so far builds fraction area models (3–5.NF). The pathway above is still fully grounded in the graph.`,
-    };
-  }
-
+/** Context every widget generator gets, regardless of kind. */
+function widgetContext(anchor: Anchor, plan: PathwayPlan, step: PathwayPlan['steps'][number]) {
   const componentBlock = anchor.learningComponents
     .map((c) => `- id: ${c.identifier}\n  skill: ${c.description}`)
     .join('\n');
 
+  return [
+    `Standard ${anchor.standard.statementCode}: ${anchor.standard.description}`,
+    '',
+    'Learning components:',
+    componentBlock || '(none)',
+    '',
+    'Pathway outcomes:',
+    plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
+    '',
+    'Known misconceptions:',
+    plan.misconceptions.map((m) => `- ${m}`).join('\n'),
+    '',
+    `This widget belongs to the "${step.purpose}" step: ${step.title} — ${step.description}`,
+  ].join('\n');
+}
+
+/**
+ * Every step needs a widget, so a mismatch is resolved by substitution, not
+ * omission — this is the only place `widgetKind` can differ from what the plan
+ * asked for, and it always resolves to a kind that fits the standard.
+ */
+function resolveWidgetKind(
+  requested: WidgetKind,
+  standardCode: string,
+): { kind: WidgetKind; note: string | null } {
+  if (requested === 'fraction-area-model' && !FRACTION_CODE.test(standardCode)) {
+    return {
+      kind: 'swiper-flashcard',
+      note: `A fraction area model doesn't fit ${standardCode} — it's not a fractions standard. Built a sorting activity for this step instead.`,
+    };
+  }
+  return { kind: requested, note: null };
+}
+
+async function generateStepWidget(
+  anchor: Anchor,
+  plan: PathwayPlan,
+  step: PathwayPlan['steps'][number],
+): Promise<{ widget: WidgetSpec; note: string | null }> {
+  const { kind, note } = resolveWidgetKind(step.widgetKind, anchor.standard.statementCode);
+
+  if (kind === 'fraction-area-model') {
+    const spec = await generateStructured({
+      schema: fractionAreaModelSpec,
+      system: [
+        'You configure an interactive fraction area model: the student picks how many equal parts',
+        'to partition a whole into, then selects parts to build a target fraction.',
+        'Choose a numerator and denominator that make the target learning component visible —',
+        'a unit fraction (numerator 1) for partitioning skills, a non-unit fraction for composing.',
+        'Keep the denominator inside the grade-level range the standard implies.',
+        'The hint names the specific misconception a wrong answer reveals.',
+      ].join(' '),
+      prompt: widgetContext(anchor, plan, step),
+    });
+
+    return { widget: normalizeWidget(spec), note };
+  }
+
   const spec = await generateStructured({
-    schema: fractionAreaModelSpec,
+    schema: swiperFlashcardSpec,
     system: [
-      'You configure an interactive fraction area model: the student picks how many equal parts',
-      'to partition a whole into, then selects parts to build a target fraction.',
-      'Choose a numerator and denominator that make the target learning component visible —',
-      'a unit fraction (numerator 1) for partitioning skills, a non-unit fraction for composing.',
-      'Keep the denominator inside the grade-level range the standard implies.',
-      'The hint names the specific misconception a wrong answer reveals.',
+      'You configure a two-way sorting activity: the student reads a statement on a card and',
+      'swipes it left or right into one of two labelled buckets.',
+      'Pick a single, consistent dichotomy for the whole set (true/false, example/non-example,',
+      'equivalent/not equivalent) and use the same two labels on every card.',
+      'Write cards that discriminate: at least one should sit on a known misconception, so a',
+      'student holding it sorts wrongly. Vary which direction is correct across the set.',
+      'Each explanation names why the answer is what it is, in one student-facing sentence.',
     ].join(' '),
-    prompt: [
-      `Standard ${anchor.standard.statementCode}: ${anchor.standard.description}`,
-      '',
-      'Learning components:',
-      componentBlock || '(none)',
-      '',
-      'Pathway outcomes:',
-      plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
-      '',
-      'Known misconceptions:',
-      plan.misconceptions.map((m) => `- ${m}`).join('\n'),
-      '',
-      'Configure the widget for the "model" step of this pathway.',
-    ].join('\n'),
+    prompt: widgetContext(anchor, plan, step),
   });
 
-  return { widget: normalizeWidget(spec), note: null };
+  return { widget: normalizeFlashcards(spec), note };
 }
 
 /**
@@ -338,19 +384,26 @@ export async function* streamPathway(
   yield { type: 'plan', plan };
   yield { type: 'stage', stage: 'plan', status: 'done', detail: `${plan.steps.length} steps` };
 
-  // The widget gate depends only on the anchor, so a skip is knowable here and
-  // reported as a skip rather than a silent absence.
-  if (!FRACTION_CODE.test(anchor.standard.statementCode)) {
-    const { note } = await generateWidget(anchor, plan);
-    yield { type: 'stage', stage: 'widget', status: 'skipped', detail: 'No generator for this standard' };
-    yield { type: 'widget', widget: null, note };
-    yield { type: 'done' };
-    return;
+  // Every step carries a widget, so this is never skipped — only how many run
+  // concurrently varies. Parallel rather than sequential: with one call per
+  // step, serializing would multiply the slowest single stage by up to 6.
+  yield { type: 'stage', stage: 'widget', status: 'active' };
+
+  const running = new Map(
+    plan.steps.map((step, index) => [
+      index,
+      generateStepWidget(anchor, plan, step).then((result) => ({ index, ...result })),
+    ]),
+  );
+
+  // Yield in completion order, not step order, so the fastest widget appears
+  // against its step immediately rather than waiting behind a slower one.
+  while (running.size > 0) {
+    const { index, widget, note } = await Promise.race(running.values());
+    running.delete(index);
+    yield { type: 'step-widget', stepIndex: index, widget, note };
   }
 
-  yield { type: 'stage', stage: 'widget', status: 'active' };
-  const { widget, note } = await generateWidget(anchor, plan);
-  yield { type: 'widget', widget, note };
-  yield { type: 'stage', stage: 'widget', status: 'done' };
+  yield { type: 'stage', stage: 'widget', status: 'done', detail: `${plan.steps.length} built` };
   yield { type: 'done' };
 }

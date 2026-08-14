@@ -3,7 +3,7 @@ import type {
   ProgressionStandard,
   StandardStatement,
 } from '@/lib/learning-commons/client';
-import type { FractionAreaModelSpec, PathwayPlan } from '@/lib/pathway/schema';
+import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
 
 /**
  * The wire protocol between the pipeline and the UI.
@@ -35,7 +35,7 @@ export const STAGES = [
   { id: 'verify', label: 'Verifying against the graph', active: 'Checking each code for a real match' },
   { id: 'graph', label: 'Loading the standard’s spine', active: 'Fetching learning components and prerequisites' },
   { id: 'plan', label: 'Planning the pathway', active: 'Writing outcomes, misconceptions and steps' },
-  { id: 'widget', label: 'Building the widget', active: 'Configuring an interactive model' },
+  { id: 'widget', label: 'Building the interactions', active: 'Configuring a widget for every step' },
 ] as const;
 
 export type StageId = (typeof STAGES)[number]['id'];
@@ -53,7 +53,13 @@ export type PathwayEvent =
   /** Successive partial plans as the model writes it. Each supersedes the last. */
   | { type: 'plan-partial'; plan: DeepPartial<PathwayPlan> }
   | { type: 'plan'; plan: PathwayPlan }
-  | { type: 'widget'; widget: FractionAreaModelSpec | null; note: string | null }
+  /**
+   * One per step, emitted as its widget finishes configuring so each appears
+   * against its step rather than all at once at the end. `note` is set when
+   * the requested kind didn't fit and a different one was substituted — the
+   * substitution is transparent, not silent, but it isn't a failure either.
+   */
+  | { type: 'step-widget'; stepIndex: number; widget: WidgetSpec; note: string | null }
   | { type: 'error'; message: string }
   | { type: 'done' };
 

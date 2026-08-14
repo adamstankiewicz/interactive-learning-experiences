@@ -10,12 +10,14 @@ import {
   type PathwayEvent,
   type StageId,
 } from '@/lib/pathway/events';
-import type { FractionAreaModelSpec, PathwayPlan } from '@/lib/pathway/schema';
+import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
 
 export type StageStatus = 'pending' | 'active' | 'done' | 'skipped';
 
 export type PathwayState = {
   status: 'idle' | 'streaming' | 'done' | 'error';
+  /** The topic this run was started for, so the result can title itself. */
+  topic: string;
   stages: Record<StageId, { status: StageStatus; detail?: string }>;
   candidates: Candidate[];
   /** code -> did the graph resolve it. Absent means not yet checked. */
@@ -23,8 +25,14 @@ export type PathwayState = {
   anchor: Anchor | null;
   /** Partial while the model writes, replaced by the validated plan at the end. */
   plan: DeepPartial<PathwayPlan> | null;
-  widget: FractionAreaModelSpec | null;
-  widgetNote: string | null;
+  /**
+   * Widget per step index, arriving one at a time as each is configured. A
+   * missing key means not yet arrived — every step gets a widget eventually,
+   * so there is no other reason for a key to be absent once the run finishes.
+   */
+  stepWidgets: Record<number, WidgetSpec>;
+  /** Why a step's widget is null, keyed the same way. */
+  stepWidgetNotes: Record<number, string>;
   error: string | null;
   /**
    * Run timing. Timestamps are taken in event handlers and passed in, so the
@@ -39,27 +47,28 @@ const idleStages = () =>
 
 const initialState: PathwayState = {
   status: 'idle',
+  topic: '',
   stages: idleStages(),
   candidates: [],
   verdicts: {},
   anchor: null,
   plan: null,
-  widget: null,
-  widgetNote: null,
+  stepWidgets: {},
+  stepWidgetNotes: {},
   error: null,
   startedAt: null,
   finishedAt: null,
 };
 
 type Action =
-  | { kind: 'start'; at: number }
+  | { kind: 'start'; at: number; topic: string }
   /** Stop streaming but keep whatever already arrived on screen. */
   | { kind: 'stop'; at: number }
   | { kind: 'event'; event: PathwayEvent; at: number };
 
 function reducer(state: PathwayState, action: Action): PathwayState {
   if (action.kind === 'start') {
-    return { ...initialState, status: 'streaming', startedAt: action.at };
+    return { ...initialState, status: 'streaming', startedAt: action.at, topic: action.topic };
   }
   if (action.kind === 'stop') {
     return {
@@ -97,8 +106,14 @@ function reducer(state: PathwayState, action: Action): PathwayState {
       return { ...state, plan: event.plan };
     case 'plan':
       return { ...state, plan: event.plan };
-    case 'widget':
-      return { ...state, widget: event.widget, widgetNote: event.note };
+    case 'step-widget':
+      return {
+        ...state,
+        stepWidgets: { ...state.stepWidgets, [event.stepIndex]: event.widget },
+        stepWidgetNotes: event.note
+          ? { ...state.stepWidgetNotes, [event.stepIndex]: event.note }
+          : state.stepWidgetNotes,
+      };
     case 'error':
       return { ...state, status: 'error', error: event.message, finishedAt: action.at };
     case 'done':
@@ -130,7 +145,7 @@ export function usePathwayStream() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    dispatch({ kind: 'start', at: Date.now() });
+    dispatch({ kind: 'start', at: Date.now(), topic });
 
     try {
       const response = await fetch('/api/pathway', {

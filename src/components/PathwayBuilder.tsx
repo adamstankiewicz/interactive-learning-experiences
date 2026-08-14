@@ -3,23 +3,18 @@
 import { useState } from 'react';
 
 import { ActivityTrail } from '@/components/pathway/ActivityTrail';
+import { PathwayDocument } from '@/components/pathway/PathwayDocument';
+import { ThemeToggle } from '@/components/pathway/ThemeToggle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { WidgetRenderer } from '@/components/widgets/registry';
-import { plainMath } from '@/lib/learning-commons/format';
-import type { Anchor } from '@/lib/pathway/events';
-import { usePathwayStream, type PathwayState } from '@/lib/pathway/use-pathway-stream';
+import { usePathwayStream } from '@/lib/pathway/use-pathway-stream';
 
-const EXAMPLES = ['understanding fractions', 'multiplying by powers of ten', 'finding the main idea of a text'];
-
-const PURPOSE_LABEL: Record<string, string> = {
-  activate: 'Activate',
-  model: 'Model',
-  practice: 'Practice',
-  check: 'Check',
-};
+const EXAMPLES = [
+  { topic: 'understanding fractions', grade: '4' },
+  { topic: 'multiplying by powers of ten', grade: '5' },
+  { topic: 'finding the main idea of a text', grade: '5' },
+];
 
 export function PathwayBuilder() {
   const [topic, setTopic] = useState('');
@@ -36,245 +31,95 @@ export function PathwayBuilder() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-12">
-      <header>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Topic to student pathway</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Enter a topic. It resolves against the Learning Commons knowledge graph for the authoritative
-          standard, its learning components, and its prerequisites — then becomes a pedagogical pathway
-          with one interactive widget.
-        </p>
+    <div className="flex min-h-full flex-col">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-3">
+          <span className="font-heading text-sm font-semibold tracking-tight">
+            Pathways
+          </span>
+          <span className="text-xs text-muted-foreground">Standards-grounded lessons</span>
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
+        </div>
       </header>
 
-      <form onSubmit={submit} className="mt-8 space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Input
-            value={topic}
-            onChange={(event) => setTopic(event.target.value)}
-            placeholder="e.g. understanding fractions"
-            aria-label="Topic"
-            className="h-10 flex-1"
-          />
-          <Input
-            value={gradeHint}
-            onChange={(event) => setGradeHint(event.target.value)}
-            placeholder="grade (optional)"
-            aria-label="Grade"
-            className="h-10 sm:w-40"
-          />
-          {streaming ? (
-            <Button type="button" variant="outline" size="lg" onClick={cancel} className="h-10 px-5">
-              Stop
-            </Button>
-          ) : (
-            <Button type="submit" size="lg" disabled={!topic.trim()} className="h-10 px-5">
-              Build
-            </Button>
-          )}
-        </div>
-
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
         {!started && (
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((example) => (
-              <Button
-                key={example}
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => setTopic(example)}
-                className="rounded-full text-muted-foreground"
-              >
-                {example}
-              </Button>
-            ))}
+          <div className="pt-14">
+            <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance">
+              Turn a topic into a lesson students can do.
+            </h1>
+            <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
+              Name what you&rsquo;re teaching. We find the standard it maps to in the Learning
+              Commons knowledge graph, then build a pathway from its verified learning
+              components — with interactive activities your students work through.
+            </p>
           </div>
         )}
-      </form>
 
-      {started && <ActivityTrail state={state} />}
+        <form onSubmit={submit} className={started ? 'pt-8' : 'mt-8'}>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Input
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+              placeholder="What are you teaching?"
+              aria-label="Topic"
+              className="h-11 flex-1 text-base"
+            />
+            <Input
+              value={gradeHint}
+              onChange={(event) => setGradeHint(event.target.value)}
+              placeholder="Grade"
+              aria-label="Grade level"
+              className="h-11 text-base sm:w-28"
+            />
+            {streaming ? (
+              <Button type="button" variant="outline" size="lg" onClick={cancel} className="h-11 px-6">
+                Stop
+              </Button>
+            ) : (
+              <Button type="submit" size="lg" disabled={!topic.trim()} className="h-11 px-6">
+                {started ? 'Rebuild' : 'Build pathway'}
+              </Button>
+            )}
+          </div>
 
-      {state.error && (
-        <Alert variant="destructive" className="mt-6">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-
-      <Pathway state={state} />
-    </div>
-  );
-}
-
-/**
- * Renders whatever has arrived. Every section is independently gated on its own
- * data, so the page fills in as the stream produces rather than appearing all
- * at once at the end.
- */
-function Pathway({ state }: { state: PathwayState }) {
-  const { anchor, plan, widget, widgetNote } = state;
-  const streaming = state.status === 'streaming';
-  const writingPlan = streaming && state.stages.plan.status === 'active';
-
-  if (!anchor) return null;
-
-  const rejectedCodes = Object.entries(state.verdicts)
-    .filter(([, resolved]) => !resolved)
-    .map(([code]) => code);
-
-  return (
-    <div className="mt-8 space-y-8">
-      <Section title="Anchor standard" note="Verified against the Learning Commons graph">
-        <AnchorCard anchor={anchor} />
-        {rejectedCodes.length > 0 && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Rejected by the graph before this one: {rejectedCodes.join(', ')}
-          </p>
-        )}
-      </Section>
-
-      {plan?.bigIdea && (
-        <Section title="Big idea">
-          <p className="text-sm leading-relaxed">
-            {plan.bigIdea}
-            {writingPlan && !plan.outcomes?.length && <Caret />}
-          </p>
-        </Section>
-      )}
-
-      {Boolean(plan?.outcomes?.length) && (
-        <Section
-          title="Learning outcomes"
-          note={
-            anchor.learningComponents.length
-              ? `${anchor.learningComponents.length} learning components from the graph`
-              : 'No published learning components for this standard'
-          }
-        >
-          <ol className="space-y-3">
-            {plan?.outcomes?.map((outcome, index) => (
-              <li key={index}>
-                <Card size="sm">
-                  <CardContent>
-                    <p className="text-sm font-medium">{outcome?.statement}</p>
-                    {outcome?.evidence && (
-                      <p className="mt-1 text-xs text-muted-foreground">Evidence: {outcome.evidence}</p>
-                    )}
-                    {outcome?.learningComponentId && (
-                      <p className="mt-2 font-mono text-[11px] text-muted-foreground/70">
-                        LC {outcome.learningComponentId}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
-
-      {anchor.prerequisites.length > 0 && (
-        <Section title="Prior knowledge to activate" note="From the SAP coherence map">
-          <ul className="space-y-2">
-            {anchor.prerequisites.map((prerequisite) => (
-              <li key={prerequisite.caseIdentifierUUID} className="text-sm">
-                <code className="font-mono text-xs font-medium text-muted-foreground">
-                  {prerequisite.statementCode}
-                </code>{' '}
-                {plainMath(prerequisite.description)}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {Boolean(plan?.misconceptions?.length) && (
-        <Section title="Misconceptions to watch for">
-          <ul className="list-disc space-y-1.5 pl-5">
-            {plan?.misconceptions?.map((misconception, index) => (
-              <li key={index} className="text-sm">
-                {misconception}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {Boolean(plan?.steps?.length) && (
-        <Section title="Pathway">
-          {/* Fixed left gutter for the purpose label — the sequence reads down
-              the column, which a per-item pill does not give you. */}
-          <ol className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-            {plan?.steps?.map((step, index) => (
-              <li
-                key={index}
-                className="flex flex-col gap-1 border-b border-border px-4 py-3 last:border-b-0 sm:flex-row sm:gap-4"
-              >
-                <span className="shrink-0 pt-0.5 text-xs font-medium tracking-wide text-muted-foreground uppercase sm:w-20">
-                  {(step?.purpose && PURPOSE_LABEL[step.purpose]) ?? step?.purpose}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{step?.title}</p>
-                  {step?.description && (
-                    <p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
-
-      {(widget || widgetNote) && (
-        <Section title="Interactive widget">
-          {widget ? (
-            <WidgetRenderer spec={widget} />
-          ) : (
-            <Alert>
-              <AlertDescription>{widgetNote}</AlertDescription>
-            </Alert>
+          {!started && (
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground">Or start from an example</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {EXAMPLES.map((example) => (
+                  <Button
+                    key={example.topic}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTopic(example.topic);
+                      setGradeHint(example.grade);
+                    }}
+                    className="rounded-full font-normal text-muted-foreground"
+                  >
+                    {example.topic}
+                    <span className="text-muted-foreground/60">· Gr {example.grade}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
           )}
-        </Section>
-      )}
+        </form>
+
+        {started && <ActivityTrail state={state} />}
+
+        {state.error && (
+          <Alert variant="destructive" className="mt-6">
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        )}
+
+        <PathwayDocument state={state} />
+      </main>
     </div>
-  );
-}
-
-function AnchorCard({ anchor }: { anchor: Anchor }) {
-  return (
-    <Card>
-      <CardContent>
-        <div className="flex flex-wrap items-baseline gap-2">
-          <code className="rounded bg-primary px-2 py-0.5 font-mono text-xs font-medium text-primary-foreground">
-            {anchor.standard.statementCode}
-          </code>
-          <span className="text-xs text-muted-foreground">
-            {anchor.standard.academicSubject} · grade {anchor.standard.gradeLevels.join(', ')} ·{' '}
-            {anchor.standard.jurisdiction}
-          </span>
-        </div>
-        <p className="mt-3 text-sm leading-relaxed">{plainMath(anchor.standard.description)}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Marks the text the model is still writing. */
-function Caret() {
-  return (
-    <span
-      aria-hidden
-      className="ml-0.5 inline-block h-3.5 w-px translate-y-0.5 animate-pulse bg-foreground"
-    />
-  );
-}
-
-function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
-        <h2 className="font-heading text-sm font-semibold tracking-wide uppercase">{title}</h2>
-        {note && <span className="text-xs text-muted-foreground">{note}</span>}
-      </div>
-      {children}
-    </section>
   );
 }

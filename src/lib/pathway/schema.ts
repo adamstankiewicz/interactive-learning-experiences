@@ -72,11 +72,31 @@ export const learningOutcome = z.object({
   evidence: z.string().describe('What a student does that shows they reached this outcome'),
 });
 
+/** The widget kinds the registry can render. Keep in step with `widgetSpec`. */
+export const widgetKind = z.enum(['fraction-area-model', 'swiper-flashcard']);
+export type WidgetKind = z.infer<typeof widgetKind>;
+
 export const pathwayStep = z.object({
   title: z.string(),
   purpose: z.enum(['activate', 'model', 'practice', 'check']),
   description: z.string(),
   outcomeIndex: z.number().int().describe('Zero-based index into outcomes[] this step advances'),
+  /**
+   * Composition happens here. Every step is something a student does, so every
+   * step names which interaction does it; a second pass configures the chosen
+   * widget with full context. That keeps the plan call cheap and lets each
+   * widget be configured against the step it actually serves.
+   */
+  widgetKind: widgetKind.describe(
+    [
+      'Which interactive widget the student uses to do this step. Every step gets one — this is',
+      'not supporting material, it is the task.',
+      '"fraction-area-model" partitions a whole into equal parts to build a target fraction —',
+      'only meaningful for fractions. "swiper-flashcard" is a two-way sort of statements',
+      '(true/false, example/non-example, prime/composite) and suits almost any subject, including',
+      'an "activate" step sorting prior statements or a "check" step sorting worked answers.',
+    ].join(' '),
+  ),
 });
 
 /** What the model authors, given graph-verified facts. */
