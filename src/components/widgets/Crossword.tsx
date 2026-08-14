@@ -2,6 +2,9 @@
 
 import { useMemo, useRef, useState } from 'react';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { plainMath } from '@/lib/learning-commons/format';
 import { layoutCrossword, type Direction, type PlacedEntry } from '@/lib/pathway/crossword';
 import type { CrosswordSpec } from '@/lib/pathway/schema';
@@ -207,181 +210,171 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
 
   if (!layout.entries.length) {
     return (
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-        None of this puzzle&rsquo;s terms could be interlocked into a grid.
-      </div>
+      <Alert variant="warning">
+        <AlertDescription>
+          None of this puzzle&rsquo;s terms could be interlocked into a grid.
+        </AlertDescription>
+      </Alert>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-base font-medium text-slate-900 dark:text-slate-100">{spec.title}</p>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{spec.prompt}</p>
+    <Card>
+      <CardContent>
+        <p className="text-base font-medium">{spec.title}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{spec.prompt}</p>
 
-      {/* Grid above clues, always. The pathway column is a fixed 3xl, so a grid
-          wide enough to be worth solving never leaves room for clues beside it. */}
-      <div className="mt-5 flex flex-col gap-6">
-        <div className="overflow-x-auto pb-1">
-          <div
-            role="group"
-            aria-label={spec.title}
-            className="grid w-max"
-            style={{ gridTemplateColumns: `repeat(${layout.cols}, 2rem)` }}
-          >
-            {layout.grid.flatMap((cells, row) =>
-              cells.map((letter, col) => {
-                if (!letter) return <div key={cellKey(row, col)} aria-hidden />;
+        {/* Grid above clues, always. The pathway column is a fixed 3xl, so a grid
+            wide enough to be worth solving never leaves room for clues beside it. */}
+        <div className="mt-5 flex flex-col gap-6">
+          <div className="overflow-x-auto pb-1">
+            <div
+              role="group"
+              aria-label={spec.title}
+              className="grid w-max"
+              style={{ gridTemplateColumns: `repeat(${layout.cols}, 2rem)` }}
+            >
+              {layout.grid.flatMap((cells, row) =>
+                cells.map((letter, col) => {
+                  if (!letter) return <div key={cellKey(row, col)} aria-hidden />;
 
-                const key = cellKey(row, col);
-                const cell = cellEntries.get(key);
-                const number = layout.entries.find(
-                  (entry) => entry.row === row && entry.col === col,
-                )?.number;
-                const value = letters[key] ?? '';
-                const onCursor = cursor?.row === row && cursor?.col === col;
+                  const key = cellKey(row, col);
+                  const cell = cellEntries.get(key);
+                  const number = layout.entries.find(
+                    (entry) => entry.row === row && entry.col === col,
+                  )?.number;
+                  const value = letters[key] ?? '';
+                  const onCursor = cursor?.row === row && cursor?.col === col;
 
-                // Exact 1px rules: each square draws its top and left edge, and
-                // its right or bottom edge only where no open square follows.
-                const openRight = Boolean(layout.grid[row][col + 1]);
-                const openBelow = Boolean(layout.grid[row + 1]?.[col]);
+                  // Exact 1px rules: each square draws its top and left edge, and
+                  // its right or bottom edge only where no open square follows.
+                  const openRight = Boolean(layout.grid[row][col + 1]);
+                  const openBelow = Boolean(layout.grid[row + 1]?.[col]);
 
-                let tone = 'bg-white dark:bg-slate-900';
-                if (checked && value) {
-                  tone =
-                    value === letter
-                      ? 'bg-emerald-100 dark:bg-emerald-950'
-                      : 'bg-rose-100 dark:bg-rose-950';
-                } else if (onCursor) {
-                  tone = 'bg-sky-200 dark:bg-sky-900';
-                } else if (activeCells.has(key)) {
-                  tone = 'bg-sky-50 dark:bg-sky-950';
-                }
+                  // Tints rather than the solid tokens: these squares carry a
+                  // letter, so the fill has to stay behind readable text. Same
+                  // semantics as every other widget — selected, right, look again.
+                  let tone = 'bg-card';
+                  if (checked && value) {
+                    tone = value === letter ? 'bg-success/15' : 'bg-warning/25';
+                  } else if (onCursor) {
+                    tone = 'bg-selected/40';
+                  } else if (activeCells.has(key)) {
+                    tone = 'bg-selected/15';
+                  }
 
-                const label = [cell?.across, cell?.down]
-                  .filter((entry): entry is PlacedEntry => Boolean(entry))
-                  .map((entry) => `${entry.number} ${entry.direction}: ${plainMath(entry.clue)}`)
-                  .join('. ');
+                  const label = [cell?.across, cell?.down]
+                    .filter((entry): entry is PlacedEntry => Boolean(entry))
+                    .map((entry) => `${entry.number} ${entry.direction}: ${plainMath(entry.clue)}`)
+                    .join('. ');
 
-                return (
-                  <div
-                    key={key}
-                    className={`relative h-8 w-8 border-t border-l border-slate-400 dark:border-slate-600 ${
-                      openRight ? '' : 'border-r'
-                    } ${openBelow ? '' : 'border-b'} ${tone}`}
-                  >
-                    {number !== undefined && (
-                      <span className="pointer-events-none absolute top-0 left-0.5 text-[9px] leading-tight text-slate-500 dark:text-slate-400">
-                        {number}
-                      </span>
-                    )}
-                    <input
-                      ref={(element) => {
-                        inputs.current.set(key, element);
-                      }}
-                      value={value}
-                      onChange={(event) => handleChange(row, col, event.target.value)}
-                      onKeyDown={(event) => handleKeyDown(event, row, col)}
-                      onClick={() => handleCellClick(row, col)}
-                      onFocus={(event) => {
-                        event.currentTarget.select();
-                        setCursor((current) => {
-                          if (current?.row === row && current?.col === col) return current;
-                          const direction =
-                            current && cell?.[current.direction]
-                              ? current.direction
-                              : cell?.across
-                                ? 'across'
-                                : 'down';
-                          return { row, col, direction };
-                        });
-                      }}
-                      aria-label={label}
-                      autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="characters"
-                      spellCheck={false}
-                      maxLength={2}
-                      className="h-full w-full bg-transparent pt-1 text-center text-sm font-semibold text-slate-900 uppercase caret-transparent outline-none dark:text-slate-100"
-                    />
-                  </div>
-                );
-              }),
-            )}
+                  return (
+                    <div
+                      key={key}
+                      className={`relative h-8 w-8 border-t border-l border-foreground/40 ${
+                        openRight ? '' : 'border-r'
+                      } ${openBelow ? '' : 'border-b'} ${tone}`}
+                    >
+                      {number !== undefined && (
+                        <span className="pointer-events-none absolute top-0 left-0.5 text-[9px] leading-tight text-muted-foreground">
+                          {number}
+                        </span>
+                      )}
+                      <input
+                        ref={(element) => {
+                          inputs.current.set(key, element);
+                        }}
+                        value={value}
+                        onChange={(event) => handleChange(row, col, event.target.value)}
+                        onKeyDown={(event) => handleKeyDown(event, row, col)}
+                        onClick={() => handleCellClick(row, col)}
+                        onFocus={(event) => {
+                          event.currentTarget.select();
+                          setCursor((current) => {
+                            if (current?.row === row && current?.col === col) return current;
+                            const direction =
+                              current && cell?.[current.direction]
+                                ? current.direction
+                                : cell?.across
+                                  ? 'across'
+                                  : 'down';
+                            return { row, col, direction };
+                          });
+                        }}
+                        aria-label={label}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        maxLength={2}
+                        className="h-full w-full bg-transparent pt-1 text-center text-sm font-semibold uppercase caret-transparent outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                      />
+                    </div>
+                  );
+                }),
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <ClueList
+              title="Across"
+              entries={layout.entries.filter((entry) => entry.direction === 'across')}
+              activeEntry={activeEntry}
+              checked={checked}
+              answerOf={answerOf}
+              onSelect={selectEntry}
+            />
+            <ClueList
+              title="Down"
+              entries={layout.entries.filter((entry) => entry.direction === 'down')}
+              activeEntry={activeEntry}
+              checked={checked}
+              answerOf={answerOf}
+              onSelect={selectEntry}
+            />
           </div>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <ClueList
-            title="Across"
-            entries={layout.entries.filter((entry) => entry.direction === 'across')}
-            activeEntry={activeEntry}
-            checked={checked}
-            answerOf={answerOf}
-            onSelect={selectEntry}
-          />
-          <ClueList
-            title="Down"
-            entries={layout.entries.filter((entry) => entry.direction === 'down')}
-            activeEntry={activeEntry}
-            checked={checked}
-            answerOf={answerOf}
-            onSelect={selectEntry}
-          />
-        </div>
-      </div>
+        {checked && (
+          <Alert role="status" variant={allCorrect ? 'success' : 'warning'} className="mt-5">
+            <AlertDescription>
+              {allCorrect
+                ? spec.successMessage
+                : // Never "the squares in red": the marking is a tint, and colour
+                  // alone should not be what tells a student which squares to fix.
+                  `${solvedCount} of ${layout.entries.length} answers are right. The marked squares do not match — reread those clues.`}
+            </AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          <span className="font-semibold text-slate-900 dark:text-slate-100">{filledCount}</span> of{' '}
-          <span className="font-semibold text-slate-900 dark:text-slate-100">{layout.entries.length}</span>{' '}
-          answers filled
+      <CardFooter className="flex-wrap justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{filledCount}</span> of{' '}
+          <span className="font-semibold text-foreground">{layout.entries.length}</span> answers filled
         </p>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={revealActiveEntry}
-            disabled={!activeEntry}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
-          >
+          <Button variant="outline" size="lg" onClick={revealActiveEntry} disabled={!activeEntry}>
             Reveal {activeEntry ? `${activeEntry.number} ${activeEntry.direction}` : 'answer'}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
             onClick={() => {
               setLetters({});
               setChecked(false);
             }}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
           >
             Clear
-          </button>
-          <button
-            type="button"
-            onClick={() => setChecked(true)}
-            disabled={!hasLetters}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
-          >
+          </Button>
+          <Button size="lg" onClick={() => setChecked(true)} disabled={!hasLetters}>
             Check
-          </button>
+          </Button>
         </div>
-      </div>
-
-      {checked && (
-        <p
-          role="status"
-          className={`mt-3 rounded-md px-3 py-2 text-sm ${
-            allCorrect
-              ? 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100'
-              : 'bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100'
-          }`}
-        >
-          {allCorrect
-            ? spec.successMessage
-            : `${solvedCount} of ${layout.entries.length} answers are right. Squares in red do not match — reread those clues.`}
-        </p>
-      )}
-    </div>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -404,9 +397,7 @@ function ClueList({
 
   return (
     <div>
-      <h3 className="text-xs font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
-        {title}
-      </h3>
+      <h3 className="font-heading text-xs font-semibold tracking-wide uppercase">{title}</h3>
       <ul className="mt-2 space-y-1">
         {entries.map((entry) => {
           const isActive = entry === activeEntry;
@@ -418,20 +409,21 @@ function ClueList({
                 type="button"
                 onClick={() => onSelect(entry)}
                 aria-current={isActive}
-                className={`w-full rounded px-2 py-1 text-left text-sm transition ${
-                  isActive
-                    ? 'bg-sky-50 text-slate-900 dark:bg-sky-900/40 dark:text-slate-100'
-                    : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
+                className={`w-full rounded px-2 py-1 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-ring ${
+                  // Heavier than the grid's active-entry tint: a square reads as
+                  // highlighted against its outlined neighbours, a line of text
+                  // has nothing to be compared against.
+                  isActive ? 'bg-selected/25' : 'hover:bg-muted'
                 }`}
               >
                 <span className="font-semibold">{entry.number}.</span>{' '}
                 <span className={isSolved ? 'line-through opacity-60' : undefined}>
                   {plainMath(entry.clue)}
                 </span>{' '}
-                <span className="text-slate-400 dark:text-slate-500">({entry.answer.length})</span>
+                <span className="text-muted-foreground">({entry.answer.length})</span>
                 {/* Where the term came from, so a teacher can see the puzzle is not invented vocabulary. */}
                 {entry.sourceCode && (
-                  <span className="ml-1 text-[11px] text-slate-400 dark:text-slate-500">
+                  <span className="ml-1 text-[11px] text-muted-foreground">
                     {entry.source === 'prerequisite' ? 'prereq ' : ''}
                     {entry.sourceCode}
                   </span>
