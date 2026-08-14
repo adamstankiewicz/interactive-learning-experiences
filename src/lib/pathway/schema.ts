@@ -40,8 +40,29 @@ export const fractionAreaModelSpec = z.object({
 
 export type FractionAreaModelSpec = z.infer<typeof fractionAreaModelSpec>;
 
+export const swiperFlashcardSpec = z.object({
+  kind: z.literal('swiper-flashcard'),
+  learningComponentId: z.string().nullable(),
+  cards: z
+    .array(
+      z.object({
+        question: z.string().describe('Text shown on the face of the card'),
+        leftLabel: z.string().describe('Label shown on the left swipe affordance'),
+        rightLabel: z.string().describe('Label shown on the right swipe affordance'),
+        correctDirection: z.enum(['left', 'right']).describe('Which direction is the correct answer'),
+        explanation: z.string().describe('Brief explanation shown after the student swipes'),
+      }),
+    )
+    .describe('Give 4-8 cards.'),
+});
+
+export type SwiperFlashcardSpec = z.infer<typeof swiperFlashcardSpec>;
+
 /** Discriminated union — add widget kinds here as generators are registered. */
-export const widgetSpec = z.discriminatedUnion('kind', [fractionAreaModelSpec]);
+export const widgetSpec = z.discriminatedUnion('kind', [
+  fractionAreaModelSpec,
+  swiperFlashcardSpec,
+]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
 export const learningOutcome = z.object({

@@ -2,6 +2,7 @@
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
+import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
 
 /**
@@ -13,6 +14,8 @@ function render(spec: WidgetSpec) {
   switch (spec.kind) {
     case 'fraction-area-model':
       return <FractionAreaModel spec={spec} />;
+    case 'swiper-flashcard':
+      return <SwiperFlashcard spec={spec} />;
   }
 }
 
