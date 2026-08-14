@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { plainMath } from '@/lib/learning-commons/format';
 import type { PathwayResult } from '@/lib/pathway/generate';
@@ -50,10 +54,8 @@ export function PathwayBuilder() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          Topic to student pathway
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">Topic to student pathway</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Enter a topic. It resolves against the Learning Commons knowledge graph for the authoritative
           standard, its learning components, and its prerequisites — then becomes a pedagogical pathway
           with one interactive widget.
@@ -62,51 +64,51 @@ export function PathwayBuilder() {
 
       <form onSubmit={submit} className="mt-8 space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <input
+          <Input
             value={topic}
             onChange={(event) => setTopic(event.target.value)}
             placeholder="e.g. understanding fractions"
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-300"
+            aria-label="Topic"
+            className="h-10 flex-1"
           />
-          <input
+          <Input
             value={gradeHint}
             onChange={(event) => setGradeHint(event.target.value)}
             placeholder="grade (optional)"
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-900 sm:w-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-300"
+            aria-label="Grade"
+            className="h-10 sm:w-40"
           />
-          <button
-            type="submit"
-            disabled={loading || !topic.trim()}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
-          >
+          <Button type="submit" size="lg" disabled={loading || !topic.trim()} className="h-10 px-5">
             {loading ? 'Building…' : 'Build'}
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
           {EXAMPLES.map((example) => (
-            <button
+            <Button
               key={example}
               type="button"
+              variant="outline"
+              size="xs"
               onClick={() => setTopic(example)}
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-100"
+              className="rounded-full text-muted-foreground"
             >
               {example}
-            </button>
+            </Button>
           ))}
         </div>
       </form>
 
       {loading && (
-        <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-8 text-sm text-muted-foreground">
           Proposing standards, verifying against the graph, planning the pathway…
         </p>
       )}
 
       {error && (
-        <div className="mt-8 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
-          {error}
-        </div>
+        <Alert variant="destructive" className="mt-8">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {result && <Pathway result={result} />}
@@ -120,29 +122,29 @@ function Pathway({ result }: { result: PathwayResult }) {
   return (
     <div className="mt-10 space-y-8">
       <Section title="Anchor standard" note="Verified against the Learning Commons graph">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <code className="rounded bg-slate-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-slate-100 dark:text-slate-900">
-              {anchor.standard.statementCode}
-            </code>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {anchor.standard.academicSubject} · grade {anchor.standard.gradeLevels.join(', ')} ·{' '}
-              {anchor.standard.jurisdiction}
-            </span>
-          </div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {plainMath(anchor.standard.description)}
-          </p>
-        </div>
+        <Card>
+          <CardContent>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <code className="rounded bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
+                {anchor.standard.statementCode}
+              </code>
+              <span className="text-xs text-muted-foreground">
+                {anchor.standard.academicSubject} · grade {anchor.standard.gradeLevels.join(', ')} ·{' '}
+                {anchor.standard.jurisdiction}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed">{plainMath(anchor.standard.description)}</p>
+          </CardContent>
+        </Card>
         {rejectedCodes.length > 0 && (
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             Rejected by the graph before this one: {rejectedCodes.join(', ')}
           </p>
         )}
       </Section>
 
       <Section title="Big idea">
-        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{plan.bigIdea}</p>
+        <p className="text-sm leading-relaxed">{plan.bigIdea}</p>
       </Section>
 
       <Section
@@ -155,17 +157,18 @@ function Pathway({ result }: { result: PathwayResult }) {
       >
         <ol className="space-y-3">
           {plan.outcomes.map((outcome, index) => (
-            <li
-              key={index}
-              className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{outcome.statement}</p>
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Evidence: {outcome.evidence}</p>
-              {outcome.learningComponentId && (
-                <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-600">
-                  LC {outcome.learningComponentId}
-                </p>
-              )}
+            <li key={index}>
+              <Card size="sm">
+                <CardContent>
+                  <p className="text-sm font-medium">{outcome.statement}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Evidence: {outcome.evidence}</p>
+                  {outcome.learningComponentId && (
+                    <p className="mt-2 text-[11px] text-muted-foreground/70">
+                      LC {outcome.learningComponentId}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </li>
           ))}
         </ol>
@@ -175,8 +178,8 @@ function Pathway({ result }: { result: PathwayResult }) {
         <Section title="Prior knowledge to activate" note="From the SAP coherence map">
           <ul className="space-y-2">
             {anchor.prerequisites.map((prerequisite) => (
-              <li key={prerequisite.caseIdentifierUUID} className="text-sm text-slate-700 dark:text-slate-300">
-                <code className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <li key={prerequisite.caseIdentifierUUID} className="text-sm">
+                <code className="text-xs font-medium text-muted-foreground">
                   {prerequisite.statementCode}
                 </code>{' '}
                 {plainMath(prerequisite.description)}
@@ -189,7 +192,7 @@ function Pathway({ result }: { result: PathwayResult }) {
       <Section title="Misconceptions to watch for">
         <ul className="list-disc space-y-1.5 pl-5">
           {plan.misconceptions.map((misconception, index) => (
-            <li key={index} className="text-sm text-slate-700 dark:text-slate-300">
+            <li key={index} className="text-sm">
               {misconception}
             </li>
           ))}
@@ -200,12 +203,12 @@ function Pathway({ result }: { result: PathwayResult }) {
         <ol className="space-y-3">
           {plan.steps.map((step, index) => (
             <li key={index} className="flex gap-4">
-              <span className="mt-0.5 h-6 shrink-0 rounded bg-slate-100 px-2 text-xs leading-6 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+              <span className="mt-0.5 h-6 shrink-0 rounded bg-muted px-2 text-xs leading-6 font-medium text-muted-foreground">
                 {PURPOSE_LABEL[step.purpose] ?? step.purpose}
               </span>
               <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{step.title}</p>
-                <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{step.description}</p>
+                <p className="text-sm font-medium">{step.title}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p>
               </div>
             </li>
           ))}
@@ -216,9 +219,9 @@ function Pathway({ result }: { result: PathwayResult }) {
         {widget ? (
           <WidgetRenderer spec={widget} />
         ) : (
-          <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-            {widgetNote}
-          </p>
+          <Alert>
+            <AlertDescription>{widgetNote}</AlertDescription>
+          </Alert>
         )}
       </Section>
     </div>
@@ -229,10 +232,8 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
-        <h2 className="text-sm font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
-          {title}
-        </h2>
-        {note && <span className="text-xs text-slate-500 dark:text-slate-500">{note}</span>}
+        <h2 className="font-heading text-sm font-semibold tracking-wide uppercase">{title}</h2>
+        {note && <span className="text-xs text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>

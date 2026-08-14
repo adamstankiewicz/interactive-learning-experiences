@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
 
@@ -24,9 +25,9 @@ export function WidgetRenderer({ spec }: { spec: unknown }) {
 
   if (!parsed.success) {
     return (
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-        This widget spec did not match any registered schema.
-      </div>
+      <Alert variant="warning">
+        <AlertDescription>This widget spec did not match any registered schema.</AlertDescription>
+      </Alert>
     );
   }
 
