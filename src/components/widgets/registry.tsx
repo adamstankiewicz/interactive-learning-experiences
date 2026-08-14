@@ -1,6 +1,8 @@
 'use client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DragCategorize } from '@/components/widgets/DragCategorize';
+import { DragSort } from '@/components/widgets/DragSort';
 import { DraftMeter } from '@/components/widgets/DraftMeter';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';

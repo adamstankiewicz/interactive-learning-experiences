@@ -118,11 +118,61 @@ export const draftMeterSpec = z.object({
 
 export type DraftMeterSpec = z.infer<typeof draftMeterSpec>;
 
+export const dragSortSpec = z.object({
+  kind: z.literal('drag-sort'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the list, e.g. "Order these events from earliest to latest."'),
+  items: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this item'),
+        label: z.string().describe('Text shown on the draggable chip'),
+      }),
+    )
+    .describe('Give 4-8 items. They will be shuffled before display.'),
+  correctOrder: z
+    .array(z.string())
+    .describe('Item ids in the correct order, first to last.'),
+  successMessage: z.string().describe('Shown when the student arranges all items correctly.'),
+  hint: z.string().describe('Shown after a wrong submission; names the misconception or gives a nudge.'),
+});
+
+export type DragSortSpec = z.infer<typeof dragSortSpec>;
+
+export const dragCategorizeSpec = z.object({
+  kind: z.literal('drag-categorize'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the activity, e.g. "Sort each term into the correct era."'),
+  categories: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this category'),
+        label: z.string().describe('Column heading shown to the student'),
+      }),
+    )
+    .describe('Give 2-4 categories.'),
+  items: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this item'),
+        label: z.string().describe('Text shown on the draggable chip'),
+        categoryId: z.string().describe('id of the category this item belongs to'),
+      }),
+    )
+    .describe('Give 4-10 items spread across the categories.'),
+  successMessage: z.string().describe('Shown when all items are placed correctly.'),
+  hint: z.string().describe('Shown after a wrong submission; names the misconception or gives a nudge.'),
+});
+
+export type DragCategorizeSpec = z.infer<typeof dragCategorizeSpec>;
+
 /** Discriminated union — add widget kinds here as generators are registered. */
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
   draftMeterSpec,
+  dragSortSpec,
+  dragCategorizeSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
