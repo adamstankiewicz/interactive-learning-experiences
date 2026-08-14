@@ -44,10 +44,11 @@ const BUILDING_LINES = [
 /**
  * Some widgets (swiper-flashcard, drag-sort, drag-categorize) report their own
  * completion through `onComplete` — there is a moment the student is
- * unambiguously "done". Fraction area model and Draft Meter have no such
- * moment: an area model is checked as many times as a student likes, and a
- * meter just keeps scoring as they type. Those two need an explicit "I'm
- * done" action instead of an automatic one.
+ * unambiguously "done". Fraction area model, Draft Meter, and Crossword have
+ * no such moment: an area model is checked as many times as a student likes,
+ * a meter just keeps scoring as they type, and a crossword can sit
+ * partially solved. Those three need an explicit "I'm done" action instead
+ * of an automatic one.
  */
 const SELF_ADVANCING_KINDS = new Set(['swiper-flashcard', 'drag-sort', 'drag-categorize']);
 
@@ -309,8 +310,8 @@ export default function LearnPage() {
                   />
                 </WidgetTelemetryProvider>
 
-                {/* Fraction area model and Draft Meter have no "done" moment of
-                    their own, so the student says when they're ready to move on. */}
+                {/* Fraction area model, Draft Meter, and Crossword have no "done"
+                    moment of their own, so the student says when they're ready to move on. */}
                 {currentKind && !SELF_ADVANCING_KINDS.has(currentKind) && (
                   <button
                     type="button"

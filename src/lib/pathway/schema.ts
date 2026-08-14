@@ -165,6 +165,48 @@ export const dragCategorizeSpec = z.object({
 });
 
 export type DragCategorizeSpec = z.infer<typeof dragCategorizeSpec>;
+export const crosswordEntrySpec = z.object({
+  answer: z
+    .string()
+    .describe(
+      'The term typed into the grid. One word, 3-12 letters, letters only — no spaces, hyphens, digits or punctuation. Case is ignored.',
+    ),
+  clue: z
+    .string()
+    .describe(
+      'One student-facing line at the grade level of the standard. Never contains the answer or a word sharing its root.',
+    ),
+  source: z
+    .enum(['anchor', 'prerequisite'])
+    .describe(
+      '"anchor" for vocabulary the anchor standard and its learning components carry; "prerequisite" for terms drawn from earlier standards.',
+    ),
+  sourceCode: z
+    .string()
+    .nullable()
+    .describe('Statement code the term came from, e.g. "3.NF.A.1". Null for general academic vocabulary.'),
+});
+
+export type CrosswordEntrySpec = z.infer<typeof crosswordEntrySpec>;
+
+/**
+ * Terms and clues only. The grid itself is interlocked in code — see
+ * `pathway/crossword.ts` — so nothing here can describe an impossible puzzle.
+ */
+export const crosswordSpec = z.object({
+  kind: z.literal('crossword'),
+  learningComponentId: z.string().nullable(),
+  title: z.string().describe('Short heading, e.g. "Fraction vocabulary"'),
+  prompt: z.string().describe('One line telling the student what to do'),
+  entries: z
+    .array(crosswordEntrySpec)
+    .describe(
+      'Give 12-16 terms, most central first. Vary the lengths and include at least four 3-5 letter terms: short words with common letters are what let the grid interlock. Terms that share letters with each other beat terms that do not.',
+    ),
+  successMessage: z.string(),
+});
+
+export type CrosswordSpec = z.infer<typeof crosswordSpec>;
 
 /** Discriminated union — add widget kinds here as generators are registered. */
 export const widgetSpec = z.discriminatedUnion('kind', [
@@ -173,6 +215,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   draftMeterSpec,
   dragSortSpec,
   dragCategorizeSpec,
+  crosswordSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
@@ -190,6 +233,7 @@ export const widgetKind = z.enum([
   'draft-meter',
   'drag-sort',
   'drag-categorize',
+  'crossword',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 
@@ -220,6 +264,9 @@ export const pathwayStep = z.object({
       'standards about writing an argument (W, WHST) or citing textual evidence (RL/RI/RH/RST',
       'strands 1 and 8) — it is meaningless for any other standard. It is also the heaviest',
       'interaction: use it for at most one step in a pathway, normally "practice" or "check".',
+      '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
+      'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
+      'lesson taught, not for introducing a concept the student has not met yet.',
     ].join(' '),
   ),
 });

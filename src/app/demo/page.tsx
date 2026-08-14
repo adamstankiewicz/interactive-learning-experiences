@@ -14,7 +14,7 @@ const WIDGETS = [
     slug: 'swiper-flashcard',
     name: 'Swiper Flashcard',
     description:
-      'Swipe a card left or right to answer a question or sort a statement into a category. Supports drag gestures and emits a completion event with per-card results.',
+      'Swipe a card up or down to answer a question or sort a statement into a category. Supports drag gestures and emits a completion event with per-card results.',
     tags: ['flashcards', 'true/false', 'sorting'],
   },
   {
@@ -23,6 +23,27 @@ const WIDGETS = [
     description:
       'Write a short response and one line scores how strong the argument is, from a live model call on a debounce. Optionally supplies a source passage, so "evidence" means citing the text.',
     tags: ['writing', 'argument', 'live scoring'],
+  },
+  {
+    slug: 'drag-sort',
+    name: 'Drag & Sort',
+    description:
+      'Drag items into the correct order — timelines, rankings, sequences, and more. Emits a completion event when the student confirms a correct arrangement.',
+    tags: ['ordering', 'timeline', 'ranking'],
+  },
+  {
+    slug: 'drag-categorize',
+    name: 'Drag & Categorize',
+    description:
+      'Drag items from a bank into labeled category columns. Supports 2–4 categories with all-or-nothing submission and per-item correctness feedback.',
+    tags: ['sorting', 'categorization', 'classification'],
+  },
+  {
+    slug: 'crossword',
+    name: 'Crossword',
+    description:
+      'Solve a vocabulary crossword built from a standard and its prerequisites. The spec carries only terms and clues — the grid is interlocked in code — and each clue names the standard it came from.',
+    tags: ['vocabulary', 'any subject', 'keyboard'],
   },
 ];
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Crossword } from '@/components/widgets/Crossword';
 import { DragCategorize } from '@/components/widgets/DragCategorize';
 import { DragSort } from '@/components/widgets/DragSort';
 import { DraftMeter } from '@/components/widgets/DraftMeter';
@@ -16,9 +17,10 @@ import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
  * `onComplete` is deliberately payload-free — each widget's internal result
  * shape (swipe results, sort correctness) is that widget's own business. A
  * caller that walks a student through several widgets in sequence only ever
- * needs to know "this one is done," never what was in it. Fraction area model
- * and Draft Meter have no notion of "done" (an area model is checked
- * repeatedly; a meter just keeps scoring) and so never call it.
+ * needs to know "this one is done," never what was in it. Fraction area model,
+ * Draft Meter, and Crossword have no notion of "done" (an area model is
+ * checked repeatedly, a meter just keeps scoring, a crossword is solved cell
+ * by cell with no single completion moment) and so never call it.
  */
 function render(spec: WidgetSpec, onComplete?: () => void) {
   switch (spec.kind) {
@@ -32,6 +34,8 @@ function render(spec: WidgetSpec, onComplete?: () => void) {
       return <DragSort spec={spec} onComplete={onComplete} />;
     case 'drag-categorize':
       return <DragCategorize spec={spec} onComplete={onComplete} />;
+    case 'crossword':
+      return <Crossword spec={spec} />;
   }
 }
 

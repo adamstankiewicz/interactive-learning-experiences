@@ -5,8 +5,10 @@ import {
   type StandardStatement,
 } from '@/lib/learning-commons/client';
 import { FRACTION_CODE, READING_EVIDENCE_CODE, WRITING_CODE } from '@/lib/pathway/coverage';
+import { layoutCrossword, sanitizeAnswer } from '@/lib/pathway/crossword';
 import type { Anchor, DeepPartial, PathwayEvent } from '@/lib/pathway/events';
 import {
+  crosswordSpec,
   draftMeterSpec,
   dragCategorizeSpec,
   dragSortSpec,
@@ -14,6 +16,7 @@ import {
   pathwayPlan,
   standardProposal,
   swiperFlashcardSpec,
+  type CrosswordSpec,
   type DragCategorizeSpec,
   type DragSortSpec,
   type FractionAreaModelSpec,
@@ -118,6 +121,51 @@ function normalizeDragCategorize(spec: DragCategorizeSpec): DragCategorizeSpec {
   );
 
   return { ...spec, categories, items };
+}
+
+/**
+ * A crossword is only a crossword if the words interlock. The model authors
+ * terms, `layoutCrossword` decides which of them earn a square, and anything
+ * that cannot cross what is already on the grid is dropped here rather than
+ * shipped as a clue pointing at nothing. Ported from Bethany's pathway-level
+ * crossword generator — the interlocking algorithm and its rules are unchanged,
+ * only the call site (per-step now, not once per pathway) differs.
+ */
+const MIN_CROSSWORD_ENTRIES = 5;
+const MAX_CROSSWORD_ENTRIES = 18;
+
+function normalizeCrossword(spec: CrosswordSpec): { widget: CrosswordSpec | null; note: string | null } {
+  const requested = spec.entries.slice(0, MAX_CROSSWORD_ENTRIES);
+  const layout = layoutCrossword(requested);
+
+  if (layout.entries.length < MIN_CROSSWORD_ENTRIES) {
+    return {
+      widget: null,
+      note: `Only ${layout.entries.length} of ${requested.length} generated terms interlocked into a grid — too few for a crossword, so none is shown.`,
+    };
+  }
+
+  // Keep the survivors in their authored order, carrying the sanitized answer.
+  // Layout is deterministic and greedy, so replaying it on this pruned list in
+  // the browser reproduces exactly the grid measured here.
+  const placed = new Set(layout.entries.map((entry) => entry.answer));
+  const kept: CrosswordSpec['entries'] = [];
+  const seen = new Set<string>();
+
+  for (const entry of requested) {
+    const answer = sanitizeAnswer(entry.answer);
+    if (!placed.has(answer) || seen.has(answer)) continue;
+
+    seen.add(answer);
+    kept.push({ ...entry, answer });
+  }
+
+  return {
+    widget: { ...spec, entries: kept },
+    note: layout.unplaced.length
+      ? `${layout.unplaced.length} generated term${layout.unplaced.length === 1 ? '' : 's'} could not interlock and was dropped from the crossword: ${layout.unplaced.join(', ')}.`
+      : null,
+  };
 }
 
 /**
@@ -289,7 +337,9 @@ function widgetContext(anchor: Anchor, plan: PathwayPlan, step: PathwayPlan['ste
  * omission — this is the only place `widgetKind` can differ from what the plan
  * asked for, and it always resolves to a kind that fits the standard.
  * `swiper-flashcard` is the fallback for both gated kinds: it has no subject
- * restriction of its own, so it always fits.
+ * restriction of its own, so it always fits. `crossword` is never gated here
+ * at all — every standard carries vocabulary, so it is always a valid choice
+ * (see `coverage.ts`'s `CROSSWORD_SERVES_EVERY_STANDARD`).
  */
 function resolveWidgetKind(
   requested: WidgetKind,
@@ -313,6 +363,37 @@ function resolveWidgetKind(
   }
 
   return { kind: requested, note: null };
+}
+
+/**
+ * A crossword can legitimately come back too sparse to interlock (see
+ * `normalizeCrossword`) — the one widget kind whose *normalization*, not just
+ * its subject-match, can fail. When that happens the step still needs
+ * something, so it falls back the same way a subject mismatch does.
+ */
+/**
+ * Broken out because it has two call sites: the normal `swiper-flashcard`
+ * case below, and the crossword case's own fallback when too few terms
+ * interlock to make a puzzle (see `normalizeCrossword`). Swiper-flashcard has
+ * no subject restriction of its own, which is what makes it a safe landing
+ * spot for either kind of failure.
+ */
+async function generateSwiperFlashcard(context: string): Promise<SwiperFlashcardSpec> {
+  const spec = await generateStructured({
+    schema: swiperFlashcardSpec,
+    system: [
+      'You configure a two-way sorting activity: the student reads a statement on a card and',
+      'swipes it up or down into one of two labelled buckets.',
+      'Pick a single, consistent dichotomy for the whole set (true/false, example/non-example,',
+      'equivalent/not equivalent) and use the same two labels on every card.',
+      'Write cards that discriminate: at least one should sit on a known misconception, so a',
+      'student holding it sorts wrongly. Vary which direction is correct across the set.',
+      'Each explanation names why the answer is what it is, in one student-facing sentence.',
+    ].join(' '),
+    prompt: context,
+  });
+
+  return normalizeFlashcards(spec);
 }
 
 async function attemptStepWidget(
@@ -341,23 +422,8 @@ async function attemptStepWidget(
       return { widget: normalizeWidget(spec), note };
     }
 
-    case 'swiper-flashcard': {
-      const spec = await generateStructured({
-        schema: swiperFlashcardSpec,
-        system: [
-          'You configure a two-way sorting activity: the student reads a statement on a card and',
-          'swipes it up or down into one of two labelled buckets.',
-          'Pick a single, consistent dichotomy for the whole set (true/false, example/non-example,',
-          'equivalent/not equivalent) and use the same two labels on every card.',
-          'Write cards that discriminate: at least one should sit on a known misconception, so a',
-          'student holding it sorts wrongly. Vary which direction is correct across the set.',
-          'Each explanation names why the answer is what it is, in one student-facing sentence.',
-        ].join(' '),
-        prompt: context,
-      });
-
-      return { widget: normalizeFlashcards(spec), note };
-    }
+    case 'swiper-flashcard':
+      return { widget: await generateSwiperFlashcard(context), note };
 
     // The standard's wording is copied into the spec verbatim rather than
     // regenerated: the scoring call needs the graph's text, not a paraphrase.
@@ -440,6 +506,54 @@ async function attemptStepWidget(
       });
 
       return { widget: normalizeDragCategorize(spec), note };
+    }
+
+    case 'crossword': {
+      const prerequisiteBlock = anchor.prerequisites.length
+        ? anchor.prerequisites
+            .map((p) => `- ${p.statementCode} (grade ${p.gradeLevel}): ${p.description}`)
+            .join('\n')
+        : '(no prerequisite standards published — draw the supporting terms from the anchor standard instead)';
+
+      const spec = await generateStructured({
+        schema: crosswordSpec,
+        system: [
+          'You write the terms and clues for a vocabulary crossword. You do not lay out a grid:',
+          'the words are interlocked by an algorithm afterwards, and any word that cannot cross',
+          'another is thrown away — so supply words that share letters, and plenty of short ones.',
+          'Terms are the vocabulary this standard makes students read, say and write — words that',
+          'would earn a place on the classroom word wall. Never lift incidental words out of the',
+          'phrasing of a standard: in "the quantity formed by 1 part", the term being taught is',
+          '"unit fraction", not "quantity" or "formed". Draw the central terms from the anchor',
+          'standard, its learning components and the learning outcomes; mark those source',
+          '"anchor". Fill the rest from the prerequisite standards, marked source "prerequisite",',
+          'so solving the puzzle rehearses the prior knowledge the lesson depends on.',
+          'Set sourceCode to the statement code the term came from.',
+          'A clue defines or exemplifies the term in the plainest language the grade band allows.',
+          'Never put the answer, its plural, or a word sharing its root inside its own clue.',
+          'Write clues in words, never in LaTeX or symbols. Where a known misconception has a',
+          'name, clue the correct term precisely enough to rule the misconception out.',
+          'No proper nouns, no abbreviations, no two entries meaning the same thing.',
+        ].join(' '),
+        prompt: [
+          context,
+          '',
+          'Prerequisite standards (source of the supporting terms):',
+          prerequisiteBlock,
+        ].join('\n'),
+      });
+
+      const result = normalizeCrossword(spec);
+      if (result.widget) return { widget: result.widget, note };
+
+      // Too few terms interlocked for a solvable grid — the one way this
+      // kind's own normalization, not just a subject mismatch, can fail. The
+      // step still needs a widget, so it falls back the same way the gated
+      // kinds do above.
+      return {
+        widget: await generateSwiperFlashcard(context),
+        note: [note, result.note].filter(Boolean).join(' '),
+      };
     }
   }
 }
