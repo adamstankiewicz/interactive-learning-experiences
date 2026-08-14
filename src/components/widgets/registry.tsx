@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DraftMeter } from '@/components/widgets/DraftMeter';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
@@ -16,6 +17,8 @@ function render(spec: WidgetSpec) {
       return <FractionAreaModel spec={spec} />;
     case 'swiper-flashcard':
       return <SwiperFlashcard spec={spec} />;
+    case 'draft-meter':
+      return <DraftMeter spec={spec} />;
   }
 }
 

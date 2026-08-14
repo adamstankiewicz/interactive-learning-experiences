@@ -1,4 +1,4 @@
-import { generateText, streamText, Output } from 'ai';
+import { streamText, Output } from 'ai';
 import type { FlexibleSchema } from 'ai';
 
 import { pathwayModel } from '@/lib/model';
@@ -10,37 +10,27 @@ import {
 } from '@/lib/learning-commons/client';
 import type { Anchor, DeepPartial, PathwayEvent } from '@/lib/pathway/events';
 import {
+  COVERAGE_SENTENCE,
+  FRACTION_CODE,
+  READING_EVIDENCE_CODE,
+  WRITING_CODE,
+  hasGeneratorFor,
+} from '@/lib/pathway/coverage';
+import {
+  draftMeterSpec,
   fractionAreaModelSpec,
   pathwayPlan,
   standardProposal,
+  type DraftMeterSpec,
   type FractionAreaModelSpec,
   type PathwayPlan,
+  type WidgetSpec,
 } from '@/lib/pathway/schema';
+import { generateStructured } from '@/lib/structured';
 
 export type { Anchor };
 
 const MODEL = pathwayModel();
-
-/**
- * Every stage here is the same shape: a schema, a system prompt, and a user
- * prompt, in and a validated object out. `generateObject` is deprecated in AI
- * SDK v7 in favour of `generateText` with an `output` spec, so that lives in
- * one place rather than being repeated at each call site.
- */
-async function generateStructured<T>(options: {
-  schema: FlexibleSchema<T>;
-  system: string;
-  prompt: string;
-}): Promise<T> {
-  const result = await generateText({
-    model: MODEL,
-    output: Output.object({ schema: options.schema }),
-    system: options.system,
-    prompt: options.prompt,
-  });
-
-  return result.output;
-}
 
 /**
  * The same call, surfaced incrementally. The plan is the slowest stage by far
@@ -117,7 +107,7 @@ export type PathwayResult = {
   /** Codes the model proposed that the graph rejected — surfaced, not hidden. */
   rejectedCodes: string[];
   plan: PathwayPlan;
-  widget: FractionAreaModelSpec | null;
+  widget: WidgetSpec | null;
   /** Why no widget, when widget is null. */
   widgetNote: string | null;
 };
@@ -213,28 +203,27 @@ async function* planPathway(
 }
 
 /**
- * Stage 5 — generate the one widget we have a generator for.
+ * Stage 5 — configure a widget for the anchor standard.
  *
- * The registry has exactly one entry today. Rather than force every topic
- * through a fraction model, this gates on the standard actually being about
- * fractions and returns a note otherwise — the honest shape of a first step.
+ * Each generator declares the standards it can serve (see `coverage.ts`).
+ * Rather than force every topic through whichever widget happens to exist, an
+ * unmatched standard returns a note explaining why — the honest shape of a
+ * first step.
  */
-const FRACTION_CODE = /^(3|4|5)\.NF\./;
 
-async function generateWidget(
+/** Shared context block — the graph's skill decomposition, when it has one. */
+function componentBlockFor(anchor: Anchor): string {
+  return (
+    anchor.learningComponents.map((c) => `- id: ${c.identifier}\n  skill: ${c.description}`).join('\n') ||
+    '(none published for this standard)'
+  );
+}
+
+async function generateFractionAreaModel(
   anchor: Anchor,
   plan: PathwayPlan,
-): Promise<{ widget: FractionAreaModelSpec | null; note: string | null }> {
-  if (!FRACTION_CODE.test(anchor.standard.statementCode)) {
-    return {
-      widget: null,
-      note: `No widget generator is registered for ${anchor.standard.statementCode} yet. The only generator so far builds fraction area models (3–5.NF). The pathway above is still fully grounded in the graph.`,
-    };
-  }
-
-  const componentBlock = anchor.learningComponents
-    .map((c) => `- id: ${c.identifier}\n  skill: ${c.description}`)
-    .join('\n');
+): Promise<FractionAreaModelSpec> {
+  const componentBlock = componentBlockFor(anchor);
 
   const spec = await generateStructured({
     schema: fractionAreaModelSpec,
@@ -262,7 +251,90 @@ async function generateWidget(
     ].join('\n'),
   });
 
-  return { widget: normalizeWidget(spec), note: null };
+  return normalizeWidget(spec);
+}
+
+/**
+ * The standard's wording is copied into the spec verbatim rather than
+ * regenerated: the scoring call needs the graph's text, not a paraphrase.
+ *
+ * Two modes, decided by the standard rather than by the model. A reading
+ * standard asks the student to cite a source, so one has to exist; a writing
+ * standard asks them to argue from their own knowledge, and a passage there
+ * would quietly change the task.
+ */
+async function generateDraftMeter(anchor: Anchor, plan: PathwayPlan): Promise<DraftMeterSpec> {
+  const needsPassage = READING_EVIDENCE_CODE.test(anchor.standard.statementCode);
+
+  const mode = needsPassage
+    ? [
+        'This is a READING standard, so the widget supplies a source passage the student reads',
+        'before answering. Write it yourself: 40-120 words, age-appropriate, with a real position or',
+        'tension in it worth disagreeing about, and give it a plausible short attribution.',
+        'The question must be answerable ONLY from that passage — it asks the student to take a',
+        'position about the text and back it with something the passage actually says.',
+      ]
+    : [
+        'This is a WRITING standard, so set passage to null.',
+        'The question must be answerable in three to five sentences by a middle schooler with no',
+        'source material in front of them, and must have a real second side — a question with one',
+        'obvious answer produces no argument to measure.',
+        "Prefer something in a student's own life over an abstract civic topic.",
+      ];
+
+  const spec = await generateStructured({
+    schema: draftMeterSpec,
+    system: [
+      'You configure a Draft Meter: a question, a textbox, and one line that scores the strength',
+      'of what the student writes.',
+      ...mode,
+      'The criteria name what a strong answer contains; they ground the scorer and are never shown.',
+      'standardForStudents IS shown to the student behind a "?", so it must name what counts as done',
+      'in plain words — the point is that they can see the goalposts, not just be measured against them.',
+    ].join(' '),
+    prompt: [
+      `Standard ${anchor.standard.statementCode}: ${anchor.standard.description}`,
+      '',
+      'Learning components:',
+      componentBlockFor(anchor),
+      '',
+      'Pathway outcomes:',
+      plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
+      '',
+      `Grade band: ${plan.gradeBand}`,
+      '',
+      'Copy standardCode and standardDescription from the standard above exactly as given.',
+      'Configure the widget for the "practice" step of this pathway.',
+    ].join('\n'),
+  });
+
+  // The mode is the pipeline's call, not the model's — a passage on a writing
+  // standard would change the task the standard actually asks for.
+  return {
+    ...spec,
+    criteria: spec.criteria.slice(0, 4),
+    passage: needsPassage ? spec.passage : null,
+  };
+}
+
+async function generateWidget(
+  anchor: Anchor,
+  plan: PathwayPlan,
+): Promise<{ widget: WidgetSpec | null; note: string | null }> {
+  const code = anchor.standard.statementCode;
+
+  if (FRACTION_CODE.test(code)) {
+    return { widget: await generateFractionAreaModel(anchor, plan), note: null };
+  }
+
+  if (WRITING_CODE.test(code) || READING_EVIDENCE_CODE.test(code)) {
+    return { widget: await generateDraftMeter(anchor, plan), note: null };
+  }
+
+  return {
+    widget: null,
+    note: `No widget generator is registered for ${code} yet. Generators so far cover ${COVERAGE_SENTENCE}. The pathway above is still fully grounded in the graph.`,
+  };
 }
 
 /**
@@ -340,7 +412,7 @@ export async function* streamPathway(
 
   // The widget gate depends only on the anchor, so a skip is knowable here and
   // reported as a skip rather than a silent absence.
-  if (!FRACTION_CODE.test(anchor.standard.statementCode)) {
+  if (!hasGeneratorFor(anchor.standard.statementCode)) {
     const { note } = await generateWidget(anchor, plan);
     yield { type: 'stage', stage: 'widget', status: 'skipped', detail: 'No generator for this standard' };
     yield { type: 'widget', widget: null, note };

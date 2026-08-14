@@ -17,6 +17,13 @@ const WIDGETS = [
       'Swipe a card left or right to answer a question or sort a statement into a category. Supports drag gestures and emits a completion event with per-card results.',
     tags: ['flashcards', 'true/false', 'sorting'],
   },
+  {
+    slug: 'draft-meter',
+    name: 'Draft Meter',
+    description:
+      'Write a short response and one line scores how strong the argument is, from a live model call on a debounce. Optionally supplies a source passage, so "evidence" means citing the text.',
+    tags: ['writing', 'argument', 'live scoring'],
+  },
 ];
 
 export default function DemoIndex() {

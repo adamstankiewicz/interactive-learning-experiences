@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# personal hackathon context, not part of the project
+CLAUDE_HACKATHON.md
+
 # debug
 npm-debug.log*
 yarn-debug.log*
