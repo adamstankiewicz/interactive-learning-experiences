@@ -47,9 +47,9 @@ export const swiperFlashcardSpec = z.object({
     .array(
       z.object({
         question: z.string().describe('Text shown on the face of the card'),
-        leftLabel: z.string().describe('Label shown on the left swipe affordance'),
-        rightLabel: z.string().describe('Label shown on the right swipe affordance'),
-        correctDirection: z.enum(['left', 'right']).describe('Which direction is the correct answer'),
+        upLabel: z.string().describe('Label shown on the up-swipe affordance'),
+        downLabel: z.string().describe('Label shown on the down-swipe affordance'),
+        correctDirection: z.enum(['up', 'down']).describe('Which direction is the correct answer'),
         explanation: z.string().describe('Brief explanation shown after the student swipes'),
       }),
     )

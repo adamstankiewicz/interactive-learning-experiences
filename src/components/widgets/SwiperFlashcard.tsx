@@ -2,14 +2,31 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { SwiperFlashcardSpec } from '@/lib/pathway/schema';
 
 type CardData = SwiperFlashcardSpec['cards'][number];
-type SwipeDirection = 'left' | 'right';
+type SwipeDirection = 'up' | 'down';
 type CardResult = { cardIndex: number; direction: SwipeDirection; correct: boolean };
+
+const CORRECT_REACTIONS = [
+  'Correct!',
+  'Nice work!',
+  'You got it!',
+  'Exactly right!',
+  'Well done!',
+  'That\'s the one!',
+];
+
+const INCORRECT_REACTIONS = [
+  'Not quite.',
+  'Not this time — here\'s why.',
+  'Good try!',
+  'Not quite.',
+  'Close, but not quite.',
+  'Let\'s look at that again.',
+];
 
 type Props = {
   spec: SwiperFlashcardSpec;
@@ -18,8 +35,8 @@ type Props = {
 
 // How far (px) the user must drag before we commit the swipe on release.
 const SWIPE_THRESHOLD = 80;
-// Max rotation angle (deg) at full drag extent.
-const MAX_ROTATE = 18;
+// Max tilt angle (deg) applied during a horizontal drift while dragging vertically.
+const MAX_ROTATE = 10;
 
 export function SwiperFlashcard({ spec, onComplete }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -31,32 +48,104 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
 
   // Live drag offset while the pointer is held down. Stored in a ref so
   // pointer-move updates don't re-render the whole tree — we write straight
-  // to the card's style instead.
+  // to the card and label DOM nodes instead.
   const dragRef = useRef<{ startX: number; startY: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const leftLabelRef = useRef<HTMLDivElement>(null);
+  const rightLabelRef = useRef<HTMLDivElement>(null);
+  const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const firstSwipeButtonRef = useRef<HTMLButtonElement>(null);
 
-  const applyDragStyle = useCallback((dx: number) => {
-    if (!cardRef.current) return;
-    // Clamp rotation so it stays tasteful even on wide monitors.
-    const rotate = Math.max(-MAX_ROTATE, Math.min(MAX_ROTATE, dx / 10));
-    cardRef.current.style.transform = `translateX(${dx}px) rotate(${rotate}deg)`;
-    cardRef.current.style.transition = 'none';
+  // Imperatively highlight whichever label the card is dragged toward.
+  // Below the threshold: scale up slightly and fade the opposite label.
+  // At/past the threshold: fill with a solid background so it reads as "selected".
+  const applyLabelHighlight = useCallback((dy: number) => {
+    const topEl = leftLabelRef.current;
+    const botEl = rightLabelRef.current;
+    if (!topEl || !botEl) return;
+
+    const past = Math.abs(dy) >= SWIPE_THRESHOLD;
+    const intensity = Math.min(1, Math.abs(dy) / SWIPE_THRESHOLD);
+
+    const fillActive = (el: HTMLDivElement) => {
+      el.style.background = 'var(--color-foreground)';
+      el.style.color = 'var(--color-background)';
+      el.style.borderColor = 'var(--color-foreground)';
+      el.style.transform = 'scale(1.04)';
+      el.style.opacity = '1';
+    };
+    const scaleActive = (el: HTMLDivElement) => {
+      el.style.background = '';
+      el.style.color = '';
+      el.style.borderColor = '';
+      el.style.transform = `scale(${1 + 0.04 * intensity})`;
+      el.style.opacity = '1';
+    };
+    const dim = (el: HTMLDivElement) => {
+      el.style.background = '';
+      el.style.color = '';
+      el.style.borderColor = '';
+      el.style.transform = 'scale(1)';
+      el.style.opacity = String(1 - 0.5 * intensity);
+    };
+    const neutral = (el: HTMLDivElement) => {
+      el.style.background = '';
+      el.style.color = '';
+      el.style.borderColor = '';
+      el.style.transform = 'scale(1)';
+      el.style.opacity = '1';
+    };
+
+    if (dy < -8) {
+      if (past) { fillActive(topEl); } else { scaleActive(topEl); }
+      dim(botEl);
+    } else if (dy > 8) {
+      if (past) { fillActive(botEl); } else { scaleActive(botEl); }
+      dim(topEl);
+    } else {
+      neutral(topEl);
+      neutral(botEl);
+    }
   }, []);
+
+  const resetLabelHighlight = useCallback(() => {
+    for (const el of [leftLabelRef.current, rightLabelRef.current]) {
+      if (!el) continue;
+      el.style.background = '';
+      el.style.color = '';
+      el.style.borderColor = '';
+      el.style.opacity = '1';
+      el.style.transform = 'scale(1)';
+    }
+  }, []);
+
+  const applyDragStyle = useCallback((dx: number, dy: number) => {
+    if (!cardRef.current) return;
+    const rotate = Math.max(-MAX_ROTATE, Math.min(MAX_ROTATE, dx / 12));
+    cardRef.current.style.transform = `translate(${dx}px, ${dy}px) rotate(${rotate}deg)`;
+    cardRef.current.style.transition = 'none';
+    cardRef.current.style.opacity = '0.72';
+    cardRef.current.style.zIndex = '20';
+    applyLabelHighlight(dy);
+  }, [applyLabelHighlight]);
 
   const resetDragStyle = useCallback((instant = false) => {
     if (!cardRef.current) return;
-    cardRef.current.style.transform = 'translateX(0) rotate(0deg)';
+    cardRef.current.style.transform = 'translate(0, 0) rotate(0deg)';
     cardRef.current.style.transition = instant
       ? 'none'
       : 'transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-  }, []);
+    cardRef.current.style.opacity = '1';
+    cardRef.current.style.zIndex = '';
+    resetLabelHighlight();
+  }, [resetLabelHighlight]);
 
   const flyOutStyle = useCallback((direction: SwipeDirection) => {
     if (!cardRef.current) return;
-    const x = direction === 'left' ? '-150%' : '150%';
-    const rotate = direction === 'left' ? -25 : 25;
-    cardRef.current.style.transform = `translateX(${x}) rotate(${rotate}deg)`;
+    const y = direction === 'up' ? '-150%' : '150%';
+    cardRef.current.style.transform = `translate(0, ${y}) rotate(0deg)`;
     cardRef.current.style.opacity = '0';
+    cardRef.current.style.zIndex = '';
     cardRef.current.style.transition = 'transform 320ms ease-in, opacity 320ms ease-in';
   }, []);
 
@@ -70,27 +159,31 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
 
       setTimeout(() => {
         setSwipeState((prev) => (prev ? { ...prev, phase: 'revealing' } : null));
-        // Reset the card element for the reveal phase
         if (cardRef.current) {
           cardRef.current.style.transform = '';
           cardRef.current.style.opacity = '';
           cardRef.current.style.transition = '';
         }
+        // Clear imperative drag styles so className-driven reveal colors take over
+        resetLabelHighlight();
+        // Record the result now so onComplete can fire from handleNext
+        setResults((prev) => [...prev, { cardIndex: currentIndex, direction, correct }]);
       }, 320);
-
-      setTimeout(() => {
-        const result: CardResult = { cardIndex: currentIndex, direction, correct };
-        setResults((prev) => {
-          const next = [...prev, result];
-          if (next.length === spec.cards.length) onComplete?.(next);
-          return next;
-        });
-        setCurrentIndex((i) => i + 1);
-        setSwipeState(null);
-      }, 1600);
     },
-    [currentIndex, swipeState, spec.cards, flyOutStyle, onComplete],
+    [currentIndex, swipeState, spec.cards, flyOutStyle, resetLabelHighlight],
   );
+
+  const handleNext = useCallback(() => {
+    if (swipeState?.phase !== 'revealing') return;
+    setResults((prev) => {
+      if (currentIndex + 1 === spec.cards.length) onComplete?.(prev);
+      return prev;
+    });
+    setCurrentIndex((i) => i + 1);
+    setSwipeState(null);
+    // Defer until the next card's buttons are rendered
+    requestAnimationFrame(() => firstSwipeButtonRef.current?.focus());
+  }, [swipeState, currentIndex, spec.cards.length, onComplete]);
 
   // Pointer events — use capture so we keep the pointer even if the user
   // moves outside the card element.
@@ -107,7 +200,8 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!dragRef.current || swipeState) return;
       const dx = e.clientX - dragRef.current.startX;
-      applyDragStyle(dx);
+      const dy = e.clientY - dragRef.current.startY;
+      applyDragStyle(dx, dy);
     },
     [swipeState, applyDragStyle],
   );
@@ -116,50 +210,58 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!dragRef.current || swipeState) return;
       const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
       dragRef.current = null;
 
-      if (Math.abs(dx) >= SWIPE_THRESHOLD) {
-        handleSwipe(dx < 0 ? 'left' : 'right');
+      if (Math.abs(dy) >= SWIPE_THRESHOLD) {
+        handleSwipe(dy < 0 ? 'up' : 'down');
+      } else if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+        handleSwipe(dx < 0 ? 'up' : 'down');
       } else {
-        // Not far enough — spring back
         resetDragStyle();
       }
     },
     [swipeState, handleSwipe, resetDragStyle],
   );
 
-  // Cancel drag if pointer leaves the window (e.g. user releases outside)
+  // Cancel drag if pointer is released outside the element
   useEffect(() => {
     function onWindowPointerUp() {
       if (!dragRef.current) return;
       dragRef.current = null;
       resetDragStyle();
+      resetLabelHighlight();
     }
     window.addEventListener('pointerup', onWindowPointerUp);
     return () => window.removeEventListener('pointerup', onWindowPointerUp);
-  }, [resetDragStyle]);
+  }, [resetDragStyle, resetLabelHighlight]);
 
   // Reset card element styles whenever the card advances
   useEffect(() => {
     resetDragStyle(true);
   }, [currentIndex, resetDragStyle]);
 
+  // Move focus to Next button as soon as the reveal card appears
+  useEffect(() => {
+    if (swipeState?.phase === 'revealing') {
+      nextButtonRef.current?.focus();
+    }
+  }, [swipeState?.phase]);
+
   // ── Completed state ──────────────────────────────────────────────────────────
   if (currentIndex >= spec.cards.length) {
     const correct = results.filter((r) => r.correct).length;
     const total = results.length;
+    const allCorrect = correct === total;
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
           <p className="text-4xl font-bold tabular-nums">{correct}/{total}</p>
           <p className="text-muted-foreground">
-            {correct === total ? 'Perfect — you got every card right!' : `${total - correct} to review.`}
+            {allCorrect ? 'Perfect — you got every card right!' : 'Keep it up — you\'re getting there.'}
           </p>
-          <Button
-            variant="outline"
-            onClick={() => { setCurrentIndex(0); setResults([]); setSwipeState(null); }}
-          >
-            Try again
+          <Button size="lg" className="w-full mt-2" onClick={() => onComplete?.(results)}>
+            Continue →
           </Button>
         </CardContent>
       </Card>
@@ -169,13 +271,8 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
   const card = spec.cards[currentIndex] as CardData;
   const isRevealing = swipeState?.phase === 'revealing';
   const swipedCorrect = swipeState ? card.correctDirection === swipeState.direction : false;
-
-  // Live drag intensity (0–1) for label highlighting — read from the card's
-  // current transform so it stays in sync with the rAF-free imperative updates.
-  // We derive this only for the side-label colors; it's recalculated on every
-  // render that the labels participate in, which is fine.
-  const isSwipingLeft = swipeState?.direction === 'left';
-  const isSwipingRight = swipeState?.direction === 'right';
+  const isSwipingUp = swipeState?.direction === 'up';
+  const isSwipingDown = swipeState?.direction === 'down';
 
   const progress = currentIndex / spec.cards.length;
 
@@ -194,87 +291,111 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
         />
       </div>
 
-      {/* Card stack area */}
-      <div className="relative flex items-stretch justify-center gap-3">
-        {/* Left label */}
-        <div
-          className={`flex w-16 shrink-0 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold leading-tight transition-colors duration-150 ${
-            isSwipingLeft
+      {/* Top label — swipe up */}
+      <div
+        ref={leftLabelRef}
+        style={{ transition: 'opacity 80ms, transform 80ms' }}
+        className={`flex h-12 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold ${
+          isRevealing
+            ? swipeState?.direction === 'up'
+              ? card.correctDirection === 'up'
+                ? 'border-success bg-success text-white'       // selected + correct = solid green
+                : 'border-destructive bg-destructive text-white' // selected + wrong  = solid red
+              : card.correctDirection === 'up'
+                ? 'border-success text-success'                // not selected + correct = outlined green
+                : 'border-muted-foreground/30 text-muted-foreground/30' // not selected + wrong = dim
+            : isSwipingUp
               ? 'border-destructive text-destructive'
-              : isSwipingRight
+              : isSwipingDown
                 ? 'border-muted-foreground/20 text-muted-foreground/20'
                 : 'border-muted-foreground/40 text-muted-foreground'
-          }`}
-          aria-hidden="true"
-        >
-          {card.leftLabel}
-        </div>
+        }`}
+        aria-hidden="true"
+      >
+        {card.upLabel}
+      </div>
 
-        {/* The flashcard — ref lets us write transform directly during drag */}
-        <div
-          ref={cardRef}
-          className="flex-1 cursor-grab select-none active:cursor-grabbing"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-        >
-          {isRevealing ? (
-            <Alert
-              role="status"
-              variant={swipedCorrect ? 'success' : 'warning'}
-              className="flex min-h-36 items-center justify-center text-center"
-            >
-              <AlertDescription className="text-sm">{card.explanation}</AlertDescription>
-            </Alert>
-          ) : (
-            <Card className="min-h-36 pointer-events-none">
-              <CardContent className="flex min-h-36 items-center justify-center text-center">
-                <p className="text-base font-medium">{card.question}</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {/* The flashcard — ref lets us write transform directly during drag */}
+      <div
+        ref={cardRef}
+        className={isRevealing ? undefined : 'cursor-grab select-none active:cursor-grabbing'}
+        onPointerDown={isRevealing ? undefined : onPointerDown}
+        onPointerMove={isRevealing ? undefined : onPointerMove}
+        onPointerUp={isRevealing ? undefined : onPointerUp}
+      >
+        {isRevealing ? (
+          <Card role="status" className="min-h-36">
+            <CardContent className="flex min-h-36 flex-col items-center justify-center gap-3 text-center">
+              <p className={`text-sm font-semibold ${swipedCorrect ? 'text-success' : 'text-destructive'}`}>
+                {swipedCorrect
+                  ? CORRECT_REACTIONS[currentIndex % CORRECT_REACTIONS.length]
+                  : INCORRECT_REACTIONS[currentIndex % INCORRECT_REACTIONS.length]}
+              </p>
+              <p className="text-sm text-foreground">{card.explanation}</p>
+              <Button ref={nextButtonRef} size="lg" className="mt-1 w-full" onClick={handleNext}>
+                Next →
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="min-h-36 pointer-events-none">
+            <CardContent className="flex min-h-36 items-center justify-center text-center">
+              <p className="text-base font-medium">{card.question}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-        {/* Right label */}
-        <div
-          className={`flex w-16 shrink-0 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold leading-tight transition-colors duration-150 ${
-            isSwipingRight
+      {/* Bottom label — swipe down */}
+      <div
+        ref={rightLabelRef}
+        style={{ transition: 'opacity 80ms, transform 80ms' }}
+        className={`flex h-12 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold ${
+          isRevealing
+            ? swipeState?.direction === 'down'
+              ? card.correctDirection === 'down'
+                ? 'border-success bg-success text-white'       // selected + correct = solid green
+                : 'border-destructive bg-destructive text-white' // selected + wrong  = solid red
+              : card.correctDirection === 'down'
+                ? 'border-success text-success'                // not selected + correct = outlined green
+                : 'border-muted-foreground/30 text-muted-foreground/30' // not selected + wrong = dim
+            : isSwipingDown
               ? 'border-success text-success'
-              : isSwipingLeft
+              : isSwipingUp
                 ? 'border-muted-foreground/20 text-muted-foreground/20'
                 : 'border-muted-foreground/40 text-muted-foreground'
-          }`}
-          aria-hidden="true"
-        >
-          {card.rightLabel}
-        </div>
+        }`}
+        aria-hidden="true"
+      >
+        {card.downLabel}
       </div>
 
       {/* Swipe hint */}
-      {!swipeState && (
+      {!swipeState && !isRevealing && (
         <p className="text-center text-xs text-muted-foreground">
-          Drag the card or use the buttons below
+          Drag the card up or down — or use the buttons below
         </p>
       )}
 
       {/* Button row */}
-      {!swipeState && (
+      {!swipeState && !isRevealing && (
         <div className="flex justify-center gap-4">
           <Button
+            ref={firstSwipeButtonRef}
             variant="outline"
             size="lg"
-            onClick={() => handleSwipe('left')}
-            aria-label={`Swipe left — ${card.leftLabel}`}
+            onClick={() => handleSwipe('up')}
+            aria-label={`Swipe up — ${card.upLabel}`}
           >
-            ← {card.leftLabel}
+            {card.upLabel}
           </Button>
           <Button
             variant="outline"
             size="lg"
-            onClick={() => handleSwipe('right')}
-            aria-label={`Swipe right — ${card.rightLabel}`}
+            onClick={() => handleSwipe('down')}
+            aria-label={`Swipe down — ${card.downLabel}`}
           >
-            {card.rightLabel} →
+            {card.downLabel}
           </Button>
         </div>
       )}
