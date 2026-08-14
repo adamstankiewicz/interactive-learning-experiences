@@ -1,5 +1,5 @@
 import { generateText, Output } from 'ai';
-import type { FlexibleSchema } from 'ai';
+import type { FlexibleSchema, LanguageModel } from 'ai';
 
 import { pathwayModel } from '@/lib/model';
 
@@ -30,9 +30,11 @@ export async function generateStructured<T>(options: {
    * change is worse than any amount of sampling diversity.
    */
   temperature?: number;
+  /** Defaults to the pathway model; scoring passes the fast one. */
+  model?: LanguageModel;
 }): Promise<T> {
   const result = await generateText({
-    model: model(),
+    model: options.model ?? model(),
     output: Output.object({ schema: options.schema }),
     system: options.system,
     prompt: options.prompt,
