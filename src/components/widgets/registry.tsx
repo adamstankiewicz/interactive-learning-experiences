@@ -21,6 +21,10 @@ function render(spec: WidgetSpec) {
       return <SwiperFlashcard spec={spec} />;
     case 'draft-meter':
       return <DraftMeter spec={spec} />;
+    case 'drag-sort':
+      return <DragSort spec={spec} />;
+    case 'drag-categorize':
+      return <DragCategorize spec={spec} />;
   }
 }
 
