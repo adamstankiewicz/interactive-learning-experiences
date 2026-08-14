@@ -42,7 +42,7 @@ export function PathwayBuilder() {
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Enter a topic. It resolves against the Learning Commons knowledge graph for the authoritative
           standard, its learning components, and its prerequisites — then becomes a pedagogical pathway
-          with one interactive widget.
+          with interactive widgets.
         </p>
       </header>
 
