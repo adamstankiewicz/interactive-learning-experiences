@@ -23,8 +23,9 @@ type Session = {
   topic: string;
   bigIdea: string;
   standardCode: string | null;
-  widget: unknown;
-  widgetNote: string | null;
+  /** Every generator that produced something, in the order the stream sent them. */
+  widgets: unknown[];
+  widgetNotes: string[];
 };
 
 const BUILDING_LINES = [
@@ -89,8 +90,8 @@ export default function LearnPage() {
           topic,
           bigIdea: '',
           standardCode: null,
-          widget: null,
-          widgetNote: null,
+          widgets: [],
+          widgetNotes: [],
         };
 
         const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -111,9 +112,11 @@ export default function LearnPage() {
 
             if (event.type === 'anchor') next.standardCode = event.anchor.standard.statementCode;
             if (event.type === 'plan') next.bigIdea = event.plan.bigIdea;
+            // One event per generator, so collect rather than overwrite —
+            // otherwise only the last generator to finish reaches the student.
             if (event.type === 'widget') {
-              next.widget = event.widget;
-              next.widgetNote = event.note;
+              if (event.widget) next.widgets.push(event.widget);
+              if (event.note) next.widgetNotes.push(event.note);
             }
             if (event.type === 'session') next.sessionId = event.sessionId;
             if (event.type === 'error') failure = event.message;
@@ -247,18 +250,20 @@ export default function LearnPage() {
           >
             <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
 
-            {session.widget ? (
-              <div className="w-full rounded-3xl border-4 border-violet-200 bg-white/80 p-4">
-                <WidgetTelemetryProvider
-                  telemetry={telemetry}
-                  standardCode={session.standardCode}
-                >
-                  <WidgetRenderer spec={session.widget} />
-                </WidgetTelemetryProvider>
-              </div>
+            {session.widgets.length > 0 ? (
+              <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode}>
+                {session.widgets.map((widget, index) => (
+                  <div
+                    key={index}
+                    className="w-full rounded-3xl border-4 border-violet-200 bg-white/80 p-4"
+                  >
+                    <WidgetRenderer spec={widget} />
+                  </div>
+                ))}
+              </WidgetTelemetryProvider>
             ) : (
               <p className="rounded-2xl border-4 border-amber-200 bg-amber-50 p-4 text-center font-bold text-amber-900">
-                {session.widgetNote ?? 'No activity for this topic yet.'}
+                {session.widgetNotes[0] ?? 'No activity for this topic yet.'}
               </p>
             )}
 

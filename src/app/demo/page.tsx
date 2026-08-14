@@ -37,6 +37,11 @@ const WIDGETS = [
     description:
       'Drag items from a bank into labeled category columns. Supports 2–4 categories with all-or-nothing submission and per-item correctness feedback.',
     tags: ['sorting', 'categorization', 'classification'],
+    slug: 'crossword',
+    name: 'Crossword',
+    description:
+      'Solve a vocabulary crossword built from a standard and its prerequisites. The spec carries only terms and clues — the grid is interlocked in code — and each clue names the standard it came from.',
+    tags: ['vocabulary', 'any subject', 'keyboard'],
   },
 ];
 

@@ -42,7 +42,7 @@ export function PathwayBuilder() {
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Enter a topic. It resolves against the Learning Commons knowledge graph for the authoritative
           standard, its learning components, and its prerequisites — then becomes a pedagogical pathway
-          with one interactive widget.
+          with interactive widgets.
         </p>
       </header>
 
@@ -110,7 +110,7 @@ export function PathwayBuilder() {
  * at once at the end.
  */
 function Pathway({ state }: { state: PathwayState }) {
-  const { anchor, plan, widget, widgetNote } = state;
+  const { anchor, plan, widgets, widgetNotes } = state;
   const streaming = state.status === 'streaming';
   const writingPlan = streaming && state.stages.plan.status === 'active';
 
@@ -223,15 +223,21 @@ function Pathway({ state }: { state: PathwayState }) {
         </Section>
       )}
 
-      {(widget || widgetNote) && (
-        <Section title="Interactive widget">
-          {widget ? (
-            <WidgetRenderer spec={widget} />
-          ) : (
-            <Alert>
-              <AlertDescription>{widgetNote}</AlertDescription>
-            </Alert>
-          )}
+      {(widgets.length > 0 || widgetNotes.length > 0) && (
+        <Section
+          title={widgets.length === 1 ? 'Interactive widget' : 'Interactive widgets'}
+          note={widgets.length > 1 ? `${widgets.length} generated for this standard` : undefined}
+        >
+          <div className="space-y-4">
+            {widgets.map((widget, index) => (
+              <WidgetRenderer key={index} spec={widget} />
+            ))}
+            {widgetNotes.map((note, index) => (
+              <Alert key={index}>
+                <AlertDescription>{note}</AlertDescription>
+              </Alert>
+            ))}
+          </div>
         </Section>
       )}
     </div>

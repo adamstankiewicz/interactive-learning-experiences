@@ -15,13 +15,16 @@ import {
   FRACTION_CODE,
   READING_EVIDENCE_CODE,
   WRITING_CODE,
-  hasGeneratorFor,
+  hasContentGeneratorFor,
 } from '@/lib/pathway/coverage';
+import { layoutCrossword, sanitizeAnswer } from '@/lib/pathway/crossword';
 import {
+  crosswordSpec,
   draftMeterSpec,
   fractionAreaModelSpec,
   pathwayPlan,
   standardProposal,
+  type CrosswordSpec,
   type DraftMeterSpec,
   type FractionAreaModelSpec,
   type PathwayPlan,
@@ -77,6 +80,49 @@ function normalizePlan(plan: PathwayPlan): PathwayPlan {
       // A step pointing past the trimmed outcomes would break the UI's cross-reference.
       outcomeIndex: clamp(step.outcomeIndex, 0, Math.max(outcomes.length - 1, 0)),
     })),
+  };
+}
+
+/**
+ * A crossword is only a crossword if the words interlock. The model authors
+ * terms, `layoutCrossword` decides which of them earn a square, and anything
+ * that cannot cross what is already on the grid is dropped here rather than
+ * shipped as a clue pointing at nothing.
+ */
+const MIN_CROSSWORD_ENTRIES = 5;
+const MAX_CROSSWORD_ENTRIES = 18;
+
+function normalizeCrossword(spec: CrosswordSpec): { widget: CrosswordSpec | null; note: string | null } {
+  const requested = spec.entries.slice(0, MAX_CROSSWORD_ENTRIES);
+  const layout = layoutCrossword(requested);
+
+  if (layout.entries.length < MIN_CROSSWORD_ENTRIES) {
+    return {
+      widget: null,
+      note: `Only ${layout.entries.length} of ${requested.length} generated terms interlocked into a grid — too few for a crossword, so none is shown.`,
+    };
+  }
+
+  // Keep the survivors in their authored order, carrying the sanitized answer.
+  // Layout is deterministic and greedy, so replaying it on this pruned list in
+  // the browser reproduces exactly the grid measured here.
+  const placed = new Set(layout.entries.map((entry) => entry.answer));
+  const kept: CrosswordSpec['entries'] = [];
+  const seen = new Set<string>();
+
+  for (const entry of requested) {
+    const answer = sanitizeAnswer(entry.answer);
+    if (!placed.has(answer) || seen.has(answer)) continue;
+
+    seen.add(answer);
+    kept.push({ ...entry, answer });
+  }
+
+  return {
+    widget: { ...spec, entries: kept },
+    note: layout.unplaced.length
+      ? `${layout.unplaced.length} generated term${layout.unplaced.length === 1 ? '' : 's'} could not interlock and was dropped from the crossword: ${layout.unplaced.join(', ')}.`
+      : null,
   };
 }
 
@@ -359,24 +405,107 @@ async function generateDraftMeter(anchor: Anchor, plan: PathwayPlan): Promise<Dr
   };
 }
 
-async function generateWidget(
+/**
+ * The crossword: a vocabulary puzzle from the standard's own language.
+ *
+ * Every standard has vocabulary, so unlike the generators above this one has no
+ * gate. The anchor standard and the pathway's outcomes supply the terms the
+ * lesson is actually about; the prerequisite standards supply the shorter,
+ * already-learned words that give the grid something to interlock with — recall
+ * of prior knowledge doing double duty as puzzle scaffolding.
+ */
+async function generateCrossword(
   anchor: Anchor,
   plan: PathwayPlan,
-): Promise<{ widget: WidgetSpec | null; note: string | null }> {
+): Promise<{ widget: CrosswordSpec | null; note: string | null }> {
+  const prerequisiteBlock = anchor.prerequisites.length
+    ? anchor.prerequisites
+        .map((p) => `- ${p.statementCode} (grade ${p.gradeLevel}): ${p.description}`)
+        .join('\n')
+    : '(no prerequisite standards published — draw the supporting terms from the anchor standard instead)';
+
+  const spec = await generateStructured({
+    schema: crosswordSpec,
+    system: [
+      'You write the terms and clues for a vocabulary crossword. You do not lay out a grid:',
+      'the words are interlocked by an algorithm afterwards, and any word that cannot cross',
+      'another is thrown away — so supply words that share letters, and plenty of short ones.',
+      'Terms are the vocabulary this standard makes students read, say and write — words that',
+      'would earn a place on the classroom word wall. Never lift incidental words out of the',
+      'phrasing of a standard: in "the quantity formed by 1 part", the term being taught is',
+      '"unit fraction", not "quantity" or "formed". Draw the central terms from the anchor',
+      'standard, its learning components and the learning outcomes; mark those source',
+      '"anchor". Fill the rest from the prerequisite standards, marked source "prerequisite",',
+      'so solving the puzzle rehearses the prior knowledge the lesson depends on.',
+      'Set sourceCode to the statement code the term came from.',
+      'A clue defines or exemplifies the term in the plainest language the grade band allows.',
+      'Never put the answer, its plural, or a word sharing its root inside its own clue.',
+      'Write clues in words, never in LaTeX or symbols. Where a known misconception has a',
+      'name, clue the correct term precisely enough to rule the misconception out.',
+      'No proper nouns, no abbreviations, no two entries meaning the same thing.',
+    ].join(' '),
+    prompt: [
+      `Big idea of the lesson: ${plan.bigIdea}`,
+      '',
+      `Anchor standard ${anchor.standard.statementCode} (${anchor.standard.academicSubject}, grade ${anchor.standard.gradeLevels.join('/')}):`,
+      anchor.standard.description,
+      '',
+      'Learning components:',
+      componentBlockFor(anchor),
+      '',
+      'Learning outcomes this puzzle consolidates:',
+      plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
+      '',
+      'Prerequisite standards (source of the supporting terms):',
+      prerequisiteBlock,
+      '',
+      'Misconceptions the clues should not reinforce:',
+      plan.misconceptions.map((m) => `- ${m}`).join('\n'),
+      '',
+      `Grade band: ${plan.gradeBand}. Write the puzzle for the "practice" step of this pathway.`,
+    ].join('\n'),
+  });
+
+  return normalizeCrossword(spec);
+}
+
+/**
+ * Every generator that can serve this standard, started at once.
+ *
+ * They are independent model calls, so the run takes as long as the slowest
+ * rather than their sum. The returned promises stay in pathway order — the
+ * content-specific manipulative first, the vocabulary puzzle after it — so the
+ * caller can await them in turn and emit each result as it lands.
+ */
+function startWidgetGenerators(
+  anchor: Anchor,
+  plan: PathwayPlan,
+): Promise<{ widget: WidgetSpec | null; note: string | null }>[] {
   const code = anchor.standard.statementCode;
+  const running: Promise<{ widget: WidgetSpec | null; note: string | null }>[] = [];
 
   if (FRACTION_CODE.test(code)) {
-    return { widget: await generateFractionAreaModel(anchor, plan), note: null };
+    running.push(generateFractionAreaModel(anchor, plan).then((widget) => ({ widget, note: null })));
   }
 
   if (WRITING_CODE.test(code) || READING_EVIDENCE_CODE.test(code)) {
-    return { widget: await generateDraftMeter(anchor, plan), note: null };
+    running.push(generateDraftMeter(anchor, plan).then((widget) => ({ widget, note: null })));
   }
 
-  return {
-    widget: null,
-    note: `No widget generator is registered for ${code} yet. Generators so far cover ${COVERAGE_SENTENCE}. The pathway above is still fully grounded in the graph.`,
-  };
+  running.push(generateCrossword(anchor, plan));
+
+  // Say so when the only thing on offer is the vocabulary puzzle, rather than
+  // letting a standard we have no manipulative for look fully served.
+  if (!hasContentGeneratorFor(code)) {
+    running.push(
+      Promise.resolve({
+        widget: null,
+        note: `No content-specific widget generator is registered for ${code} yet — generators so far cover ${COVERAGE_SENTENCE}. The crossword is built from this standard's own vocabulary, and the pathway above is fully grounded in the graph.`,
+      }),
+    );
+  }
+
+  return running;
 }
 
 /**
@@ -453,19 +582,22 @@ export async function* streamPathway(
   yield { type: 'plan', plan };
   yield { type: 'stage', stage: 'plan', status: 'done', detail: `${plan.steps.length} steps` };
 
-  // The widget gate depends only on the anchor, so a skip is knowable here and
-  // reported as a skip rather than a silent absence.
-  if (!hasGeneratorFor(anchor.standard.statementCode)) {
-    const { note } = await generateWidget(anchor, plan);
-    yield { type: 'stage', stage: 'widget', status: 'skipped', detail: 'No generator for this standard' };
-    yield { type: 'widget', widget: null, note };
-    yield { type: 'done' };
-    return;
+  yield { type: 'stage', stage: 'widget', status: 'active' };
+
+  // All applicable generators run together, and each result is emitted the
+  // moment it lands rather than when the slowest one does.
+  let built = 0;
+  for (const generator of startWidgetGenerators(anchor, plan)) {
+    const { widget, note } = await generator;
+    if (widget) built += 1;
+    yield { type: 'widget', widget, note };
   }
 
-  yield { type: 'stage', stage: 'widget', status: 'active' };
-  const { widget, note } = await generateWidget(anchor, plan);
-  yield { type: 'widget', widget, note };
-  yield { type: 'stage', stage: 'widget', status: 'done' };
+  yield {
+    type: 'stage',
+    stage: 'widget',
+    status: built > 0 ? 'done' : 'skipped',
+    detail: built > 0 ? `${built} widget${built === 1 ? '' : 's'}` : 'No generator produced one',
+  };
   yield { type: 'done' };
 }
