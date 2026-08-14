@@ -1,7 +1,8 @@
 import { streamText, Output } from 'ai';
 import type { FlexibleSchema } from 'ai';
+import { z } from 'zod';
 
-import { pathwayModel } from '@/lib/model';
+import { pathwayModel, scoringModel } from '@/lib/model';
 import {
   findLearningComponents,
   findProgression,
@@ -20,14 +21,20 @@ import {
 import { layoutCrossword, sanitizeAnswer } from '@/lib/pathway/crossword';
 import {
   crosswordSpec,
+  dragCategorizeSpec,
+  dragSortSpec,
   draftMeterSpec,
   fractionAreaModelSpec,
   pathwayPlan,
   standardProposal,
+  swiperFlashcardSpec,
   type CrosswordSpec,
+  type DragCategorizeSpec,
+  type DragSortSpec,
   type DraftMeterSpec,
   type FractionAreaModelSpec,
   type PathwayPlan,
+  type SwiperFlashcardSpec,
   type WidgetSpec,
 } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
@@ -124,6 +131,119 @@ function normalizeCrossword(spec: CrosswordSpec): { widget: CrosswordSpec | null
       ? `${layout.unplaced.length} generated term${layout.unplaced.length === 1 ? '' : 's'} could not interlock and was dropped from the crossword: ${layout.unplaced.join(', ')}.`
       : null,
   };
+}
+
+/**
+ * Card counts are asked for in prose, so trim rather than fail. A deck of one
+ * or two is not worth rendering — below that floor the widget is dropped and
+ * the student keeps the rest of the pathway.
+ */
+const MIN_FLASHCARDS = 3;
+const MAX_FLASHCARDS = 8;
+
+function normalizeFlashcards(spec: SwiperFlashcardSpec): {
+  widget: SwiperFlashcardSpec | null;
+  note: string | null;
+} {
+  // A card whose two affordances read the same gives the student nothing to
+  // decide between, so it is dropped rather than shown as an unanswerable swipe.
+  const cards = spec.cards
+    .filter((card) => card.question.trim() && card.upLabel.trim() !== card.downLabel.trim())
+    .slice(0, MAX_FLASHCARDS);
+
+  if (cards.length < MIN_FLASHCARDS) {
+    return {
+      widget: null,
+      note: `Only ${cards.length} usable flashcard${cards.length === 1 ? '' : 's'} were generated — too few for a deck, so none is shown.`,
+    };
+  }
+
+  return { widget: { ...spec, cards }, note: null };
+}
+
+/**
+ * `DragSort` decides correctness by comparing the student's item order against
+ * `correctOrder` position for position, so the two lists have to describe the
+ * same set. Rather than invent an order for an item the model left out of
+ * `correctOrder` — which would assert a sequence nobody authored — the
+ * mismatch is resolved by keeping only the items that appear in both.
+ */
+const MIN_DRAG_SORT_ITEMS = 4;
+const MAX_DRAG_SORT_ITEMS = 8;
+
+function normalizeDragSort(spec: DragSortSpec): { widget: DragSortSpec | null; note: string | null } {
+  const byId = new Map<string, DragSortSpec['items'][number]>();
+  for (const item of spec.items) {
+    if (item.id.trim() && !byId.has(item.id)) byId.set(item.id, item);
+  }
+
+  // The authored sequence is the source of truth for order; items are then
+  // re-derived from it so the two lists agree by construction.
+  const order: string[] = [];
+  const seen = new Set<string>();
+  for (const id of spec.correctOrder) {
+    if (byId.has(id) && !seen.has(id)) {
+      seen.add(id);
+      order.push(id);
+    }
+  }
+
+  const kept = order.slice(0, MAX_DRAG_SORT_ITEMS);
+
+  if (kept.length < MIN_DRAG_SORT_ITEMS) {
+    return {
+      widget: null,
+      note: `The generated ordering activity had only ${kept.length} item${kept.length === 1 ? '' : 's'} with a definite position, so it is not shown.`,
+    };
+  }
+
+  return {
+    widget: {
+      ...spec,
+      items: kept.map((id) => byId.get(id)!),
+      correctOrder: kept,
+    },
+    note: null,
+  };
+}
+
+/**
+ * `DragCategorize` marks an item correct when its resting column matches
+ * `categoryId`, so an item pointing at a column that was never authored can
+ * never be placed correctly. Those items are dropped, then any column left
+ * holding nothing goes with them.
+ */
+const MIN_DRAG_CATEGORIZE_ITEMS = 4;
+const MAX_DRAG_CATEGORIZE_ITEMS = 10;
+const MAX_DRAG_CATEGORIZE_CATEGORIES = 4;
+
+function normalizeDragCategorize(spec: DragCategorizeSpec): {
+  widget: DragCategorizeSpec | null;
+  note: string | null;
+} {
+  const categories = spec.categories
+    .filter((category, index, all) => category.id.trim() && all.findIndex((c) => c.id === category.id) === index)
+    .slice(0, MAX_DRAG_CATEGORIZE_CATEGORIES);
+
+  const categoryIds = new Set(categories.map((category) => category.id));
+  const items = spec.items
+    .filter((item, index, all) => item.id.trim() && all.findIndex((i) => i.id === item.id) === index)
+    .filter((item) => categoryIds.has(item.categoryId))
+    .slice(0, MAX_DRAG_CATEGORIZE_ITEMS);
+
+  // A column with nothing in it is a distractor the student can never satisfy,
+  // and with fewer than two columns there is no sorting decision left to make.
+  const used = new Set(items.map((item) => item.categoryId));
+  const keptCategories = categories.filter((category) => used.has(category.id));
+
+  if (keptCategories.length < 2 || items.length < MIN_DRAG_CATEGORIZE_ITEMS) {
+    return {
+      widget: null,
+      note: `The generated sorting activity did not resolve into at least two filled categories, so it is not shown.`,
+    };
+  }
+
+  return { widget: { ...spec, categories: keptCategories, items }, note: null };
 }
 
 /**
@@ -470,12 +590,185 @@ async function generateCrossword(
 }
 
 /**
+ * A recall check that needs nothing from the subject but its own language, so
+ * it runs for every standard — the same reasoning that makes the crossword
+ * unconditional. Where the crossword consolidates vocabulary, this one puts a
+ * claim in front of the student and asks them to judge it, which is what makes
+ * it the widget that surfaces misconceptions rather than gaps in wording.
+ */
+async function generateSwiperFlashcards(
+  anchor: Anchor,
+  plan: PathwayPlan,
+): Promise<{ widget: WidgetSpec | null; note: string | null }> {
+  const spec = await generateStructured({
+    schema: swiperFlashcardSpec,
+    system: [
+      'You write a deck of swipeable judgement cards. Each card states one claim about the',
+      'standard, and the student swipes to accept or reject it.',
+      'Write 6 cards. Roughly half should be true, in no fixed pattern, so the deck cannot be',
+      'passed by alternating.',
+      'Every false card must be a claim a student who holds one of the listed misconceptions',
+      'would actually accept — not an obvious absurdity, and never a trick of wording.',
+      'The up and down labels are the two judgements themselves, phrased for the content',
+      '(for example "Always true" and "Not always"), never the literal words "up" and "down".',
+      'The explanation says why in one sentence a student at this grade band would follow, and',
+      'names the misconception when the card was built from one.',
+    ].join(' '),
+    prompt: [
+      `Standard ${anchor.standard.statementCode} (${anchor.standard.academicSubject}, grade ${anchor.standard.gradeLevels.join('/')}):`,
+      anchor.standard.description,
+      '',
+      'Learning components:',
+      componentBlockFor(anchor),
+      '',
+      'Learning outcomes:',
+      plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
+      '',
+      'Misconceptions the false cards should be built from:',
+      plan.misconceptions.map((m) => `- ${m}`).join('\n'),
+      '',
+      `Grade band: ${plan.gradeBand}. Write the deck for the "check" step of this pathway.`,
+      'Set learningComponentId to the id of the component the deck targets, or null if none fits.',
+    ].join('\n'),
+  });
+
+  return normalizeFlashcards(spec);
+}
+
+async function generateDragSort(
+  anchor: Anchor,
+  plan: PathwayPlan,
+): Promise<{ widget: WidgetSpec | null; note: string | null }> {
+  const spec = await generateStructured({
+    schema: dragSortSpec,
+    system: [
+      'You configure a drag-to-order activity: the student arranges chips into a single',
+      'correct sequence.',
+      'Give 5 items. The ordering must be genuinely determined by the content — a sequence of',
+      'events, steps, magnitudes, or stages — never a matter of taste or style.',
+      'Ids are short, stable, lowercase slugs. correctOrder lists every item id exactly once,',
+      'in the correct order.',
+      'Labels are self-contained: a student must be able to place a chip without having seen',
+      'the others, so no label may refer to "the next one" or "the previous step".',
+      'The hint names the misconception a wrong ordering reveals rather than giving the answer.',
+    ].join(' '),
+    prompt: [
+      `Standard ${anchor.standard.statementCode} (${anchor.standard.academicSubject}, grade ${anchor.standard.gradeLevels.join('/')}):`,
+      anchor.standard.description,
+      '',
+      'Learning components:',
+      componentBlockFor(anchor),
+      '',
+      'Learning outcomes:',
+      plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
+      '',
+      'Known misconceptions:',
+      plan.misconceptions.map((m) => `- ${m}`).join('\n'),
+      '',
+      `Grade band: ${plan.gradeBand}. Build the ordering activity for the "practice" step of this pathway.`,
+      'Set learningComponentId to the id of the component it targets, or null if none fits.',
+    ].join('\n'),
+  });
+
+  return normalizeDragSort(spec);
+}
+
+async function generateDragCategorize(
+  anchor: Anchor,
+  plan: PathwayPlan,
+): Promise<{ widget: WidgetSpec | null; note: string | null }> {
+  const spec = await generateStructured({
+    schema: dragCategorizeSpec,
+    system: [
+      'You configure a drag-to-sort activity: the student drops each chip into the column it',
+      'belongs to.',
+      'Give 3 categories and 6 items spread across them, with at least one item per category.',
+      'Each item belongs in exactly one category, and categoryId must match one of the',
+      'category ids you defined. Ids are short, stable, lowercase slugs.',
+      'The categories are the distinction the standard actually turns on, and the items are',
+      'chosen so that the borderline ones separate students who hold a listed misconception',
+      'from students who do not.',
+      'The hint names that misconception rather than giving the answer.',
+    ].join(' '),
+    prompt: [
+      `Standard ${anchor.standard.statementCode} (${anchor.standard.academicSubject}, grade ${anchor.standard.gradeLevels.join('/')}):`,
+      anchor.standard.description,
+      '',
+      'Learning components:',
+      componentBlockFor(anchor),
+      '',
+      'Learning outcomes:',
+      plan.outcomes.map((o, i) => `${i + 1}. ${o.statement}`).join('\n'),
+      '',
+      'Known misconceptions:',
+      plan.misconceptions.map((m) => `- ${m}`).join('\n'),
+      '',
+      `Grade band: ${plan.gradeBand}. Build the sorting activity for the "practice" step of this pathway.`,
+      'Set learningComponentId to the id of the component it targets, or null if none fits.',
+    ].join('\n'),
+  });
+
+  return normalizeDragCategorize(spec);
+}
+
+const structuralChoice = z.object({
+  kind: z
+    .enum(['order', 'categorize', 'neither'])
+    .describe('Which structure, if either, the content of this standard genuinely has'),
+  reason: z.string().describe('One sentence naming the sequence or the categories, or why neither fits'),
+});
+
+/**
+ * Which of the two structural manipulatives a standard can support is a fact
+ * about its content, not its code, so there is no regex that answers it: some
+ * science standards are sequences, some are taxonomies, and plenty are neither.
+ * The judgement is small and closed enough for the fast model, and asking it is
+ * what stops a standard with no natural order from being handed a shuffled list
+ * whose "correct" sequence is arbitrary.
+ *
+ * A failure here is not worth failing the pathway over — the student still gets
+ * the flashcards and the crossword — so it degrades to `neither`.
+ */
+async function chooseStructuralWidget(anchor: Anchor, plan: PathwayPlan): Promise<'order' | 'categorize' | 'neither'> {
+  try {
+    const choice = await generateStructured({
+      schema: structuralChoice,
+      model: scoringModel(),
+      temperature: 0,
+      system: [
+        'You decide which interactive structure a standard supports. Answer "order" only if its',
+        'content has one genuinely correct sequence — events in time, steps that depend on each',
+        'other, values that rank. Answer "categorize" only if it turns on a distinction with two',
+        'or more clear groups that specific examples fall into.',
+        'Most standards are neither, and "neither" is the right answer whenever the sequence',
+        'would be a matter of preference or the categories would be invented for the exercise.',
+        'Prefer "neither" when both would be a stretch.',
+      ].join(' '),
+      prompt: [
+        `Standard ${anchor.standard.statementCode} (${anchor.standard.academicSubject}, grade ${anchor.standard.gradeLevels.join('/')}):`,
+        anchor.standard.description,
+        '',
+        'Learning components:',
+        componentBlockFor(anchor),
+        '',
+        `Big idea of the lesson: ${plan.bigIdea}`,
+      ].join('\n'),
+    });
+
+    return choice.kind;
+  } catch {
+    return 'neither';
+  }
+}
+
+/**
  * Every generator that can serve this standard, started at once.
  *
  * They are independent model calls, so the run takes as long as the slowest
  * rather than their sum. The returned promises stay in pathway order — the
- * content-specific manipulative first, the vocabulary puzzle after it — so the
- * caller can await them in turn and emit each result as it lands.
+ * content-specific manipulative first, then the structural one, then the
+ * judgement deck and the vocabulary puzzle — so the caller can await them in
+ * turn and emit each result as it lands.
  */
 function startWidgetGenerators(
   anchor: Anchor,
@@ -492,16 +785,34 @@ function startWidgetGenerators(
     running.push(generateDraftMeter(anchor, plan).then((widget) => ({ widget, note: null })));
   }
 
+  // Decided once and awaited twice: the structural widget itself, and the note
+  // below that should only appear if nothing else did.
+  const structural = chooseStructuralWidget(anchor, plan);
+
+  running.push(
+    structural.then((choice) => {
+      if (choice === 'order') return generateDragSort(anchor, plan);
+      if (choice === 'categorize') return generateDragCategorize(anchor, plan);
+      return { widget: null, note: null };
+    }),
+  );
+
+  running.push(generateSwiperFlashcards(anchor, plan));
   running.push(generateCrossword(anchor, plan));
 
-  // Say so when the only thing on offer is the vocabulary puzzle, rather than
-  // letting a standard we have no manipulative for look fully served.
+  // Say so when nothing tied to this standard's content could be built, rather
+  // than letting a standard we have no manipulative for look fully served. The
+  // flashcards and crossword work from any standard's own language, so they are
+  // not what this is measuring.
   if (!hasContentGeneratorFor(code)) {
     running.push(
-      Promise.resolve({
+      structural.then((choice) => ({
         widget: null,
-        note: `No content-specific widget generator is registered for ${code} yet — generators so far cover ${COVERAGE_SENTENCE}. The crossword is built from this standard's own vocabulary, and the pathway above is fully grounded in the graph.`,
-      }),
+        note:
+          choice === 'neither'
+            ? `No content-specific widget generator is registered for ${code} yet — generators so far cover ${COVERAGE_SENTENCE}, and this standard's content is neither a sequence nor a set of categories. The flashcards and crossword are built from this standard's own language, and the pathway above is fully grounded in the graph.`
+            : null,
+      })),
     );
   }
 
@@ -589,6 +900,8 @@ export async function* streamPathway(
   let built = 0;
   for (const generator of startWidgetGenerators(anchor, plan)) {
     const { widget, note } = await generator;
+    // A generator that was offered and did not apply has nothing to report.
+    if (!widget && !note) continue;
     if (widget) built += 1;
     yield { type: 'widget', widget, note };
   }
