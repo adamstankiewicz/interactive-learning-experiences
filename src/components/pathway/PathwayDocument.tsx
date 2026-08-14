@@ -47,16 +47,9 @@ export function PathwayDocument({ state }: { state: PathwayState }) {
         topic={state.topic}
       />
 
-      {Boolean(plan?.steps?.length) && (
-        <Section title="The pathway" note="Each step, in order, with its interaction">
-          <ol className="space-y-4">
-            {plan?.steps?.map((step, index) => (
-              <StepCard key={index} step={step} index={index} state={state} />
-            ))}
-          </ol>
-        </Section>
-      )}
-
+      {/* Backward design: objectives before activities. A teacher decides
+          whether this is the right target for their class from the outcomes,
+          before investing in reading the five-step sequence that serves them. */}
       {Boolean(plan?.outcomes?.length) && (
         <Section
           title="What students will be able to do"
@@ -80,6 +73,16 @@ export function PathwayDocument({ state }: { state: PathwayState }) {
                   </CardContent>
                 </Card>
               </li>
+            ))}
+          </ol>
+        </Section>
+      )}
+
+      {Boolean(plan?.steps?.length) && (
+        <Section title="The pathway" note="Each step, in order, with its interaction">
+          <ol className="space-y-4">
+            {plan?.steps?.map((step, index) => (
+              <StepCard key={index} step={step} index={index} state={state} />
             ))}
           </ol>
         </Section>

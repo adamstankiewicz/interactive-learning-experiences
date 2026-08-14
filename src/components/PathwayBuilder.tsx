@@ -7,7 +7,8 @@ import { PathwayDocument } from '@/components/pathway/PathwayDocument';
 import { ThemeToggle } from '@/components/pathway/ThemeToggle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { usePathwayStream } from '@/lib/pathway/use-pathway-stream';
 
 const EXAMPLES = [
@@ -15,6 +16,21 @@ const EXAMPLES = [
   { topic: 'multiplying by powers of ten', grade: '5' },
   { topic: 'finding the main idea of a text', grade: '5' },
 ];
+
+/** "Any grade" has to be a real Select value — Base UI doesn't allow "". */
+const ANY_GRADE = 'any';
+const GRADE_OPTIONS = ['K', ...Array.from({ length: 12 }, (_, i) => String(i + 1))];
+
+/**
+ * Base UI's SelectValue shows the raw value string unless told otherwise — it
+ * has no built-in way to look up a SelectItem's label. Centralizing the
+ * mapping here keeps the trigger's display and the dropdown's item text from
+ * drifting apart.
+ */
+function gradeLabel(grade: string): string {
+  if (grade === ANY_GRADE) return 'Any grade';
+  return grade === 'K' ? 'Kindergarten' : `Grade ${grade}`;
+}
 
 export function PathwayBuilder() {
   const [topic, setTopic] = useState('');
@@ -24,10 +40,14 @@ export function PathwayBuilder() {
   const streaming = state.status === 'streaming';
   const started = state.status !== 'idle';
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
+  function runSubmit() {
     if (!topic.trim() || streaming) return;
     void start(topic, gradeHint);
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    runSubmit();
   }
 
   return (
@@ -59,21 +79,39 @@ export function PathwayBuilder() {
         )}
 
         <form onSubmit={submit} className={started ? 'pt-8' : 'mt-8'}>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Input
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <Textarea
               value={topic}
               onChange={(event) => setTopic(event.target.value)}
+              onKeyDown={(event) => {
+                // Enter submits like a chat input; Shift+Enter still writes a
+                // newline for a teacher who wants to give real context.
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  runSubmit();
+                }
+              }}
               placeholder="What are you teaching?"
               aria-label="Topic"
-              className="h-11 flex-1 text-base"
+              rows={1}
+              className="min-h-11 flex-1 resize-none py-2.5 text-base"
             />
-            <Input
-              value={gradeHint}
-              onChange={(event) => setGradeHint(event.target.value)}
-              placeholder="Grade"
-              aria-label="Grade level"
-              className="h-11 text-base sm:w-28"
-            />
+            <Select
+              value={gradeHint || ANY_GRADE}
+              onValueChange={(value) => setGradeHint(!value || value === ANY_GRADE ? '' : value)}
+            >
+              <SelectTrigger className="h-11 w-full text-base sm:w-40" aria-label="Grade level">
+                <SelectValue>{(value: string | null) => gradeLabel(value ?? ANY_GRADE)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY_GRADE}>{gradeLabel(ANY_GRADE)}</SelectItem>
+                {GRADE_OPTIONS.map((grade) => (
+                  <SelectItem key={grade} value={grade}>
+                    {gradeLabel(grade)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {streaming ? (
               <Button type="button" variant="outline" size="lg" onClick={cancel} className="h-11 px-6">
                 Stop
@@ -84,6 +122,15 @@ export function PathwayBuilder() {
               </Button>
             )}
           </div>
+
+          {!started && (
+            <div className="mt-3">
+              <p className="text-xs text-muted-foreground">
+                The more specific the topic, the better the match — e.g. &ldquo;comparing
+                fractions with unlike denominators,&rdquo; not just &ldquo;fractions.&rdquo;
+              </p>
+            </div>
+          )}
 
           {!started && (
             <div className="mt-4">
