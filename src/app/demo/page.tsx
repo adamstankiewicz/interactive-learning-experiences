@@ -18,13 +18,13 @@ const WIDGETS = [
     tags: ['flashcards', 'true/false', 'sorting'],
   },
   {
-<<<<<<< Updated upstream
     slug: 'draft-meter',
     name: 'Draft Meter',
     description:
       'Write a short response and one line scores how strong the argument is, from a live model call on a debounce. Optionally supplies a source passage, so "evidence" means citing the text.',
     tags: ['writing', 'argument', 'live scoring'],
-=======
+  },
+  {
     slug: 'drag-sort',
     name: 'Drag & Sort',
     description:
@@ -37,7 +37,6 @@ const WIDGETS = [
     description:
       'Drag items from a bank into labeled category columns. Supports 2–4 categories with all-or-nothing submission and per-item correctness feedback.',
     tags: ['sorting', 'categorization', 'classification'],
->>>>>>> Stashed changes
   },
 ];
 
