@@ -18,6 +18,9 @@ import type { CrosswordSpec } from '@/lib/pathway/schema';
 
 const cellKey = (row: number, col: number) => `${row},${col}`;
 
+/** "7 across" — stable across renders, unlike the entry object identity. */
+const entryKey = (entry: PlacedEntry) => `${entry.number} ${entry.direction}`;
+
 /** Every cell an entry occupies, from its first letter to its last. */
 function cellsOf(entry: PlacedEntry) {
   return Array.from({ length: entry.answer.length }, (_, index) =>
@@ -73,6 +76,12 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
 
   const [letters, setLetters] = useState<Record<string, string>>({});
   const [checked, setChecked] = useState(false);
+  /**
+   * Answers a Check has confirmed. Editing the grid clears `checked` — the
+   * wrong-square marking should not outlive the letters it judged — but a
+   * confirmed answer stays struck through while the student works on the rest.
+   */
+  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState<Cursor | null>(() => {
     const first = layout.entries[0];
     return first ? { row: first.row, col: first.col, direction: first.direction } : null;
@@ -96,6 +105,40 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
   const filledCount = layout.entries.filter((entry) => answerOf(entry).length === entry.answer.length).length;
   const solvedCount = layout.entries.filter((entry) => answerOf(entry) === entry.answer).length;
   const allCorrect = layout.entries.length > 0 && solvedCount === layout.entries.length;
+
+  /**
+   * Confirmed *and* still correct. Re-checking against the current letters is
+   * what lets a crossing answer lose its mark the moment an edit breaks it,
+   * without the widget having to work out which answers an edit touched.
+   */
+  const isSolved = (entry: PlacedEntry) =>
+    confirmed.has(entryKey(entry)) && answerOf(entry) === entry.answer;
+
+  const solvedCells = useMemo(() => {
+    const keys = new Set<string>();
+
+    for (const entry of layout.entries) {
+      if (!confirmed.has(entryKey(entry))) continue;
+
+      const cells = cellsOf(entry);
+      const current = cells.map(({ row, col }) => letters[cellKey(row, col)] ?? '').join('');
+      if (current === entry.answer) cells.forEach(({ row, col }) => keys.add(cellKey(row, col)));
+    }
+
+    return keys;
+  }, [layout, confirmed, letters]);
+
+  // A square only counts as wrong when the student actually wrote something
+  // there. Blank squares are unfinished work, not mistakes.
+  const wrongSquares = layout.grid.reduce(
+    (total, cells, row) =>
+      total +
+      cells.filter((letter, col) => {
+        const value = letters[cellKey(row, col)];
+        return Boolean(letter) && Boolean(value) && value !== letter;
+      }).length,
+    0,
+  );
   // Any letter at all is enough to check: a half-filled grid is exactly when a
   // student most wants to know whether they are on the right track.
   const hasLetters = Object.values(letters).some(Boolean);
@@ -195,6 +238,17 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
     }
   }
 
+  function check() {
+    setChecked(true);
+    setConfirmed((previous) => {
+      const next = new Set(previous);
+      for (const entry of layout.entries) {
+        if (answerOf(entry) === entry.answer) next.add(entryKey(entry));
+      }
+      return next;
+    });
+  }
+
   function revealActiveEntry() {
     if (!activeEntry) return;
 
@@ -254,11 +308,17 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
                   // Tints rather than the solid tokens: these squares carry a
                   // letter, so the fill has to stay behind readable text. Same
                   // semantics as every other widget — selected, right, look again.
+                  //
+                  // A wrong square outranks the cursor (an error is the more
+                  // urgent thing to see), and the cursor outranks a confirmed
+                  // answer (so the student can still tell where they are).
                   let tone = 'bg-card';
-                  if (checked && value) {
-                    tone = value === letter ? 'bg-success/15' : 'bg-warning/25';
+                  if (checked && value && value !== letter) {
+                    tone = 'bg-warning/25';
                   } else if (onCursor) {
                     tone = 'bg-selected/40';
+                  } else if (solvedCells.has(key) || (checked && value)) {
+                    tone = 'bg-success/15';
                   } else if (activeCells.has(key)) {
                     tone = 'bg-selected/15';
                   }
@@ -321,29 +381,36 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
               title="Across"
               entries={layout.entries.filter((entry) => entry.direction === 'across')}
               activeEntry={activeEntry}
-              checked={checked}
-              answerOf={answerOf}
+              isSolved={isSolved}
               onSelect={selectEntry}
             />
             <ClueList
               title="Down"
               entries={layout.entries.filter((entry) => entry.direction === 'down')}
               activeEntry={activeEntry}
-              checked={checked}
-              answerOf={answerOf}
+              isSolved={isSolved}
               onSelect={selectEntry}
             />
           </div>
         </div>
 
         {checked && (
-          <Alert role="status" variant={allCorrect ? 'success' : 'warning'} className="mt-5">
+          // An unfinished grid is not a wrong one. Only claim something is
+          // wrong when a square actually holds the wrong letter, or a student
+          // who simply has not got there yet is told they made a mistake.
+          <Alert
+            role="status"
+            variant={allCorrect ? 'success' : wrongSquares > 0 ? 'warning' : 'default'}
+            className="mt-5"
+          >
             <AlertDescription>
               {allCorrect
                 ? spec.successMessage
-                : // Never "the squares in red": the marking is a tint, and colour
-                  // alone should not be what tells a student which squares to fix.
-                  `${solvedCount} of ${layout.entries.length} answers are right. The marked squares do not match — reread those clues.`}
+                : wrongSquares > 0
+                  ? // Never "the squares in red": the marking is a tint, and colour
+                    // alone should not be what tells a student which squares to fix.
+                    `${solvedCount} of ${layout.entries.length} answers are right. The marked squares do not match — reread those clues.`
+                  : `${solvedCount} of ${layout.entries.length} answers are right, and nothing you have written so far is wrong. Keep going.`}
             </AlertDescription>
           </Alert>
         )}
@@ -365,11 +432,12 @@ export function Crossword({ spec }: { spec: CrosswordSpec }) {
             onClick={() => {
               setLetters({});
               setChecked(false);
+              setConfirmed(new Set());
             }}
           >
             Clear
           </Button>
-          <Button size="lg" onClick={() => setChecked(true)} disabled={!hasLetters}>
+          <Button size="lg" onClick={check} disabled={!hasLetters}>
             Check
           </Button>
         </div>
@@ -382,15 +450,13 @@ function ClueList({
   title,
   entries,
   activeEntry,
-  checked,
-  answerOf,
+  isSolved,
   onSelect,
 }: {
   title: string;
   entries: PlacedEntry[];
   activeEntry: PlacedEntry | null;
-  checked: boolean;
-  answerOf: (entry: PlacedEntry) => string;
+  isSolved: (entry: PlacedEntry) => boolean;
   onSelect: (entry: PlacedEntry) => void;
 }) {
   if (!entries.length) return null;
@@ -401,7 +467,7 @@ function ClueList({
       <ul className="mt-2 space-y-1">
         {entries.map((entry) => {
           const isActive = entry === activeEntry;
-          const isSolved = checked && answerOf(entry) === entry.answer;
+          const solved = isSolved(entry);
 
           return (
             <li key={`${entry.number}-${entry.direction}`}>
@@ -417,7 +483,7 @@ function ClueList({
                 }`}
               >
                 <span className="font-semibold">{entry.number}.</span>{' '}
-                <span className={isSolved ? 'line-through opacity-60' : undefined}>
+                <span className={solved ? 'line-through opacity-60' : undefined}>
                   {plainMath(entry.clue)}
                 </span>{' '}
                 <span className="text-muted-foreground">({entry.answer.length})</span>
