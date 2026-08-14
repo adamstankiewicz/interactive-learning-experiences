@@ -37,6 +37,8 @@ const WIDGETS = [
     description:
       'Drag items from a bank into labeled category columns. Supports 2–4 categories with all-or-nothing submission and per-item correctness feedback.',
     tags: ['sorting', 'categorization', 'classification'],
+  },
+  {
     slug: 'crossword',
     name: 'Crossword',
     description:
