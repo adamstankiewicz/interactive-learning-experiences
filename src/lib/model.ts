@@ -54,12 +54,11 @@ function modelId(provider: string, role: Role): string {
   const fromEnv = process.env[OVERRIDE[provider][role]];
   if (fromEnv) return fromEnv;
 
-  // A scoring model that isn't enabled for the account would 403 every
-  // keystroke, so falling back to the pathway model is safer than failing.
-  if (role === 'scoring' && process.env[OVERRIDE[provider].pathway]) {
-    return DEFAULTS[provider].scoring;
-  }
-
+  // Note for Bedrock: model access is granted per account and per region, so
+  // the Haiku default 403s on every keystroke if it isn't enabled. There is no
+  // automatic fallback — it would silently triple scoring latency, which is the
+  // problem the split exists to solve. Point *_SCORING_MODEL_ID at the pathway
+  // model instead, deliberately.
   return DEFAULTS[provider][role];
 }
 
