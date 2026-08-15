@@ -1,111 +1,98 @@
-# Widgets inside a chat (MCP Apps spike)
+# Widgets inside a chat
 
-Renders our widgets inside Claude, via [MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp).
+Renders our learning widgets inside Claude, via
+[MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp).
+
+## Install (nothing to clone, nothing to run)
+
+1. Claude → **Settings → Connectors → Add custom connector**
+2. URL: `https://interactive-learning-experiences.vercel.app/api/mcp`
+3. Ask for an activity — *"show me a find-the-flaw for MS-PS1-1"*, *"a crossword for RI.8.8"*,
+   *"a draft meter for RH.6-8.1"*
+
+That is the whole install. The widget appears inline and is live: the draft meter
+really scores what you type, against the real standard.
+
+Open the URL in a browser to check it is up — it answers with the widget kinds it knows.
 
 ## The idea
 
 **One resource, not one per widget.** Widgets are already `spec -> registry ->
-component`, so a single HTML bundle containing the registry renders every widget
-we have and every one we add. The tool's job is only to produce a spec and point
-at that shell.
+component`, so a single HTML bundle carrying the registry renders every widget we
+have and every one we add. The tool only produces a spec and points at that shell.
 
 ```
-mcp/shell.tsx     mounts WidgetRenderer; takes a spec from the host or window
-mcp/build.mjs     bundles it to one self-contained HTML file
-mcp/server.mjs    MCP server: ui:// resource + a tool that returns a spec
+src/app/api/mcp/route.ts    the MCP server, deployed with the app
+src/lib/widgets/build.ts    one widget from a standard code + a kind
+mcp/shell.tsx               mounts the widget; talks to the host
+mcp/host-bridge.ts          JSON-RPC over postMessage
+mcp/build.mjs               bundles to one self-contained HTML file
+public/widget-shell.html    the built bundle (committed — see below)
 ```
 
-## Run it
+`show_widget(standardCode, kind)` is the only tool. **A widget added to the app
+needs no change here** — but the bundle does have to be rebuilt:
 
 ```bash
-pnpm build && node mcp/build.mjs   # produce mcp/dist/widget-shell.html
-PORT=3100 pnpm dev                 # the scoring API the widget calls
+pnpm mcp:build      # next build && node mcp/build.mjs
 ```
 
-Open `mcp/dist/widget-shell.html` in a browser — it works standalone, no MCP
-involved. That is the fastest way to iterate on the shell.
+That writes `public/widget-shell.html`, which is committed on purpose: `next build`
+copies `public/` before this script could run, so a serverless build has no chance
+to produce it. Forget this step and new widgets render as *"No renderer registered"*.
 
-### Two ways to connect it
-
-**A — custom connector. This is the one that works.**
-
-The stdio route below registers fine and its tool gets called, but Claude never
-reads the `ui://` resource and falls back to rebuilding the widget with its own
-`visualize` tool. Every MCP App that *does* render on a desktop install —
-Slack, Atlassian, Amplitude, Figma — is a remote connector, and adding ours as
-one is what made it render. If your widget is not appearing, this is almost
-certainly why.
+## Working on it locally
 
 ```bash
-node mcp/server-http.mjs     # http://localhost:3300/mcp
+pnpm mcp:build
+PORT=3100 pnpm dev
 ```
 
-Then in Claude: **Settings → Connectors → Add custom connector**, URL
-`http://localhost:3300/mcp`.
+Point a connector at `http://localhost:3100/api/mcp`.
 
-**B — local stdio.** Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "learning-widgets": {
-      "command": "node",
-      "args": ["<abs path>/mcp/server.mjs"],
-      "env": { "WIDGET_API_ORIGIN": "http://localhost:3100" }
-    }
-  }
-}
-```
-
-Restart Claude, then ask it to show a Draft Meter.
-
-## Two things that were not obvious
-
-**CORS is mandatory.** A sandboxed iframe has an opaque origin, so every call to
-`/api/score` is cross-origin. `src/app/api/score/route.ts` now sends open CORS
-headers — fine for a hackathon, wants a scoped token before it goes anywhere real.
-
-**The SDK does not know about MCP Apps.** `registerTool`/`registerResource` have
-no notion of `ui://` or `_meta.ui`; both are hand-written in `server.mjs`.
-
-## What is verified, and what is not
-
-`mcp/harness.html` simulates a host: it iframes the shell with the same sandbox
-a real host uses and replays the message sequence read off Slack's shipping
-bundle. Against it the whole handshake works —
-
-```
-← view  ui/initialize
-→ host  reply + ui/notifications/host-context-changed
-← view  ui/notifications/initialized
-→ host  ui/notifications/tool-result        (the spec arrives)
-← view  ui/notifications/size-changed
-```
-
-— and the widget renders from a spec delivered over the wire. So the view side
-is correct. What is unverified is any real host actually reading the resource:
-in Claude Desktop, `resources/read` has never once been called.
+Faster than asking Claude, for checking a widget renders at all:
 
 ```bash
-python3 -m http.server 3200 --directory mcp   # then open /harness.html
+python3 -m http.server 3200 --directory mcp
+open 'http://localhost:3200/harness.html?kind=draw-the-curve&code=RH.6-8.7'
 ```
 
-## How a widget gets built
+`harness.html` simulates a host — same iframe sandbox, same message sequence — and
+builds a real spec through `/api/widget`. A failure there is ours; a failure only in
+Claude is the host's.
 
-The server is a thin adapter. `show_widget` takes a standard code and a widget
-kind, posts them to `/api/widget` in the app, and hands back whatever comes out.
+## Things that cost hours, written down
 
-That endpoint exists because `/api/pathway` is the wrong shape for a
-conversation: five model calls and ~30s to author a whole lesson, when the
-caller already knows which standard and which interaction it wants. `/api/widget`
-does the one step that is left — configure the widget — in a single call.
+**A local stdio server will not render UI.** It registers, lists its tools, gets
+called — and the host never reads the `ui://` resource, so Claude rebuilds an
+imitation with its own `visualize` tool. Every MCP App that works on a desktop
+install is a remote connector. This is why the server is a route.
 
-The consequence worth knowing: **a widget added to the app shows up in chat with
-no change on this side.** There are no per-widget tools and no fixtures here.
+**`_meta.ui` goes on the resource, not only the tool**, and the CSP keys are
+`connectDomains` / `resourceDomains`. Both were found by listing what the shipping
+first-party connectors declare, not from documentation.
+
+**The view must send `ui/notifications/initialized`** or the host never sends it the
+tool result, and the widget sits empty. The spec arrives via
+`ui/notifications/tool-result`.
+
+**CORS is mandatory.** A sandboxed iframe has an opaque origin, so every call the
+widget makes to `/api/score` is cross-origin.
+
+**The host hands the app its own CSS variables** through
+`ui/notifications/host-context-changed`. Adopting them is most of why a widget looks
+native rather than embedded — though our design system switches on a `.dark` class,
+so the shell reads the host's background colour and decides for itself.
+
+There is no client library for any of this: `@modelcontextprotocol/app-sdk` does not
+exist, and the TS SDK knows nothing about `ui://`. `mcp/host-bridge.ts` is
+hand-rolled from the wire format.
 
 ## Not done yet
-- The shell logs every message the host sends and sniffs a spec out of it,
-  because we have not yet seen Claude's actual envelope. That is the point of
-  the spike — check the console once it renders.
-- `ui/update-model-context` would let a finished widget tell the conversation
-  what the student did. That is the feedback loop, and nothing implements it.
+
+- Widgets emit telemetry into a context with no provider, so nothing a student does
+  in chat reaches the database. No session, no mastery.
+- `ui/update-model-context` — the widget telling the conversation what the student
+  did — is supported by the bridge and called by nothing. That is the feedback loop.
+- The tool builds one widget. A `build_lesson` returning a whole pathway would be
+  the obvious next tool.

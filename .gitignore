@@ -48,3 +48,4 @@ next-env.d.ts
 
 # built widget shell — run `pnpm build && node mcp/build.mjs`
 mcp/dist/
+# public/widget-shell.html IS committed — the deployed MCP route serves it

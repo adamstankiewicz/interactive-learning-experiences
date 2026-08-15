@@ -133,4 +133,10 @@ const html = `<!doctype html>
 
 const out = join(outDir, 'widget-shell.html');
 writeFileSync(out, html);
-console.log(`${out}  ${(html.length / 1024).toFixed(0)} KB  (js ${(js.length / 1024).toFixed(0)} KB, css ${(css.length / 1024).toFixed(0)} KB)`);
+
+// Also into public/, which is what the deployed MCP route serves as the
+// ui:// resource. Committed, because a serverless build has no chance to
+// produce it: `next build` copies public/ and this script runs after.
+const published = join(root, 'public', 'widget-shell.html');
+writeFileSync(published, html);
+console.log(`${out}\n${published}  ${(html.length / 1024).toFixed(0)} KB  (js ${(js.length / 1024).toFixed(0)} KB, css ${(css.length / 1024).toFixed(0)} KB)`);
