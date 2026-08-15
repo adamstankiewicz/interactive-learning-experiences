@@ -1,7 +1,8 @@
 {
   "name": "interactive-student-experiences",
   "version": "0.1.0",
-  "private": true,
+  "license": "Apache-2.0",
+  "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

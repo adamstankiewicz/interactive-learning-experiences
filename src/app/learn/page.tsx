@@ -135,7 +135,9 @@ export default function LearnPage() {
             if (!raw.trim()) continue;
             const event = JSON.parse(raw) as PathwayEvent;
 
-            if (event.type === 'anchor') next.standardCode = event.anchor.standard.statementCode;
+            if (event.type === 'anchor') {
+              next.standardCode = event.anchor.standard.verified ? event.anchor.standard.code : null;
+            }
             if (event.type === 'plan') {
               next.bigIdea = event.plan.bigIdea;
               next.steps = event.plan.steps;
@@ -182,7 +184,7 @@ export default function LearnPage() {
         {session && (
           <div className="flex w-full items-center justify-between">
             <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 text-xs font-bold text-violet-600">
-              {session.standardCode ?? 'no standard'}
+              {session.standardCode ?? '✨ exploring'}
             </span>
             <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
               <motion.span

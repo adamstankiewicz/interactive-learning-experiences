@@ -108,11 +108,30 @@ export function PathwayDocument({ state }: { state: PathwayState }) {
         >
           <ul className="space-y-2.5">
             {anchor.prerequisites.map((prerequisite) => (
-              <li key={prerequisite.caseIdentifierUUID} className="text-sm">
+              <li key={prerequisite.id} className="text-sm">
                 <Badge variant="outline" className="mr-2 font-mono">
-                  {prerequisite.statementCode}
+                  {prerequisite.code}
                 </Badge>
                 {plainMath(prerequisite.description)}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {anchor.companions.length > 0 && (
+        <Section
+          title="Also touches"
+          note="Peer standards from other subjects this topic resolved against — informed the framing, not the outcomes"
+        >
+          <ul className="space-y-2.5">
+            {anchor.companions.map((companion) => (
+              <li key={companion.id} className="text-sm">
+                <Badge variant="outline" className="mr-2 font-mono">
+                  {companion.code}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{companion.subject} · </span>
+                {plainMath(companion.description)}
               </li>
             ))}
           </ul>
@@ -138,10 +157,18 @@ function DocumentHeader({
   return (
     <header>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge className="font-mono">{standard.statementCode}</Badge>
-        <span className="text-xs text-muted-foreground">
-          {standard.academicSubject} · Grade {standard.gradeLevels.join(', ')} · {standard.jurisdiction}
-        </span>
+        {standard.verified ? (
+          <>
+            <Badge className="font-mono">{standard.code}</Badge>
+            <span className="text-xs text-muted-foreground">
+              {standard.subject} · Grade {standard.gradeLevels.join(', ')} · {standard.jurisdiction}
+            </span>
+          </>
+        ) : (
+          <Badge variant="secondary" className="font-mono">
+            Exploration pathway — not matched to a standard
+          </Badge>
+        )}
       </div>
 
       <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight">{topic}</h2>
@@ -155,17 +182,28 @@ function DocumentHeader({
       <Collapsible className="mt-4">
         <CollapsibleTrigger className="group/why flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
           <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]/why:rotate-180" />
-          Why this standard
+          {standard.verified ? 'Why this standard' : 'Why no standard'}
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-2 border-l-2 border-border pl-3 text-sm text-muted-foreground">
-            <p className="leading-relaxed">{plainMath(standard.description)}</p>
-            <p className="mt-2 text-xs">
-              Matched against the Learning Commons graph.
-              {rejectedCodes.length > 0 && (
-                <> Rejected before this one: {rejectedCodes.join(', ')}.</>
-              )}
-            </p>
+            {standard.verified ? (
+              <>
+                <p className="leading-relaxed">{plainMath(standard.description)}</p>
+                <p className="mt-2 text-xs">
+                  Matched against the {standard.sourceLabel} graph.
+                  {rejectedCodes.length > 0 && (
+                    <> Rejected before this one: {rejectedCodes.join(', ')}.</>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-xs">
+                None of the proposed codes resolved against any active standards source
+                {rejectedCodes.length > 0 && <> ({rejectedCodes.join(', ')})</>}. This pathway is built from
+                general subject-matter knowledge instead — treat it as a starting point to review, not a
+                verified alignment.
+              </p>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

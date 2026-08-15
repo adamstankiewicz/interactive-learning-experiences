@@ -1,8 +1,4 @@
-import type {
-  LearningComponent,
-  ProgressionStandard,
-  StandardStatement,
-} from '@/lib/learning-commons/client';
+import type { LearningComponentRef, StandardRef } from '@/lib/standards/types';
 import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
 
 /**
@@ -10,13 +6,24 @@ import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
  *
  * This module deliberately imports no model or network code: the client bundle
  * pulls `STAGES` and these types in, and dragging `generate.ts` along would
- * drag the AI SDK and server env with it.
+ * drag the AI SDK and server env with it. `standards/types.ts` is safe to
+ * import here for the same reason `learning-commons/client.ts`'s types used
+ * to be — it's just type declarations, no client code.
  */
 
 export type Anchor = {
-  standard: StandardStatement;
-  learningComponents: LearningComponent[];
-  prerequisites: ProgressionStandard[];
+  standard: StandardRef;
+  learningComponents: LearningComponentRef[];
+  prerequisites: StandardRef[];
+  /**
+   * Peer-level standards — other proposed candidates that also verified,
+   * distinct from `standard` and never structural the way it is. No
+   * decomposition, no widget coverage, no mastery rollup keyed to these;
+   * they exist to let a genuinely cross-subject topic (a science standard on
+   * forces *and* a social-studies standard on cultural origin, say) feed the
+   * plan's framing without forcing a single anchor to carry both.
+   */
+  companions: StandardRef[];
 };
 
 export type DeepPartial<T> = T extends (infer U)[]
