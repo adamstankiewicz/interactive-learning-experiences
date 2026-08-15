@@ -315,12 +315,16 @@ export function usePathwayStream() {
     if (!state.sessionId || !state.plan) return;
     const plan = state.plan as PathwayPlan;
     const sessionId = state.sessionId;
+    // The server checks this against the session's owner; a session only
+    // exists because `start` minted an id first, so it is set by now.
+    const studentId = studentIdRef.current;
+    if (!studentId) return;
 
     const id = setTimeout(() => {
       void fetch(`/api/pathway/session/${sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, studentId }),
       }).catch(() => {
         // Best-effort — the teacher's local view already has the edit.
       });

@@ -203,8 +203,8 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
   const handleNext = useCallback(() => {
     if (swipeState?.phase !== 'revealing') return;
 
-    // A plain read and a plain call, not a setState updater: this runs from a
-    // click handler, which is the safe place to trigger the parent's state.
+    // Records completion only. Advancing the pathway is the summary screen's
+    // "Continue" button, so the student gets to see their score first.
     if (currentIndex + 1 === spec.cards.length) {
       const finalResults = resultsRef.current;
       telemetry.track({
@@ -219,7 +219,6 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
         },
       });
       telemetry.flush();
-      onComplete?.(finalResults);
     }
 
     setCurrentIndex((i) => i + 1);
@@ -232,7 +231,6 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
     spec.cards.length,
     spec.kind,
     spec.learningComponentId,
-    onComplete,
     telemetry,
   ]);
 

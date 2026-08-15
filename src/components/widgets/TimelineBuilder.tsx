@@ -19,21 +19,12 @@ import { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { TimelineBuilderSpec } from '@/lib/pathway/schema';
+import { seededShuffle } from '@/lib/widgets/shuffle';
 
 type Event = TimelineBuilderSpec['events'][number];
 type Zone = TimelineBuilderSpec['zones'][number];
 type Placement = Record<string, string | null>;
 type Feedback = Record<string, 'correct' | 'wrong' | null>;
-
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const seed = copy.slice(0, i + 1).reduce((acc, it) => acc + JSON.stringify(it).charCodeAt(0), 0);
-    const j = seed % (i + 1);
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
-}
 
 // ── Draggable event chip ──────────────────────────────────────────────────────
 
@@ -176,7 +167,7 @@ function TimelineZone({
 // ── Widget ────────────────────────────────────────────────────────────────────
 
 export function TimelineBuilder({ spec, onComplete }: { spec: TimelineBuilderSpec; onComplete?: (correct: boolean) => void }) {
-  const [shuffledEvents] = useState(() => shuffle(spec.events));
+  const [shuffledEvents] = useState(() => seededShuffle(spec.events, (e) => e.id));
   const [placement, setPlacement] = useState<Placement>(() =>
     Object.fromEntries(spec.events.map((e) => [e.id, null])),
   );

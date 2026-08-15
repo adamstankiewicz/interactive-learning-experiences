@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, useEffect } from 'react';
+import { useId, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -46,25 +46,24 @@ export function PathwayBuilder() {
   const streaming = state.status === 'streaming';
   const started = state.status !== 'idle';
 
+  // Latched: this effect also sets `topic`/`gradeHint`, so depending on them
+  // re-ran it before `started` had flipped, queuing a second generation. Both
+  // reached the server; only the first was aborted, and only client-side.
+  const autoSubmitted = useRef(false);
+
   // Pre-fill form from URL parameters
   useEffect(() => {
     const topicParam = searchParams.get('topic');
     const gradeParam = searchParams.get('grade');
+    if (!topicParam || autoSubmitted.current) return;
 
-    if (topicParam && !topic) {
-      setTopic(topicParam);
-    }
-    if (gradeParam && !gradeHint) {
-      setGradeHint(gradeParam);
-    }
+    autoSubmitted.current = true;
+    setTopic(topicParam);
+    if (!gradeParam) return;
 
-    // Auto-submit if both params present and not already started
-    if (topicParam && gradeParam && !started && !streaming) {
-      setTimeout(() => {
-        start(topicParam, gradeParam, undefined);
-      }, 100);
-    }
-  }, [searchParams, topic, gradeHint, started, streaming, start]);
+    setGradeHint(gradeParam);
+    void start(topicParam, gradeParam, undefined);
+  }, [searchParams, start]);
 
   function runSubmit() {
     if (!topic.trim() || streaming) return;
