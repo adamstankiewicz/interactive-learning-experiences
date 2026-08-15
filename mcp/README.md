@@ -92,8 +92,12 @@ first-party connectors declare, not from documentation.
 tool result, and the widget sits empty. The spec arrives via
 `ui/notifications/tool-result`.
 
-**CORS is mandatory.** A sandboxed iframe has an opaque origin, so every call the
-widget makes to `/api/score` is cross-origin.
+**Do not have the view fetch your server directly.** A sandboxed iframe has an
+opaque origin, so the call is cross-origin — and even with CORS right, whether it
+arrives depends on the host's CSP, which you cannot see or debug from inside the
+frame. The symptom is a widget that renders perfectly and then says it could not
+reach anything. Route it as a `tools/call` instead and the host does the talking:
+that is what `score_draft` is for.
 
 **The host hands the app its own CSS variables** through
 `ui/notifications/host-context-changed`. Adopting them is most of why a widget looks

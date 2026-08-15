@@ -119,6 +119,19 @@ window.addEventListener('message', (event) => {
   if (m.id !== undefined && m.method === 'ui/update-model-context') {
     send({ jsonrpc: '2.0', id: m.id, result: {} });
   }
+
+  // Proxy the view's tool calls the way a host does — this is the path the
+  // Draft Meter now scores through.
+  if (m.id !== undefined && m.method === 'tools/call') {
+    fetch('http://localhost:3100/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'tools/call', params: m.params }),
+    })
+      .then((r) => r.json())
+      .then((d) => send({ jsonrpc: '2.0', id: m.id, result: d.result }))
+      .catch((e) => send({ jsonrpc: '2.0', id: m.id, error: { code: -32603, message: String(e) } }));
+  }
 });
 
 line('out', '(harness ready — waiting for the view to speak first)');

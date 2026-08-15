@@ -1,3 +1,5 @@
+import { scoreDraft } from '@/lib/draft-meter/score';
+import { scoreRequest } from '@/lib/draft-meter/schema';
 import { buildWidget, WidgetBuildError, WIDGET_KINDS } from '@/lib/widgets/build';
 
 export const maxDuration = 60;
@@ -96,6 +98,29 @@ function tools(origin: string) {
       },
       _meta: uiMeta(origin),
     },
+    {
+      name: 'score_draft',
+      title: 'Score a draft',
+      description: [
+        'Score a student response for the Draft Meter. Called by the widget itself, not by you —',
+        'it is how the meter reaches its scorer without the iframe making a cross-origin request',
+        'the host would have to allow. Do not call this directly.',
+      ].join(' '),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          response: { type: 'string' },
+          question: { type: 'string' },
+          standardCode: { type: 'string' },
+          standardDescription: { type: 'string' },
+          checks: { type: 'array', items: { type: 'object' } },
+          passage: { type: ['object', 'null'] },
+        },
+        required: ['response', 'question', 'standardCode', 'standardDescription'],
+      },
+      // Not offered to the model — only the view has any reason to call it.
+      _meta: { ui: { visibility: ['app'] } },
+    },
   ];
 }
 
@@ -180,6 +205,32 @@ async function handle(message: RpcRequest, request: Request) {
     }
 
     case 'tools/call': {
+      /**
+       * The widget's scorer, reached through the host rather than by the
+       * iframe fetching us directly. A sandboxed view has an opaque origin, so
+       * a direct call depends on the host's CSP allowing our domain — which
+       * we cannot see or debug from here. Routing it as a tool call is the
+       * channel the protocol provides for exactly this, and it cannot be
+       * blocked by an origin rule.
+       */
+      if (message.params?.name === 'score_draft') {
+        const parsed = scoreRequest.safeParse(message.params?.arguments ?? {});
+        if (!parsed.success) {
+          return ok(message.id, { content: [{ type: 'text', text: 'Malformed scoring request.' }], isError: true });
+        }
+
+        try {
+          const scored = await scoreDraft(parsed.data);
+          return ok(message.id, {
+            content: [{ type: 'text', text: `Scored ${scored.score}: ${scored.label}` }],
+            structuredContent: scored,
+          });
+        } catch (error) {
+          const text = error instanceof Error ? error.message : 'Scoring failed.';
+          return ok(message.id, { content: [{ type: 'text', text }], isError: true });
+        }
+      }
+
       if (message.params?.name !== 'show_widget') {
         return fail(message.id, -32602, `Unknown tool: ${String(message.params?.name)}`);
       }
