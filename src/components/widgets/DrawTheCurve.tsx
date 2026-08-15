@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
+import { reportToConversation } from '@/lib/mcp/report';
 import type { DrawTheCurveSpec } from '@/lib/pathway/schema';
 
 type Props = { spec: DrawTheCurveSpec; onComplete?: (correct: boolean) => void };
@@ -298,6 +299,20 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
         ...(allRight ? {} : { misconception: spec.hint }),
       },
     });
+
+    // Reported on every commit, right or wrong — unlike the other widgets,
+    // the shape a student *predicted* is the thing worth talking about, and a
+    // wrong prediction says more about what they believe than a right one.
+    reportToConversation(
+      [
+        `The student predicted a shape for "${spec.yAxis.label}" across "${spec.xAxis.label}".`,
+        `Situation: ${spec.setup}`,
+        `They drew a line that ${describeShape(segments.map((s) => s.mine), false).replace(/^Your line /, '')}`,
+        allRight
+          ? 'That matches the real curve.'
+          : `The real curve ${describeShape(segments.map((s) => s.theirs), false).replace(/^Your line /, '')} ${wrongSegments} of ${segments.length} stretches went the wrong way.`,
+      ].join(' '),
+    );
 
     if (!allRight) return;
     onComplete?.(true);
