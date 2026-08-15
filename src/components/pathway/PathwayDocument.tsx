@@ -76,25 +76,22 @@ const PURPOSE_META: Record<
 };
 
 /**
- * Waypoint colors for the pathway thread — the vertical line + node running
- * down "The pathway" section. Separate from `PURPOSE_META`'s `tint`/`icon`
- * (a low-alpha pill background needs a different color than a solid node
- * fill), reusing the same four-hue mapping so a step's category reads
- * identically whether you're scanning the thread or the card itself.
+ * Waypoint dot colors for the pathway thread — the one concentrated point of
+ * category color per step. The connecting line stays a plain neutral trail
+ * and the card stays a quiet neutral ring; only the dot (and the pill inside
+ * the card) carry the hue, so a step's category reads once, not three times.
  */
-const WAYPOINT_META: Record<string, { dot: string; line: string }> = {
-  activate: { dot: 'bg-pink-400', line: 'bg-pink-200 dark:bg-pink-900' },
-  model: { dot: 'bg-violet-400', line: 'bg-violet-200 dark:bg-violet-900' },
-  practice: { dot: 'bg-amber-400', line: 'bg-amber-200 dark:bg-amber-900' },
-  check: { dot: 'bg-emerald-400', line: 'bg-emerald-200 dark:bg-emerald-900' },
+const WAYPOINT_META: Record<string, { dot: string }> = {
+  activate: { dot: 'bg-pink-400' },
+  model: { dot: 'bg-violet-400' },
+  practice: { dot: 'bg-amber-400' },
+  check: { dot: 'bg-emerald-400' },
 };
 
-/** A preview cycle of the four purposes' border + waypoint colors, for the skeleton — real steps aren't known yet. */
-const STEP_SKELETON_WAYPOINTS = (['activate', 'model', 'practice', 'check'] as const).map((purpose) => ({
-  border: PURPOSE_META[purpose].border,
-  dot: WAYPOINT_META[purpose].dot,
-  line: WAYPOINT_META[purpose].line,
-}));
+/** A preview cycle of the four purposes' waypoint dots, for the skeleton — real steps aren't known yet. */
+const STEP_SKELETON_DOTS = (['activate', 'model', 'practice', 'check'] as const).map(
+  (purpose) => WAYPOINT_META[purpose].dot,
+);
 
 /**
  * The plan names a step's `widgetKind` before the spec exists — real
@@ -334,9 +331,10 @@ export function PathwayDocument({
                     >
                       <Icon className="size-3.5" />
                     </span>
-                    {!isLast && (
-                      <span className={cn('my-1 w-0.5 flex-1 rounded-full', waypoint?.line ?? 'bg-border')} />
-                    )}
+                    {/* The line is a plain trail, not another colored signal —
+                        the dot is the one waypoint marker; a colored line too
+                        would just repeat what the dot and card already say. */}
+                    {!isLast && <span className="my-1 w-0.5 flex-1 rounded-full bg-border" />}
                   </div>
                   <div className="min-w-0 flex-1 pb-4">
                     <StepCard
@@ -502,9 +500,9 @@ function OutcomeSkeletonRow() {
 }
 
 /** One placeholder step card — same sharing rationale as `OutcomeSkeletonRow`. */
-function StepSkeletonCard({ border }: { border: string }) {
+function StepSkeletonCard() {
   return (
-    <div className={cn('rounded-2xl border-3 bg-card px-4 py-3.5', border)}>
+    <div className="rounded-2xl bg-card px-4 py-3.5 ring-1 ring-foreground/10">
       <Skeleton className="h-5 w-20 rounded-full" />
       <Skeleton className="mt-2.5 h-4 w-1/2" />
       <Skeleton className="mt-1.5 h-3.5 w-3/4" />
@@ -550,16 +548,14 @@ function PathwayDocumentSkeleton() {
 function StepWaypointSkeletonList() {
   return (
     <div className="space-y-0">
-      {STEP_SKELETON_WAYPOINTS.map(({ border, dot, line }, i) => (
+      {STEP_SKELETON_DOTS.map((dot, i) => (
         <div key={i} className="flex gap-3">
           <div className="flex w-8 shrink-0 flex-col items-center" aria-hidden>
             <Skeleton className={cn('size-8 shrink-0 rounded-full', dot)} />
-            {i < STEP_SKELETON_WAYPOINTS.length - 1 && (
-              <span className={cn('my-1 w-0.5 flex-1 rounded-full', line)} />
-            )}
+            {i < STEP_SKELETON_DOTS.length - 1 && <span className="my-1 w-0.5 flex-1 rounded-full bg-border" />}
           </div>
           <div className="min-w-0 flex-1 pb-4">
-            <StepSkeletonCard border={border} />
+            <StepSkeletonCard />
           </div>
         </div>
       ))}
@@ -687,12 +683,10 @@ const StepCard = memo(function StepCard({
   const meta = (purpose && PURPOSE_META[purpose]) ?? null;
 
   return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-2xl border-3 bg-card shadow-sm transition-colors',
-        meta ? meta.border : 'border-border',
-      )}
-    >
+    // Quiet on purpose: the waypoint dot and the pill below already say which
+    // kind of step this is — a colored border on top of both just repeats
+    // the same signal a third time and reads as noise, not information.
+    <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/10 transition-colors">
       <div className="flex flex-col gap-1.5 px-4 py-3.5 sm:flex-row sm:gap-4">
         <span className="shrink-0">
           <span
@@ -745,13 +739,12 @@ const StepCard = memo(function StepCard({
       {(hasWidget || pending || note) && (
         <div
           className={cn(
-            'border-t-3 bg-muted/30 px-4 py-4',
+            'border-t border-border bg-muted/30 px-4 py-4',
             // The left offset aligns widget/note content under the title
             // above — appropriate once there's a widget to align, wrong for
             // the pending state, which is its own centered moment and reads
             // as off-center if the box centering it is itself lopsided.
             !pending && 'sm:pl-24',
-            meta ? meta.border : 'border-border',
           )}
         >
 
