@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, RotateCcw, Sparkles } from 'lucide-react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -45,7 +45,6 @@ export function PathwayDocument({
   onEditPlan?: EditPlan;
 }) {
   const { anchor, plan } = state;
-  if (!anchor) return null;
 
   // Both only make sense once `plan` is the real validated thing, not the
   // partial shape it streams in as — regeneration replays a step through the
@@ -54,43 +53,78 @@ export function PathwayDocument({
   const regenerateStep = state.status === 'done' ? onRegenerateStep : undefined;
   const editPlan = state.status === 'done' ? onEditPlan : undefined;
 
-  const rejectedCodes = Object.entries(state.verdicts)
-    .filter(([, resolved]) => !resolved)
-    .map(([code]) => code);
+  const rejectedCodes = useMemo(
+    () =>
+      Object.entries(state.verdicts)
+        .filter(([, resolved]) => !resolved)
+        .map(([code]) => code),
+    [state.verdicts],
+  );
 
   // Every edit callback closes over the *current* full plan and writes back
   // a whole new one — `editPlan` (like `regenerateStep`) is only ever handed
   // a complete `PathwayPlan`, never a partial one, so this cast is safe
   // exactly where `editPlan` itself is truthy.
-  const editOutcome = editPlan
-    ? (index: number, field: 'statement' | 'evidence', text: string) => {
-        const current = plan as PathwayPlan;
-        editPlan({
-          ...current,
-          outcomes: current.outcomes.map((o, i) => (i === index ? { ...o, [field]: text } : o)),
-        });
-      }
-    : undefined;
+  const editOutcome = useMemo(
+    () =>
+      editPlan
+        ? (index: number, field: 'statement' | 'evidence', text: string) => {
+            const current = plan as PathwayPlan;
+            editPlan({
+              ...current,
+              outcomes: current.outcomes.map((o, i) => (i === index ? { ...o, [field]: text } : o)),
+            });
+          }
+        : undefined,
+    [editPlan, plan],
+  );
 
-  const editStepField = editPlan
-    ? (index: number, field: 'title' | 'description', text: string) => {
-        const current = plan as PathwayPlan;
-        editPlan({
-          ...current,
-          steps: current.steps.map((s, i) => (i === index ? { ...s, [field]: text } : s)),
-        });
-      }
-    : undefined;
+  const editStepField = useMemo(
+    () =>
+      editPlan
+        ? (index: number, field: 'title' | 'description', text: string) => {
+            const current = plan as PathwayPlan;
+            editPlan({
+              ...current,
+              steps: current.steps.map((s, i) => (i === index ? { ...s, [field]: text } : s)),
+            });
+          }
+        : undefined,
+    [editPlan, plan],
+  );
 
-  const editMisconception = editPlan
-    ? (index: number, text: string) => {
-        const current = plan as PathwayPlan;
-        editPlan({
-          ...current,
-          misconceptions: current.misconceptions.map((m, i) => (i === index ? text : m)),
-        });
-      }
-    : undefined;
+  const editMisconception = useMemo(
+    () =>
+      editPlan
+        ? (index: number, text: string) => {
+            const current = plan as PathwayPlan;
+            editPlan({
+              ...current,
+              misconceptions: current.misconceptions.map((m, i) => (i === index ? text : m)),
+            });
+          }
+        : undefined,
+    [editPlan, plan],
+  );
+
+  // Stable across renders so a memoized StepCard is not invalidated by a new
+  // closure every time the stream dispatches. Each card binds its own index.
+  const handleRegenerateStep = useCallback(
+    (index: number) => {
+      if (regenerateStep && anchor) void regenerateStep(anchor, plan as PathwayPlan, index);
+    },
+    [regenerateStep, anchor, plan],
+  );
+
+  const handleEditStepField = useCallback(
+    (index: number, field: 'title' | 'description', text: string) => {
+      editStepField?.(index, field, text);
+    },
+    [editStepField],
+  );
+
+  // Below the hooks: they must run in the same order on every render.
+  if (!anchor) return null;
 
   return (
     <article className="mt-8 space-y-10">
@@ -162,13 +196,13 @@ export function PathwayDocument({
                 key={index}
                 step={step}
                 index={index}
-                state={state}
-                onRegenerate={
-                  regenerateStep ? () => regenerateStep(anchor, plan as PathwayPlan, index) : undefined
-                }
-                onEditField={
-                  editStepField ? (field, text) => editStepField(index, field, text) : undefined
-                }
+                widget={state.stepWidgets[index]}
+                widgetSeq={state.stepWidgetSeq[index] ?? 0}
+                note={state.stepWidgetNotes[index]}
+                regenerating={Boolean(state.regeneratingSteps[index])}
+                regenerateError={state.stepErrors[index]}
+                onRegenerate={regenerateStep ? handleRegenerateStep : undefined}
+                onEditField={editStepField ? handleEditStepField : undefined}
               />
             ))}
           </ol>
@@ -323,26 +357,35 @@ function DocumentHeader({
  *
  * The plan names a `widgetKind` before the spec exists, so a step can advertise
  * a pending interaction — the placeholder is real information, not a spinner.
+ *
+ * Takes per-step values rather than the whole `PathwayState`: the stream
+ * replaces that object on every event, so passing it would defeat the memo and
+ * re-render every mounted widget on each one.
  */
-function StepCard({
+const StepCard = memo(function StepCard({
   step,
   index,
-  state,
+  widget,
+  widgetSeq,
+  note,
+  regenerating,
+  regenerateError,
   onRegenerate,
   onEditField,
 }: {
   step: PartialStep;
   index: number;
-  state: PathwayState;
-  onRegenerate?: () => void;
-  onEditField?: (field: 'title' | 'description', text: string) => void;
+  widget: unknown;
+  widgetSeq: number;
+  note?: string;
+  regenerating: boolean;
+  regenerateError?: string;
+  onRegenerate?: (index: number) => void;
+  onEditField?: (index: number, field: 'title' | 'description', text: string) => void;
 }) {
   const purpose = step?.purpose;
-  const widget = state.stepWidgets[index];
-  const note = state.stepWidgetNotes[index];
-  const pending = Boolean(step?.widgetKind) && widget === undefined;
-  const regenerating = Boolean(state.regeneratingSteps[index]);
-  const regenerateError = state.stepErrors[index];
+  const hasWidget = widget !== undefined;
+  const pending = Boolean(step?.widgetKind) && !hasWidget;
 
   return (
     <li className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
@@ -359,7 +402,7 @@ function StepCard({
           {onEditField ? (
             <EditableText
               value={step?.title ?? ''}
-              onSave={(text) => onEditField('title', text)}
+              onSave={(text) => onEditField(index, 'title', text)}
               className="text-sm font-medium"
             />
           ) : (
@@ -368,7 +411,7 @@ function StepCard({
           {onEditField ? (
             <EditableText
               value={step?.description ?? ''}
-              onSave={(text) => onEditField('description', text)}
+              onSave={(text) => onEditField(index, 'description', text)}
               className="mt-0.5 text-sm text-muted-foreground"
               multiline
             />
@@ -379,10 +422,10 @@ function StepCard({
           )}
           {regenerateError && <p className="mt-1 text-xs text-destructive">{regenerateError}</p>}
         </div>
-        {onRegenerate && widget && (
+        {onRegenerate && hasWidget && (
           <button
             type="button"
-            onClick={onRegenerate}
+            onClick={() => onRegenerate(index)}
             disabled={regenerating}
             className="flex shrink-0 items-center gap-1.5 self-start text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           >
@@ -392,10 +435,10 @@ function StepCard({
         )}
       </div>
 
-      {(widget || pending || note) && (
+      {(hasWidget || pending || note) && (
         <div className={cn('border-t border-border bg-muted/30 px-4 py-4', 'sm:pl-24')}>
-          {widget ? (
-            <WidgetRenderer key={state.stepWidgetSeq[index] ?? 0} spec={widget} />
+          {hasWidget ? (
+            <WidgetRenderer key={widgetSeq} spec={widget} />
           ) : pending ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Sparkles className="size-3.5 animate-pulse" aria-hidden />
@@ -410,7 +453,7 @@ function StepCard({
       )}
     </li>
   );
-}
+});
 
 function Section({
   title,
