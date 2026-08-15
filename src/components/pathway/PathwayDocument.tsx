@@ -745,7 +745,12 @@ const StepCard = memo(function StepCard({
       {(hasWidget || pending || note) && (
         <div
           className={cn(
-            'border-t-3 bg-muted/30 px-4 py-4 sm:pl-24',
+            'border-t-3 bg-muted/30 px-4 py-4',
+            // The left offset aligns widget/note content under the title
+            // above — appropriate once there's a widget to align, wrong for
+            // the pending state, which is its own centered moment and reads
+            // as off-center if the box centering it is itself lopsided.
+            !pending && 'sm:pl-24',
             meta ? meta.border : 'border-border',
           )}
         >
