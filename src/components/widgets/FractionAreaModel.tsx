@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import { cn } from '@/lib/utils';
 import type { FractionAreaModelSpec } from '@/lib/pathway/schema';
 
@@ -53,6 +54,10 @@ export function FractionAreaModel({ spec }: { spec: FractionAreaModelSpec }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [checked, setChecked] = useState(false);
 
+  const telemetry = useWidgetTelemetry();
+  const shownRef = useRef(false);
+  const completedRef = useRef(false);
+
   const target = spec.numerator / spec.denominator;
   const current = selected.size / denominator;
   const isCorrect = Math.abs(current - target) < 1e-9;
@@ -63,8 +68,39 @@ export function FractionAreaModel({ spec }: { spec: FractionAreaModelSpec }) {
 
   const parts = useMemo(() => Array.from({ length: denominator }, (_, i) => i), [denominator]);
 
+  // Guarded by a ref so a remount in development does not double-count.
+  useEffect(() => {
+    if (shownRef.current) return;
+    shownRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_shown',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: { target: `${spec.numerator}/${spec.denominator}`, choices: spec.denominatorChoices },
+    });
+  }, [telemetry, spec]);
+
   function toggle(index: number) {
     setChecked(false);
+
+    const deselecting = selected.has(index);
+    telemetry.track({
+      eventType: 'part_selected',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: {
+        index,
+        action: deselecting ? 'deselect' : 'select',
+        selected: selected.size + (deselecting ? -1 : 1),
+        denominator,
+      },
+    });
+
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
@@ -74,9 +110,54 @@ export function FractionAreaModel({ spec }: { spec: FractionAreaModelSpec }) {
   }
 
   function repartition(value: number) {
+    // Which denominator the student reaches for is the partitioning skill
+    // itself, so the change is worth recording even though nothing is answered.
+    telemetry.track({
+      eventType: 'partition_changed',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: { from: denominator, to: value, matchesTarget: value === spec.denominator },
+    });
+
     setDenominator(value);
     setSelected(new Set());
     setChecked(false);
+  }
+
+  function check() {
+    if (checked) return;
+    setChecked(true);
+
+    telemetry.track({
+      eventType: 'answer_checked',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: isCorrect,
+      payload: {
+        built: `${selected.size}/${denominator}`,
+        target: `${spec.numerator}/${spec.denominator}`,
+        equivalentForm: isEquivalentForm,
+        // The hint names the misconception a wrong build reveals, and the
+        // profile confirms a misconception only from a wrong answer carrying it.
+        ...(isCorrect ? {} : { misconception: spec.hint }),
+      },
+    });
+
+    if (!isCorrect || completedRef.current) return;
+    completedRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_completed',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: true,
+      payload: { equivalentForm: isEquivalentForm },
+    });
+    telemetry.flush();
   }
 
   return (
@@ -130,7 +211,7 @@ export function FractionAreaModel({ spec }: { spec: FractionAreaModelSpec }) {
               </>
             )}
           </p>
-          <Button size="lg" onClick={() => setChecked(true)} disabled={selected.size === 0}>
+          <Button size="lg" onClick={check} disabled={selected.size === 0}>
             Check
           </Button>
         </div>

@@ -19,10 +19,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { DragSortSpec } from '@/lib/pathway/schema';
 
 type Item = DragSortSpec['items'][number];
@@ -129,6 +130,25 @@ export function DragSort({ spec, onComplete }: Props) {
   const [attempts, setAttempts] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const telemetry = useWidgetTelemetry();
+  const shownRef = useRef(false);
+  const completedRef = useRef(false);
+
+  // Guarded by a ref so a remount in development does not double-count.
+  useEffect(() => {
+    if (shownRef.current) return;
+    shownRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_shown',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: null,
+      payload: { items: spec.items.length },
+    });
+  }, [telemetry, spec]);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -152,11 +172,42 @@ export function DragSort({ spec, onComplete }: Props) {
   );
 
   const handleSubmit = useCallback(() => {
-    const correct = items.map((it) => it.id).join(',') === spec.correctOrder.join(',');
+    const submitted = items.map((it) => it.id);
+    const correct = submitted.join(',') === spec.correctOrder.join(',');
     setAttempts((a) => a + 1);
     setPhase(correct ? 'correct' : 'wrong');
-    if (correct) onComplete?.(true);
-  }, [items, spec.correctOrder, onComplete]);
+
+    telemetry.track({
+      eventType: 'answer_checked',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct,
+      payload: {
+        attempt: attempts + 1,
+        // Position-level detail so a near-miss reads differently from a scramble.
+        misplaced: submitted.filter((id, i) => id !== spec.correctOrder[i]).length,
+        // The profile confirms a misconception only from a wrong answer carrying it.
+        ...(correct ? {} : { misconception: spec.hint }),
+      },
+    });
+
+    if (!correct) return;
+    onComplete?.(true);
+
+    if (completedRef.current) return;
+    completedRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_completed',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: true,
+      payload: { attempts: attempts + 1 },
+    });
+    telemetry.flush();
+  }, [items, spec, onComplete, attempts, telemetry]);
 
   const handleTryAgain = useCallback(() => setPhase('idle'), []);
 
