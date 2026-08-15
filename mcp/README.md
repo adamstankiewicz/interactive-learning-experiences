@@ -88,6 +88,11 @@ settles it: if the host never read the resource, the declaration is wrong.
 `connectDomains` / `resourceDomains`. Both were found by listing what the shipping
 first-party connectors declare, not from documentation.
 
+**One fixed `ui://` URI renders exactly once per conversation.** Ask for a second
+activity and nothing appears, whatever the widget — a host treats a URI it has
+already instantiated as a view it already has. Each tool call needs its own URI;
+`resources/read` accepts anything under the base and serves the same bundle.
+
 **The view must send `ui/notifications/initialized`** or the host never sends it the
 tool result, and the widget sits empty. The spec arrives via
 `ui/notifications/tool-result`.
