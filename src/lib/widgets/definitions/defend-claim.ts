@@ -1,4 +1,4 @@
-import { DefendClaim } from '@/components/widgets/DefendClaim';
+import { lazy } from 'react';
 import { defendClaimSpec, type DefendClaimSpec } from '@/lib/pathway/schema';
 import { reachesGrade } from '@/lib/standards/grade';
 import { registerWidgetCatalog } from '@/lib/widgets/types';
@@ -18,7 +18,9 @@ const MIN_GRADE = 7;
 registerWidgetCatalog<DefendClaimSpec>({
   kind: 'defend-claim',
   schema: defendClaimSpec,
-  component: DefendClaim,
+  component: lazy(() =>
+    import('@/components/widgets/DefendClaim').then((m) => ({ default: m.DefendClaim })),
+  ),
   /**
    * Both conditions, and neither is redundant. The content tag alone would let
    * this land on a 4th-grade social studies standard; the grade alone would let

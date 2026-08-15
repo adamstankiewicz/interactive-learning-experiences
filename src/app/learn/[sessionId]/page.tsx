@@ -38,13 +38,5 @@ export default async function SharedPathwayPage({ params }: { params: Promise<{ 
 
   if (!session) notFound();
 
-  // Best-effort, like the write path it mirrors — a storage hiccup here
-  // shouldn't block a student from reaching the pathway they were sent.
-  try {
-    await storageAdapter().recordSessionOpen(sessionId);
-  } catch (error) {
-    console.error('[pathway] could not record session open', error);
-  }
-
   return <SharedPathwayView session={session} />;
 }
