@@ -204,7 +204,7 @@ function DraggableChip({
       style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.35 : 1 }}
       {...attributes}
       {...listeners}
-      className={`inline-flex cursor-grab select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`inline-flex cursor-grab select-none items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-sm font-medium wrap-break-word transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         feedback === 'correct'
           ? 'border-success/50 bg-success/10 text-foreground'
           : feedback === 'wrong'
@@ -535,7 +535,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
 
         <DragOverlay>
           {activeItem && (
-            <div className="inline-flex cursor-grabbing select-none items-center rounded-full border border-primary bg-card px-3 py-1.5 text-sm font-medium shadow-lg">
+            <div className="inline-flex cursor-grabbing select-none items-center rounded-2xl border border-primary bg-card px-3 py-1.5 text-sm font-medium shadow-lg">
               {activeItem.label}
             </div>
           )}

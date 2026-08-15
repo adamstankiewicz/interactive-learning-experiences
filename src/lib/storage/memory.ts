@@ -226,6 +226,7 @@ export const memoryStorageAdapter: StorageAdapter = {
       id: randomUUID(),
       rosterStudentId: input.rosterStudentId,
       sessionId: input.sessionId,
+      parentSessionId: input.parentSessionId,
       topic: input.topic,
       createdAt: new Date().toISOString(),
     };
@@ -246,47 +247,85 @@ export const memoryStorageAdapter: StorageAdapter = {
     return assignments.filter((a) => a.sessionId === sessionId);
   },
 
+  async listChildAssignments(parentSessionId) {
+    return assignments.filter((a) => a.parentSessionId === parentSessionId);
+  },
+
+  async insertRemediationWidget(sessionId, insertAt, widget) {
+    const session = sessions.get(sessionId);
+    if (!session) return;
+    const shifted: Record<number, unknown> = {};
+    for (const [key, val] of Object.entries(session.stepWidgets)) {
+      const idx = Number(key);
+      shifted[idx >= insertAt ? idx + 1 : idx] = val;
+    }
+    shifted[insertAt] = widget;
+    session.stepWidgets = shifted;
+  },
+
   async listSessions(limit = 50): Promise<SessionSummary[]> {
+    const childSessionIds = new Set(assignments.map((a) => a.sessionId));
+    // Build a map: parentSessionId → child session IDs, for completion rollup
+    const childrenByParent = new Map<string, string[]>();
+    for (const a of assignments) {
+      if (!a.parentSessionId) continue;
+      const arr = childrenByParent.get(a.parentSessionId) ?? [];
+      arr.push(a.sessionId);
+      childrenByParent.set(a.parentSessionId, arr);
+    }
     return [...sessions.values()]
+      .filter((s) => !childSessionIds.has(s.id))
       .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
       .slice(0, limit)
-      .map((s) => ({
-        id: s.id,
-        topic: s.topic,
-        standardCode: (s.anchor as { standard?: { code?: string } })?.standard?.code ?? null,
-        gradeHint: s.gradeHint,
-        openCount: [...sessionOpens].filter((k) => k.startsWith(`${s.id}:`)).length,
-        completionCount: s.completionCount,
-        createdAt: s.createdAt ?? new Date().toISOString(),
-      }));
+      .map((s) => {
+        const childIds = childrenByParent.get(s.id) ?? [];
+        const childCompletions = childIds.reduce((sum, cid) => sum + (sessions.get(cid)?.completionCount ?? 0), 0);
+        const childOpens = childIds.reduce((sum, cid) => sum + [...sessionOpens].filter((k) => k.startsWith(`${cid}:`)).length, 0);
+        return {
+          id: s.id,
+          topic: s.topic,
+          standardCode: (s.anchor as { standard?: { code?: string } })?.standard?.code ?? null,
+          gradeHint: s.gradeHint,
+          openCount: [...sessionOpens].filter((k) => k.startsWith(`${s.id}:`)).length + childOpens,
+          completionCount: s.completionCount + childCompletions,
+          createdAt: s.createdAt ?? new Date().toISOString(),
+        };
+      });
   },
 
   async sessionReport(sessionId): Promise<SessionStudentRow[]> {
-    // Build a map from anonymous studentId → assignment (roster link).
-    const sessionAssignments = assignments.filter((a) => a.sessionId === sessionId);
     const sessionObj = sessions.get(sessionId);
+
+    // Child assignments where this is the parent session.
+    const childAssignments = assignments.filter((a) => a.parentSessionId === sessionId);
+
     // Map: anonymous studentId → { rosterStudentId, name }
+    // Built from child assignments: each child assignment has its own session,
+    // and that session's studentId is the anon student who did the work.
     const rosterByAnon = new Map<string, { rosterStudentId: string; name: string }>();
-    for (const a of sessionAssignments) {
+    // Also track which session IDs belong to children (to pull their interactions).
+    const childSessionIds = new Set<string>();
+    for (const a of childAssignments) {
       const student = rosterStudents.get(a.rosterStudentId);
-      // The anonymous studentId is on the session row created during assignment
-      const sessionForAssignment = [...sessions.values()].find((s) => s.id === a.sessionId);
-      if (sessionForAssignment && student) {
-        rosterByAnon.set(sessionForAssignment.studentId, {
+      const childSession = sessions.get(a.sessionId);
+      if (childSession && student) {
+        rosterByAnon.set(childSession.studentId, {
           rosterStudentId: a.rosterStudentId,
           name: student.name,
         });
+        childSessionIds.add(a.sessionId);
       }
     }
 
-    // Aggregate interaction events per student for this session.
+    // Aggregate interaction events from the parent session AND all child sessions.
+    const relevantSessionIds = new Set([sessionId, ...childSessionIds]);
     const byStudent = new Map<string, {
       attempts: number; correctCount: number; hintsUsed: number;
       elapsedMs: number[]; lastSeenAt: string;
     }>();
 
     for (const event of interactions) {
-      if (event.sessionId !== sessionId) continue;
+      if (!relevantSessionIds.has(event.sessionId)) continue;
       const row = byStudent.get(event.studentId) ?? { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date(0).toISOString() };
       if (event.correct !== null) row.attempts += 1;
       if (event.correct === true) row.correctCount += 1;
@@ -296,7 +335,15 @@ export const memoryStorageAdapter: StorageAdapter = {
       byStudent.set(event.studentId, row);
     }
 
-    // Also include the session owner even with no interactions (they opened it).
+    // Include roster students from child assignments even with no interactions yet.
+    for (const a of childAssignments) {
+      const childSession = sessions.get(a.sessionId);
+      if (childSession && !byStudent.has(childSession.studentId)) {
+        byStudent.set(childSession.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: childSession.createdAt ?? new Date().toISOString() });
+      }
+    }
+
+    // Include the parent session's own anon student (the teacher who built it).
     if (sessionObj && !byStudent.has(sessionObj.studentId)) {
       byStudent.set(sessionObj.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: sessionObj.createdAt ?? new Date().toISOString() });
     }
