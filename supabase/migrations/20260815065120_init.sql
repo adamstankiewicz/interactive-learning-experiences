@@ -164,3 +164,24 @@ create policy profiles_self_read on public.student_profiles
   for select using (
     student_id in (select id from public.students where auth_user_id = auth.uid())
   );
+
+-- ---------------------------------------------------------------------------
+-- Table grants
+--
+-- RLS policies restrict *rows*, but a role needs a base GRANT before RLS
+-- even gets evaluated. Supabase's hosted platform provisions this
+-- automatically as part of creating a project, which is easy to mistake for
+-- "RLS is enough" — it silently isn't on a self-hosted or local CLI Postgres
+-- instance, where these tables (created by this migration, not by the
+-- platform) get no default privileges at all. `service_role` bypasses RLS by
+-- role attribute, not by these grants alone; it still needs them.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to service_role, anon, authenticated;
+
+grant select, insert, update, delete
+  on public.students, public.pathway_sessions, public.interactions, public.student_profiles
+  to service_role;
+
+grant select
+  on public.students, public.pathway_sessions, public.interactions, public.student_profiles
+  to anon, authenticated;
