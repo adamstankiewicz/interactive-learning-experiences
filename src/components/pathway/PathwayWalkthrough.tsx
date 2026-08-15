@@ -29,15 +29,23 @@ export type WalkthroughSession = {
 };
 
 /**
- * Some widgets (swiper-flashcard, drag-sort, drag-categorize) report their own
- * completion through `onComplete` — there is a moment the student is
- * unambiguously "done". Fraction area model, Draft Meter, and Crossword have
- * no such moment: an area model is checked as many times as a student likes,
- * a meter just keeps scoring as they type, and a crossword can sit
- * partially solved. Those three need an explicit "I'm done" action instead
- * of an automatic one.
+ * Most widgets report completion through `onComplete` — there is a moment the
+ * student is unambiguously "done" (last flashcard, all events correct, etc.).
+ * Fraction Area Model, Draft Meter, and Crossword have no such moment: an area
+ * model is checked as many times as a student likes, a meter just keeps scoring
+ * as they type, and a crossword can sit partially solved. Those three need an
+ * explicit "I'm done" action instead of an automatic one.
  */
-const SELF_ADVANCING_KINDS = new Set(['swiper-flashcard', 'drag-sort', 'drag-categorize']);
+const SELF_ADVANCING_KINDS = new Set([
+  'swiper-flashcard',
+  'drag-sort',
+  'drag-categorize',
+  'markdown-card',
+  'flashcard',
+  'step-reveal',
+  'narrated-card',
+  'timeline-builder',
+]);
 
 function widgetKindOf(widget: unknown): string | null {
   return widget && typeof widget === 'object' && 'kind' in widget && typeof widget.kind === 'string'
