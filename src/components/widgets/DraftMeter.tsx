@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
@@ -76,10 +76,14 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
   /**
    * Held in a ref, not read directly in the scoring effect below: the context
    * value is rebuilt on every provider render, so putting it in that effect's
-   * dependencies would re-run the fetch on unrelated re-renders.
+   * dependencies would re-run the fetch on unrelated re-renders. Written in an
+   * effect rather than during render itself — a ref is an escape hatch from
+   * React's render/commit split, not a value safe to mutate mid-render.
    */
   const telemetryRef = useRef(telemetry);
-  telemetryRef.current = telemetry;
+  useEffect(() => {
+    telemetryRef.current = telemetry;
+  }, [telemetry]);
 
   const shownRef = useRef(false);
   const completedRef = useRef(false);
@@ -109,6 +113,45 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
       payload: { mode: spec.passage ? 'cite-source' : 'argue', criteria: spec.criteria.length },
     });
   }, [telemetry, spec]);
+
+  /**
+   * The meter re-scores on every pause in typing, so recording each response
+   * would bury the profile in one student's keystrokes. Only a band change is
+   * reported, and only the finish line is scored: a draft still being written
+   * is not a wrong answer, so intermediate events carry a null verdict and stay
+   * out of mastery.
+   */
+  const recordScore = useCallback(
+    (scored: ScoreResult) => {
+      const t = telemetryRef.current;
+
+      if (scored.band !== lastBandRef.current) {
+        lastBandRef.current = scored.band;
+        t.track({
+          eventType: 'answer_checked',
+          widgetKind: spec.kind,
+          learningComponentId: spec.learningComponentId,
+          standardCode: t.standardCode,
+          correct: null,
+          payload: { score: scored.score, band: scored.band, signals: scored.signals },
+        });
+      }
+
+      if (!scored.criteriaMet || completedRef.current) return;
+      completedRef.current = true;
+
+      t.track({
+        eventType: 'widget_completed',
+        widgetKind: spec.kind,
+        learningComponentId: spec.learningComponentId,
+        standardCode: t.standardCode,
+        correct: true,
+        payload: { score: scored.score, band: scored.band },
+      });
+      t.flush();
+    },
+    [spec],
+  );
 
   /** Monotonic request id — a response whose id is stale is dropped, not rendered. */
   const seq = useRef(0);
@@ -178,43 +221,7 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [text, spec]);
-
-  /**
-   * The meter re-scores on every pause in typing, so recording each response
-   * would bury the profile in one student's keystrokes. Only a band change is
-   * reported, and only the finish line is scored: a draft still being written
-   * is not a wrong answer, so intermediate events carry a null verdict and stay
-   * out of mastery.
-   */
-  function recordScore(scored: ScoreResult) {
-    const t = telemetryRef.current;
-
-    if (scored.band !== lastBandRef.current) {
-      lastBandRef.current = scored.band;
-      t.track({
-        eventType: 'answer_checked',
-        widgetKind: spec.kind,
-        learningComponentId: spec.learningComponentId,
-        standardCode: t.standardCode,
-        correct: null,
-        payload: { score: scored.score, band: scored.band, signals: scored.signals },
-      });
-    }
-
-    if (!scored.criteriaMet || completedRef.current) return;
-    completedRef.current = true;
-
-    t.track({
-      eventType: 'widget_completed',
-      widgetKind: spec.kind,
-      learningComponentId: spec.learningComponentId,
-      standardCode: t.standardCode,
-      correct: true,
-      payload: { score: scored.score, band: scored.band },
-    });
-    t.flush();
-  }
+  }, [text, spec, recordScore]);
 
   const fill = phase === 'idle' ? IDLE_FILL : Math.max(result?.score ?? 0, IDLE_FILL);
   const label = phase === 'scored' && result ? result.label : PHASE_LABEL[phase as keyof typeof PHASE_LABEL];
