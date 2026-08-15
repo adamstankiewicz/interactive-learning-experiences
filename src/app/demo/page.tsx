@@ -114,6 +114,22 @@ export default function DemoIndex() {
               </span>
             </Link>
           </li>
+          <li>
+            <Link
+              href="/demo/ag-ui-compose"
+              className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted"
+            >
+              <span>
+                <span className="font-medium">Compose a widget on the fly</span>
+                <span className="ml-2 text-muted-foreground">
+                  Phase 3a research prototype — a novel widget from a 5-primitive catalog, not one of the six above
+                </span>
+              </span>
+              <span aria-hidden="true" className="text-muted-foreground group-hover:text-foreground">
+                →
+              </span>
+            </Link>
+          </li>
         </ul>
       </div>
     </main>
