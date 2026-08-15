@@ -91,6 +91,16 @@ function Shell() {
       if (styles?.variables) bridge.applyHostStyles(styles.variables);
     });
 
+    // The spec arrives here. Method names taken from Slack's shipping bundle,
+    // not guessed: the host pushes the tool's input and result to the view as
+    // notifications once the view has declared itself initialized.
+    for (const method of ['ui/notifications/tool-result', 'ui/notifications/tool-input']) {
+      bridge.on(method, (params) => {
+        const found = findSpec(params);
+        if (found) setHostSpec(found);
+      });
+    }
+
     void bridge
       .request('ui/initialize', {
         protocolVersion: '2025-11-21',
@@ -100,6 +110,11 @@ function Shell() {
       .then((reply) => {
         const found = reply && findSpec(reply);
         if (found) setHostSpec(found);
+
+        // Without this the host has no reason to believe the view is ready,
+        // and never sends the tool result — so the widget sits empty. It is
+        // the mirror of MCP's own `notifications/initialized`.
+        bridge.notify('ui/notifications/initialized', {});
         bridge.reportSizeOnResize();
       });
 

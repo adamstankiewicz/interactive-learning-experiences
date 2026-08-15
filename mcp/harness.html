@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MCP App host simulator</title>
+<style>
+  body { font: 13px ui-monospace, monospace; margin: 0; display: grid; grid-template-columns: 1fr 460px; height: 100vh; }
+  #frame { border: 0; width: 100%; height: 100%; }
+  #log { overflow: auto; padding: 12px; background: #111; color: #ddd; margin: 0; }
+  .in  { color: #7fd67f; }
+  .out { color: #7fb6ff; }
+  .err { color: #ff8080; }
+</style>
+</head>
+<body>
+<iframe id="frame" src="./dist/widget-shell.html" sandbox="allow-scripts allow-forms"></iframe>
+<pre id="log"></pre>
+
+<script>
+/**
+ * Simulates an MCP Apps host well enough to test our view in isolation.
+ *
+ * The real host is a black box — this replays the message sequence read off
+ * Slack's shipping bundle, so a failure here is ours and a success here means
+ * whatever remains is on the host side. That distinction is the whole point.
+ */
+const log = document.getElementById('log');
+const frame = document.getElementById('frame');
+
+function line(cls, label, data) {
+  const el = document.createElement('div');
+  el.className = cls;
+  el.textContent = `${label} ${data ? JSON.stringify(data).slice(0, 220) : ''}`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+const SPEC = {
+  kind: 'draft-meter',
+  learningComponentId: null,
+  question: 'Does this argument hold up? Say what you think — and point to what in the editorial makes you say so.',
+  placeholder: 'The editorial says…',
+  standardCode: 'RI.8.8',
+  standardDescription: 'Delineate and evaluate the argument and specific claims in a text.',
+  standardForStudents: 'Say whether it holds up, point at a bit of the editorial, and explain why.',
+  passage: {
+    source: 'School newspaper editorial',
+    text: 'Phones should be banned from every classroom. Last year test scores in Ms. Alvarez’s class dropped six points. A study of one thousand adults found most people check their phones eighty times a day. Clearly phones are why our school is struggling.',
+  },
+  checks: [
+    { id: 'position', label: 'a position', lookFor: 'Says whether the argument holds up.', essential: false },
+    { id: 'source', label: 'evidence from the text', lookFor: 'Points at a specific claim.', essential: false },
+    { id: 'why', label: 'why it does or does not fit', lookFor: 'Explains relevance and sufficiency.', essential: false },
+  ],
+};
+
+const send = (msg) => { line('out', '→ host', msg); frame.contentWindow.postMessage(msg, '*'); };
+
+window.addEventListener('message', (event) => {
+  const m = event.data;
+  if (!m || typeof m !== 'object') return;
+  line('in', '← view', m);
+
+  // Reply to requests the way a host would.
+  if (m.method === 'ui/initialize' && m.id !== undefined) {
+    send({
+      jsonrpc: '2.0',
+      id: m.id,
+      result: {
+        protocolVersion: '2025-11-21',
+        hostInfo: { name: 'harness', version: '0.0.1' },
+        capabilities: {},
+      },
+    });
+
+    // A host theme, to prove the view adopts it.
+    send({
+      jsonrpc: '2.0',
+      method: 'ui/notifications/host-context-changed',
+      params: { styles: { variables: { '--background': 'oklch(0.145 0 0)', '--foreground': 'oklch(0.985 0 0)' } } },
+    });
+  }
+
+  // Once the view says it is ready, hand it the tool result — this is the
+  // moment the spec actually reaches the widget.
+  if (m.method === 'ui/notifications/initialized') {
+    send({
+      jsonrpc: '2.0',
+      method: 'ui/notifications/tool-result',
+      params: {
+        toolName: 'show_draft_meter',
+        result: { structuredContent: { spec: SPEC } },
+      },
+    });
+  }
+
+  if (m.id !== undefined && m.method === 'ui/update-model-context') {
+    send({ jsonrpc: '2.0', id: m.id, result: {} });
+  }
+});
+
+line('out', '(harness ready — waiting for the view to speak first)');
+</script>
+</body>
+</html>
