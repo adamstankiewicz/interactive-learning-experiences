@@ -185,6 +185,31 @@ export const markdownCardSpec = z.object({
 
 export type MarkdownCardSpec = z.infer<typeof markdownCardSpec>;
 
+const flashcardSide = z.object({
+  text: z.string().nullable().describe('Plain text shown on this side. Null if unused.'),
+  markdown: z.string().nullable().describe('Markdown content shown below text, if richer formatting is needed. Null if unused.'),
+  imageUrl: z.string().nullable().describe('URL of an image shown on this side. Null if unused.'),
+  imageAlt: z.string().nullable().describe('Alt text for the image. Required when imageUrl is set.'),
+});
+
+export const flashcardSpec = z.object({
+  kind: z.literal('flashcard'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the deck, e.g. "Tap each card to reveal its definition."'),
+  cards: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this card'),
+        front: flashcardSide.describe('What the student sees before flipping'),
+        back: flashcardSide.describe('What is revealed after flipping'),
+      }),
+    )
+    .describe('Give 3-8 cards. Each card needs at least one field on each side.'),
+  successMessage: z.string().describe('Shown after the student works through all cards.'),
+});
+
+export type FlashcardSpec = z.infer<typeof flashcardSpec>;
+
 export const crosswordEntrySpec = z.object({
   answer: z
     .string()
@@ -236,6 +261,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   dragSortSpec,
   dragCategorizeSpec,
   markdownCardSpec,
+  flashcardSpec,
   crosswordSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;

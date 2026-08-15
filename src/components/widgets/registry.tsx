@@ -3,6 +3,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Crossword } from '@/components/widgets/Crossword';
 import { DragCategorize } from '@/components/widgets/DragCategorize';
+import { Flashcard } from '@/components/widgets/Flashcard';
 import { DragSort } from '@/components/widgets/DragSort';
 import { DraftMeter } from '@/components/widgets/DraftMeter';
 import { MarkdownCard } from '@/components/widgets/MarkdownCard';
@@ -29,6 +30,8 @@ function render(spec: WidgetSpec) {
       return <DragCategorize spec={spec} />;
     case 'markdown-card':
       return <MarkdownCard spec={spec} />;
+    case 'flashcard':
+      return <Flashcard spec={spec} />;
     case 'crossword':
       return <Crossword spec={spec} />;
   }

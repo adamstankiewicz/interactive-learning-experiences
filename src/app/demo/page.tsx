@@ -39,6 +39,13 @@ const WIDGETS = [
     tags: ['sorting', 'categorization', 'classification'],
   },
   {
+    slug: 'flashcard',
+    name: 'Flashcard',
+    description:
+      'Tap to flip a card and reveal its back. Each side supports any combination of text, markdown, and images. Navigate through a deck and continue when done.',
+    tags: ['vocabulary', 'study', 'flip'],
+  },
+  {
     slug: 'markdown-card',
     name: 'Markdown Card',
     description:
