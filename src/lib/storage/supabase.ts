@@ -411,17 +411,19 @@ export const supabaseStorageAdapter: StorageAdapter = {
     if (!supabaseConfigured()) return [];
 
     // Get child assignments where this is the parent session.
-    const { data: assignmentRows } = await supabaseAdmin()
+    const { data: assignmentRows, error: assignmentError } = await supabaseAdmin()
       .from('assignments')
       .select('roster_student_id, session_id, roster_students(id, name)')
       .eq('parent_session_id', sessionId);
+    if (assignmentError) console.error('[storage] sessionReport assignments failed', assignmentError);
 
     // Get the session's own student_id (the anon owner / teacher).
-    const { data: sessionRow } = await supabaseAdmin()
+    const { data: sessionRow, error: sessionError } = await supabaseAdmin()
       .from('pathway_sessions')
       .select('student_id, plan')
       .eq('id', sessionId)
       .maybeSingle();
+    if (sessionError) console.error('[storage] sessionReport session failed', sessionError);
 
     // For each child assignment, resolve its session's anon student_id so we
     // can attribute that student's interactions to the right roster name.
@@ -433,11 +435,12 @@ export const supabaseStorageAdapter: StorageAdapter = {
         if (!rs) continue;
         const childSid = String((a as Record<string, unknown>).session_id);
         childSessionIds.push(childSid);
-        const { data: childSession } = await supabaseAdmin()
+        const { data: childSession, error: childError } = await supabaseAdmin()
           .from('pathway_sessions')
           .select('student_id')
           .eq('id', childSid)
           .maybeSingle();
+        if (childError) console.error('[storage] sessionReport child session failed', childError);
         if (childSession) {
           anonToRoster.set(String(childSession.student_id), {
             rosterStudentId: String(rs.id),
@@ -449,10 +452,15 @@ export const supabaseStorageAdapter: StorageAdapter = {
 
     // Aggregate interactions from the parent session AND all child sessions.
     const allSessionIds = [sessionId, ...childSessionIds];
-    const { data: interactionRows } = await supabaseAdmin()
+    const { data: interactionRows, error: interactionError } = await supabaseAdmin()
       .from('interactions')
       .select('student_id, event_type, correct, elapsed_ms')
       .in('session_id', allSessionIds);
+    // Every number in the report comes from these rows, so a failure here is a
+    // wrong report rather than an empty one.
+    if (interactionError) {
+      throw new Error(`[storage] sessionReport interactions failed: ${interactionError.message}`);
+    }
 
     const byStudent = new Map<string, {
       attempts: number; correctCount: number; hintsUsed: number;

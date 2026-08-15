@@ -71,7 +71,10 @@ export function SessionReport({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     fetch(`/api/pathway/sessions/${sessionId}/report`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`report responded ${r.status}`);
+        return r.json();
+      })
       .then(setRows)
       .catch(() => setError('Failed to load report.'));
   }, [sessionId]);

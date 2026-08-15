@@ -209,9 +209,15 @@ export function SessionReportPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const json = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url} responded ${res.status}`);
+      return res.json();
+    };
+
     Promise.all([
-      fetch(`/api/pathway/sessions/${sessionId}/report`).then((r) => r.json()),
-      fetch(`/api/pathway/sessions/${sessionId}/children`).then((r) => r.json()),
+      json(`/api/pathway/sessions/${sessionId}/report`),
+      json(`/api/pathway/sessions/${sessionId}/children`),
     ])
       .then(([rows, kids]) => {
         setReportRows(rows);
