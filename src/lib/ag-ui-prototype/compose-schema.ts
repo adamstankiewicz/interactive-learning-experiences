@@ -1,27 +1,52 @@
 import { z } from 'zod';
 
 /**
- * The primitive catalog for the composition prototype — deliberately small
- * (five primitives) so the model's choices are legible: which of these it
- * reaches for, and how it nests them, is the actual thing being prototyped.
- * Every field here is a literal value the model authors directly (a string,
- * an array) — never a `$state`/`$computed`/`$bindState` expression. The
- * registered components (`compose-catalog.tsx`) own all reactivity
- * themselves via ordinary React state; the model only ever picks *content*
- * and *structure* from a fixed, developer-approved set, the same trust
- * boundary the plan describes for every widget this app has ever generated.
+ * The primitive catalog for the composition prototype. Every prop a literal
+ * value the model authors directly (a string, an enum, a small array) —
+ * never a `$state`/`$computed`/`$bindState` expression. The registered
+ * components (`compose-catalog.tsx`) own all reactivity themselves; the
+ * model only ever picks *content* and *structure* from a fixed,
+ * developer-approved set, the same trust boundary as every widget this app
+ * has ever generated.
  *
  * `composedElement` is one flat object shape shared by every element, not a
- * `z.discriminatedUnion` of five differently-shaped objects — a first version
+ * `z.discriminatedUnion` of differently-shaped objects — an early version
  * used a discriminated union nested inside an array and it reliably failed
- * structured-output generation: the model fell back to prose with a
- * markdown-fenced JSON block instead of enforced structured output, and even
- * that JSON didn't match the declared shape. Every other schema this app
- * generates against (`pathwayPlan.steps`, `widgetSpec` per-kind) is a flat
- * object array too — this follows that same proven shape instead of
- * reaching for a union again.
+ * structured-output generation entirely (the model fell back to prose with
+ * a markdown-fenced JSON block that didn't even match the declared shape).
+ *
+ * Field count turned out to matter on its own, independent of nesting
+ * shape: a first version of this flat schema at ~20 fields also reliably
+ * broke structured-output generation the same way, even though every field
+ * was a simple scalar/small-array. Trimmed back down by merging fields that
+ * meant almost the same thing (`expectedValue`/`revealValue` -> one
+ * `matchValue`; `headingText` folded into `text`), and by cutting
+ * `RevealWhen`'s condition enum down to the one case that covers nearly
+ * every real use ("reveal once the bound value equals X") instead of also
+ * offering not-equals/is-set variants nobody was likely to need yet.
+ *
+ * The state-sharing design this schema exists to support: primitives share
+ * *state* — one element's answer gating whether another becomes visible, or
+ * feeding a running score — without the model ever authoring a real
+ * json-render `$state`/`$cond`/`$computed` expression object (the kind of
+ * nested-expression complexity that broke generation in the first place).
+ * Every stateful element writes a value keyed by its own `id`; anything
+ * that reacts to it just names that `id` in a plain `bindTo` string field.
+ * The model composes a graph of references by string, never an expression —
+ * `compose-catalog.tsx`'s registered components are the only place that
+ * ever touches the actual state-store paths those ids resolve to.
  */
-const composedElementType = z.enum(['Stack', 'Card', 'Heading', 'Text', 'ChoiceGroup', 'QuizGrid', 'ScoreTracker']);
+const composedElementType = z.enum([
+  'Stack',
+  'Card',
+  'Heading',
+  'Text',
+  'SingleChoice',
+  'FeedbackBanner',
+  'RevealWhen',
+  'Counter',
+  'QuizGrid',
+]);
 
 const gridQuestion = z.object({
   id: z.string(),
@@ -36,73 +61,68 @@ export const composedElement = z.object({
   children: z
     .array(z.string())
     .nullable()
-    .describe(
-      "Child element ids, in order. Only for 'Stack' and 'Card' — null for every other type.",
-    ),
-  direction: z.enum(['row', 'column']).nullable().describe("Only for 'Stack': row for side-by-side, column for stacked."),
-  gap: z.enum(['sm', 'md', 'lg']).nullable().describe("Only for 'Stack': spacing between children."),
+    .describe("Child ids, in order. Only for 'Stack', 'Card', and 'RevealWhen' — null for every other type."),
+  direction: z.enum(['row', 'column']).nullable().describe("Only for 'Stack'."),
+  gap: z.enum(['sm', 'md', 'lg']).nullable().describe("Only for 'Stack'."),
   title: z.string().nullable().describe("Only for 'Card': a short heading, or null for none."),
-  headingText: z.string().nullable().describe("Only for 'Heading'."),
-  headingLevel: z
-    .enum(['lg', 'md'])
-    .nullable()
-    .describe("Only for 'Heading': 'lg' for the composition's main heading, 'md' for a secondary one."),
-  text: z.string().nullable().describe("Only for 'Text': a sentence or two of plain prose, no markdown."),
-  question: z.string().nullable().describe("Only for 'ChoiceGroup'."),
+  headingLevel: z.enum(['lg', 'md']).nullable().describe("Only for 'Heading' ('lg' main, 'md' secondary) — Text leaves this null."),
+  text: z.string().nullable().describe("For 'Heading' and 'Text': the prose itself, one sentence or two, no markdown."),
+  question: z.string().nullable().describe("Only for 'SingleChoice'."),
   options: z
     .array(z.object({ id: z.string(), label: z.string() }))
     .nullable()
+    .describe("Only for 'SingleChoice': 2-5 options, at least one genuine distractor."),
+  bindTo: z.string().nullable().describe("For 'FeedbackBanner', 'RevealWhen', 'Counter': the id this one reacts to."),
+  matchValue: z
+    .string()
+    .nullable()
     .describe(
-      "Only for 'ChoiceGroup': 2-5 options, including at least one genuine distractor — never all-obviously-wrong.",
+      "For 'FeedbackBanner' (the bound SingleChoice option id that counts correct) and 'RevealWhen' (the" +
+        ' value that unlocks the children) — same meaning, different primitive.',
     ),
-  correctOptionId: z.string().nullable().describe("Only for 'ChoiceGroup': must exactly match one of `options`' ids."),
+  correctMessage: z.string().nullable().describe("Only for 'FeedbackBanner'."),
+  incorrectMessage: z.string().nullable().describe("Only for 'FeedbackBanner'."),
+  counterLabel: z.string().nullable().describe("Only for 'Counter'."),
   gridQuestions: z
     .array(gridQuestion)
     .min(3)
     .max(9)
     .nullable()
     .describe(
-      "Only for 'QuizGrid': a pool of short questions, one per claimed square (cycles if the board has more" +
-        ' empty squares left than questions supplied). 3-9 questions.',
+      "Only for 'QuizGrid': 3-9 questions, one per claimed square, cycling if the board outlasts the pool." +
+        ' A QuizGrid writes its own win count to its own id — Counter can bindTo a QuizGrid.',
     ),
-  scoreLabel: z
-    .string()
-    .nullable()
-    .describe("Only for 'ScoreTracker': what's being counted, e.g. \"Rounds won\"."),
 });
 
 export type ComposedElement = z.infer<typeof composedElement>;
 
 export const composedWidget = z.object({
   root: z.string().describe('The id of the single top-level element — must exist in `elements`.'),
-  elements: z.array(composedElement).min(1).max(16).describe('Every element the composition uses, flat, id-keyed.'),
+  elements: z.array(composedElement).min(1).max(28).describe('Every element the composition uses, flat, id-keyed.'),
 });
 
 export type ComposedWidget = z.infer<typeof composedWidget>;
 
 const PRIMITIVE_GUIDE = [
-  'You compose a small interactive mini-lesson from exactly seven element types — never invent an eighth.',
-  'Every element shares the same flat shape; only the fields relevant to its own `type` are non-null — set',
-  'every field that does not apply to null, do not omit fields.',
-  "'Stack' arranges children in a row or column (uses: children, direction, gap); use it to lay out a Card",
-  'next to another Card, or to stack a Heading above a Text above a ChoiceGroup inside one Card.',
-  "'Card' is a bordered surface with an optional title (uses: children, title) — the usual outer container",
-  'for a section.',
-  "'Heading' (uses: headingText, headingLevel) and 'Text' (uses: text) carry the actual teaching: a short",
-  "hook or explanation in the topic's own terms, not generic filler.",
-  "'ChoiceGroup' (uses: question, options, correctOptionId) is a single check-for-understanding moment: a",
-  'question, 2-5 options, and which one is correct.',
-  "'QuizGrid' (uses: gridQuestions) is a 3x3 tic-tac-toe-style board where claiming a square means",
-  'answering one of `gridQuestions` correctly — answer right and the square is yours, answer wrong and it',
-  "goes to the opponent. Reach for this when the user explicitly asks for a game, a challenge, or something",
-  "competitive/replayable — it is the single most engaging primitive available, not a default choice.",
-  "'ScoreTracker' (uses: scoreLabel) shows a running count of QuizGrid rounds won — only ever pair it",
-  'alongside a QuizGrid in the same composition, never alone.',
-  'Default to small for a plain explanatory ask — one root Card holding a Heading, a sentence or two of',
-  'Text, and one ChoiceGroup. Reach for a row Stack of two side-by-side Cards when the topic genuinely',
-  'calls for a comparison (two processes, two categories, before/after). Reach for QuizGrid (optionally',
-  'with a ScoreTracker above it) when the ask is playful, game-like, or wants replay value — at most one',
-  'QuizGrid per composition. Every child id referenced anywhere must exist as its own element in `elements`.',
+  'Compose a small interactive mini-lesson from exactly nine element types — never invent a tenth. Every',
+  'element shares one flat shape; set fields that apply, null everything else.',
+  "Stack (children, direction, gap) lays out children in a row or column. Card (children, title) is a",
+  'bordered surface. Heading and Text (both use: text; Heading also uses headingLevel) carry the actual',
+  "teaching, in the topic's own terms.",
+  "SingleChoice (question, options) asks a question, recording the picked option id under its own id — it",
+  'shows no verdict itself. FeedbackBanner (bindTo, matchValue, correctMessage, incorrectMessage) reads the',
+  "value at bindTo, compares to matchValue, shows the matching message once bindTo has a value — pair one",
+  "with every SingleChoice. RevealWhen (bindTo, matchValue, children) hides its children until bindTo's value",
+  'equals matchValue — wrap a second SingleChoice in one bound to the first, matchValue its correct option',
+  'id, to make it unlock only after a correct answer. Counter (bindTo, counterLabel) displays a number read',
+  "from bindTo — bind it to a QuizGrid's id to show that grid's win count.",
+  'QuizGrid (gridQuestions) is a 3x3 tic-tac-toe board where claiming a square means answering one of',
+  'gridQuestions correctly; wrong answers go to the opponent. Only reach for it when the ask is explicitly',
+  'playful/a game/competitive — at most one per composition.',
+  'Default small: one root Card with a Heading, a sentence of Text, a SingleChoice, and a FeedbackBanner',
+  'bound to it. Use a row Stack of two Cards for a real comparison. Use a RevealWhen chain when the ask',
+  'implies progression or unlocking. Every child id and every bindTo referenced anywhere must exist as its',
+  'own element.',
 ].join(' ');
 
 export function composePrompt(topic: string): { system: string; prompt: string } {
@@ -113,37 +133,46 @@ export function composePrompt(topic: string): { system: string; prompt: string }
 }
 
 /**
- * The model can hallucinate a dangling child id or an id/correctOptionId
- * mismatch — structured output only guarantees shape, not referential
- * integrity. Checked once, here, rather than trusted at render time.
+ * The model can hallucinate a dangling child/bindTo id or a
+ * matchValue/correctOptionId mismatch — structured output only guarantees
+ * shape, not referential integrity. Checked once, here, rather than
+ * trusted at render time.
  */
 export function validateComposedWidget(widget: ComposedWidget): string | null {
   const ids = new Set(widget.elements.map((element) => element.id));
   if (!ids.has(widget.root)) return `root "${widget.root}" is not one of the composed elements.`;
 
   for (const element of widget.elements) {
-    if (element.type === 'Stack' || element.type === 'Card') {
+    if (element.type === 'Stack' || element.type === 'Card' || element.type === 'RevealWhen') {
       for (const childId of element.children ?? []) {
         if (!ids.has(childId)) return `"${element.id}" references missing child "${childId}".`;
       }
     }
-    if (element.type === 'ChoiceGroup') {
-      if (!element.question || !element.options || !element.correctOptionId) {
-        return `"${element.id}" is a ChoiceGroup missing question/options/correctOptionId.`;
-      }
-      const optionIds = new Set(element.options.map((option) => option.id));
-      if (!optionIds.has(element.correctOptionId)) {
-        return `"${element.id}"'s correctOptionId "${element.correctOptionId}" matches none of its options.`;
-      }
-    }
-    if (element.type === 'Heading' && (!element.headingText || !element.headingLevel)) {
-      return `"${element.id}" is a Heading missing headingText/headingLevel.`;
+    if (element.type === 'Heading' && (!element.text || !element.headingLevel)) {
+      return `"${element.id}" is a Heading missing text/headingLevel.`;
     }
     if (element.type === 'Text' && !element.text) {
       return `"${element.id}" is a Text missing text.`;
     }
     if (element.type === 'Stack' && (!element.direction || !element.gap)) {
       return `"${element.id}" is a Stack missing direction/gap.`;
+    }
+    if (element.type === 'SingleChoice' && (!element.question || !element.options)) {
+      return `"${element.id}" is a SingleChoice missing question/options.`;
+    }
+    if (element.type === 'FeedbackBanner') {
+      if (!element.bindTo || !element.matchValue || !element.correctMessage || !element.incorrectMessage) {
+        return `"${element.id}" is a FeedbackBanner missing bindTo/matchValue/correctMessage/incorrectMessage.`;
+      }
+      if (!ids.has(element.bindTo)) return `"${element.id}"'s bindTo "${element.bindTo}" is not a composed element.`;
+    }
+    if (element.type === 'RevealWhen') {
+      if (!element.bindTo || !element.matchValue) return `"${element.id}" is a RevealWhen missing bindTo/matchValue.`;
+      if (!ids.has(element.bindTo)) return `"${element.id}"'s bindTo "${element.bindTo}" is not a composed element.`;
+    }
+    if (element.type === 'Counter') {
+      if (!element.bindTo) return `"${element.id}" is a Counter missing bindTo.`;
+      if (!ids.has(element.bindTo)) return `"${element.id}"'s bindTo "${element.bindTo}" is not a composed element.`;
     }
     if (element.type === 'QuizGrid') {
       if (!element.gridQuestions) return `"${element.id}" is a QuizGrid missing gridQuestions.`;
