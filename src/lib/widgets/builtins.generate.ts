@@ -17,3 +17,5 @@ import '@/lib/widgets/definitions/narrated-card.generate';
 import '@/lib/widgets/definitions/timeline-builder.generate';
 import '@/lib/widgets/definitions/find-the-flaw.generate';
 import '@/lib/widgets/definitions/draw-the-curve.generate';
+import '@/lib/widgets/definitions/debate-ai.generate';
+import '@/lib/widgets/definitions/writing-workshop.generate';

@@ -32,6 +32,20 @@ const WIDGETS = [
     tags: ['predict-then-reveal', 'any subject', 'chart'],
   },
   {
+    slug: 'debate-ai',
+    name: 'Debate an AI',
+    description:
+      "A short debate against an opponent that argues a position and doesn't fold. Credits evaluative moves — challenging evidence, catching a leap, conceding a fair point — rather than winning. Voice input supported.",
+    tags: ['evaluate', 'argument', 'conversation'],
+  },
+  {
+    slug: 'writing-workshop',
+    name: 'Writing Workshop',
+    description:
+      'Long-form writing — essay, lab report, research proposal, short story — reviewed only when the student asks, and marked up on the sentences themselves with a note on each.',
+    tags: ['long-form', 'on demand', 'annotation'],
+  },
+  {
     slug: 'find-the-flaw',
     name: 'Find the Flaw',
     description:

@@ -590,7 +590,142 @@ export const drawTheCurveSpec = z.object({
 
 export type DrawTheCurveSpec = z.infer<typeof drawTheCurveSpec>;
 
+/**
+ * Debate an AI: the assistant argues a position and will not simply fold.
+ *
+ * Aimed at Bloom's *evaluate*, which is why the thing being credited is not
+ * winning. A student who says "you're wrong, everyone knows that" has disagreed
+ * without evaluating anything; a student who says "your study was of adults, so
+ * it doesn't support a claim about students" has judged the argument on its
+ * merits, which is the level. So the widget tracks evaluative *moves* —
+ * challenging evidence, spotting an unsupported leap, conceding a fair point —
+ * rather than counting turns or declaring a winner.
+ *
+ * Distinct from defend-claim, which is a single written defense of the
+ * student's own position against fixed sources. Here the opposition answers
+ * back and adapts, and the student is judging someone else's reasoning as it
+ * arrives.
+ */
+export const debateAiSpec = z.object({
+  kind: z.literal('debate-ai'),
+  learningComponentId: z.string().nullable(),
+  prompt: z
+    .string()
+    .describe(
+      'Instruction shown above the exchange, e.g. "I\'ll argue that homework should be abolished. Your job is to test my argument — not just disagree with it."',
+    ),
+  motion: z.string().describe('The contestable claim under debate, stated in one sentence.'),
+  /**
+   * What the assistant argues, and how. The persona matters more than it looks:
+   * an opponent that argues flawlessly gives a student nothing to evaluate, and
+   * one that argues stupidly makes the exercise trivial. It should be
+   * *plausible but flawed* — real evidence used slightly wrongly.
+   */
+  aiPosition: z.string().describe('The side the assistant takes and holds, in one sentence.'),
+  aiPersona: z
+    .string()
+    .describe(
+      'How the assistant argues, including the specific weaknesses a student could find: e.g. "Confident and friendly. Cites real statistics but sometimes ones that do not quite fit the claim, and occasionally treats a correlation as a cause."',
+    ),
+  openingMessage: z
+    .string()
+    .describe("The assistant's first message: states its position and gives one supporting reason. Two or three sentences, conversational."),
+  /**
+   * The evaluative moves worth credit — the rubric, as data, in the same spirit
+   * as draft-meter's checks. Written in the student's language because they are
+   * shown: the point is that a student can see what counts as evaluating rather
+   * than having to infer it from a score.
+   */
+  moves: z
+    .array(
+      z.object({
+        id: z.string().describe('Short stable lowercase key, e.g. "evidence", "leap", "concede".'),
+        label: z
+          .string()
+          .describe('Student-facing name, 2-4 words: "Challenged the evidence", "Spotted a leap".'),
+        lookFor: z
+          .string()
+          .describe('One sentence telling the judge what counts as making this move.'),
+      }),
+    )
+    .describe(
+      'Give 3-4 moves. At least one must be a concession move — recognising a fair point is an evaluative act, and a debate where conceding is never credited teaches students to never concede.',
+    ),
+  turnLimit: z
+    .number()
+    .describe('How many student replies the exchange runs for. Use 4-6.'),
+});
+
+export type DebateAiSpec = z.infer<typeof debateAiSpec>;
+
+/**
+ * Writing Workshop: long-form writing, marked up when the student asks.
+ *
+ * The opposite tuning to draft-meter, deliberately. That widget scores three
+ * sentences live, because a short answer is a thing you fiddle with. This one
+ * is for work with a shape — an essay, a lab write-up, a research proposal, a
+ * short story — where live feedback would be a hand on your shoulder while you
+ * think. Nothing happens until the student presses the button.
+ *
+ * And the feedback lands *on the writing* rather than beside it: passages are
+ * underlined where they work and where they don't, each with a note. A general
+ * verdict on a thousand words tells a student nothing they can act on; "this
+ * sentence is where your argument actually turns" tells them where to look.
+ */
+export const writingWorkshopSpec = z.object({
+  kind: z.literal('writing-workshop'),
+  learningComponentId: z.string().nullable(),
+  prompt: z
+    .string()
+    .describe('One line above the editor, e.g. "Write your lab report. Ask for a read whenever you want one."'),
+  brief: z
+    .object({
+      title: z.string().describe('Short name for the piece, e.g. "Argument essay: school start times".'),
+      task: z
+        .string()
+        .describe(
+          'What the student is being asked to write, in two to four sentences. Concrete enough to start from — the question, the audience, and roughly how long.',
+        ),
+    })
+    .describe('The assignment.'),
+  /**
+   * What kind of writing this is. Carried into the review prompt because the
+   * same sentence is a strength in a short story and a weakness in a lab
+   * report — a reviewer that does not know which one it is reading defaults to
+   * scoring everything as an essay.
+   */
+  genre: z
+    .string()
+    .describe(
+      'The form, in a few words: "argument essay", "lab report", "research proposal", "short story", "historical explanation".',
+    ),
+  placeholder: z.string().describe('Editor placeholder. One short inviting line.'),
+  targetWords: z
+    .number()
+    .describe('Roughly how long the piece should be. Guidance shown to the student, never enforced. Use 150-600.'),
+  /**
+   * The dimensions the reviewer marks against — the rubric as data, so one
+   * component reviews a lab report and a short story without either being
+   * judged by the other one's standards.
+   */
+  lookFor: z
+    .array(
+      z.object({
+        id: z.string().describe('Short stable lowercase key.'),
+        label: z.string().describe('Student-facing name, 2-4 words: "Evidence", "Method", "Voice".'),
+        lookFor: z
+          .string()
+          .describe('One sentence telling the reviewer what a strong and a weak version of this looks like in this genre.'),
+      }),
+    )
+    .describe('Give 3-4 dimensions drawn from the standard and the genre.'),
+});
+
+export type WritingWorkshopSpec = z.infer<typeof writingWorkshopSpec>;
+
 export const widgetSpec = z.discriminatedUnion('kind', [
+  debateAiSpec,
+  writingWorkshopSpec,
   fractionAreaModelSpec,
   swiperFlashcardSpec,
   draftMeterSpec,
@@ -631,6 +766,8 @@ export const widgetKind = z.enum([
   'timeline-builder',
   'find-the-flaw',
   'draw-the-curve',
+  'debate-ai',
+  'writing-workshop',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 
@@ -676,6 +813,17 @@ export const pathwayStep = z.object({
       'across decades, a trend across eras. Use it when the standard is about how something changes,',
       'and prefer "practice" or "check" — the reveal is the payoff and it lands hardest once the',
       'student has a real prediction to be wrong about.',
+      '"debate-ai" is a short back-and-forth where the assistant argues a contestable position and',
+      'does not fold. It credits evaluative moves — challenging evidence, spotting an unsupported',
+      'leap, conceding a fair point — rather than winning, so it is the one interaction that reaches',
+      'Bloom\'s evaluate. Needs a claim with a real second side, so it suits argument, history,',
+      'ethics-in-science and current-affairs standards and not procedural ones. Heavy: at most one',
+      'step, normally "practice" or "check".',
+      '"writing-workshop" is long-form writing — an essay, a lab report, a research proposal, a short',
+      'story — that the student asks to have read when they are ready, and gets back marked up:',
+      'passages underlined where they work and where they do not, each with a note. Use it when the',
+      'standard asks for an extended piece rather than a few sentences (that is draft-meter), and',
+      'give it a "practice" or "check" step of its own — it is the longest activity in the set.',
       '"find-the-flaw" shows a worked example containing one deliberate mistake — a solution, an',
       'experiment, an argument, a historical explanation — and asks the student to find the step',
       'where it goes wrong and say why. It is the only interaction that asks a student to judge',
