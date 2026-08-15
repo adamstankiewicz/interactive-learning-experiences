@@ -1,7 +1,7 @@
 'use client';
 
-import { Check, Mic } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, Mic, Volume2, VolumeX } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
@@ -10,6 +10,18 @@ import type { DebateMessage, DebateSide, DebateTurnResult } from '@/lib/debate/s
 import type { DebateAiSpec } from '@/lib/pathway/schema';
 
 type Props = { spec: DebateAiSpec; onComplete?: () => void };
+
+/**
+ * Read aloud, the same way NarratedCard does it: `window.speechSynthesis`,
+ * which needs no key, no network and no microphone permission — the last of
+ * which matters, because it is the reason speech *out* survives places speech
+ * *in* cannot, a sandboxed iframe being the obvious one.
+ *
+ * Subscribed rather than read during render: `speechSynthesis` does not exist
+ * on the server, and checking it in an effect would set state during render.
+ */
+const subscribeNothing = () => () => {};
+const speechAvailable = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
 
 /**
  * A debate: two sides, the student takes one, the assistant takes the other.
@@ -47,6 +59,27 @@ export function DebateAI({ spec, onComplete }: Props) {
   const completedRef = useRef(false);
   const endRef = useRef<HTMLDivElement | null>(null);
 
+  const ttsSupported = useSyncExternalStore(subscribeNothing, speechAvailable, () => false);
+  const [readAloud, setReadAloud] = useState(false);
+  /** How many messages have been spoken, so a re-render never repeats one. */
+  const spokenCount = useRef(0);
+
+  const speak = useCallback((text: string) => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    // Cancel first: a reply arriving while the last one is still being read
+    // would otherwise queue behind it and fall further behind every turn.
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Slightly quicker than NarratedCard's 0.92 — that is narration, this is
+    // someone talking back at you.
+    utterance.rate = 1;
+    synth.speak(utterance);
+  }, []);
+
+  // Stop talking if the widget goes away mid-sentence.
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+
   const appendTranscript = useCallback((text: string) => {
     setDraft((prev) => (prev ? `${prev} ${text}` : text));
   }, []);
@@ -71,6 +104,15 @@ export function DebateAI({ spec, onComplete }: Props) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, pending]);
+
+  useEffect(() => {
+    if (messages.length === spokenCount.current) return;
+    spokenCount.current = messages.length;
+
+    if (!readAloud) return;
+    const latest = messages[messages.length - 1];
+    if (latest?.role === 'ai') speak(latest.text);
+  }, [messages, readAloud, speak]);
 
   /**
    * `chosen` is passed in rather than read from state: the assistant's opening
@@ -344,6 +386,31 @@ export function DebateAI({ spec, onComplete }: Props) {
               >
                 <Mic className="size-3.5" aria-hidden="true" />
                 {voice.listening ? 'Listening' : 'Speak'}
+              </Button>
+            )}
+
+            {ttsSupported && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const next = !readAloud;
+                  setReadAloud(next);
+                  // Turning it on reads the message already on screen — waiting
+                  // for the next reply would make the button look broken.
+                  const latest = messages[messages.length - 1];
+                  if (next && latest?.role === 'ai') speak(latest.text);
+                  if (!next) window.speechSynthesis?.cancel();
+                }}
+                aria-pressed={readAloud}
+                aria-label={readAloud ? 'Stop reading replies aloud' : 'Read replies aloud'}
+              >
+                {readAloud ? (
+                  <Volume2 className="size-3.5" aria-hidden="true" />
+                ) : (
+                  <VolumeX className="size-3.5" aria-hidden="true" />
+                )}
+                {readAloud ? 'Reading' : 'Read aloud'}
               </Button>
             )}
 
