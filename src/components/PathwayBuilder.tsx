@@ -1,11 +1,11 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Plus } from "lucide-react";
 
 import { ActivityTrail } from "@/components/pathway/ActivityTrail";
+import { LessonPlanUpload } from "@/components/pathway/LessonPlanUpload";
 import { PathwayCompletionStrip, PathwayDocument } from "@/components/pathway/PathwayDocument";
 import { AssignToStudents } from "@/components/roster/AssignToStudents";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -47,6 +47,20 @@ function gradeLabel(grade: string): string {
 }
 
 /**
+ * A lesson plan's extracted grade level is free text from the model — "4",
+ * "Grade 3", "middle school", "4-5". The select only has exact values, so
+ * this maps loosely rather than rejecting anything that isn't a bare digit.
+ * Falls back to no hint rather than guessing wrong.
+ */
+function normalizeGrade(raw: string): string {
+  if (/^k(indergarten)?$/i.test(raw.trim())) return "K";
+  const match = raw.match(/\d+/);
+  if (!match) return "";
+  const grade = Number(match[0]);
+  return grade >= 1 && grade <= 12 ? String(grade) : "";
+}
+
+/**
  * The same warm, chunky visual language `/learn` uses on students — violet/
  * pink/amber, spring motion, a pressed-button physicality — carried over for
  * a teacher, not copied wholesale: this page is a workspace someone reads and
@@ -56,14 +70,8 @@ function gradeLabel(grade: string): string {
  */
 export function PathwayBuilder() {
   const teacherNoteId = useId();
-  const searchParams = useSearchParams();
-  // Seeded during render rather than synced in an effect: setting state from
-  // an effect cascades an extra render, and the effect version also depended
-  // on the values it set, which is what queued a second generation.
-  const [topic, setTopic] = useState(() => searchParams.get("topic") ?? "");
-  const [gradeHint, setGradeHint] = useState(
-    () => searchParams.get("grade") ?? "",
-  );
+  const [topic, setTopic] = useState("");
+  const [gradeHint, setGradeHint] = useState("");
   const [teacherNote, setTeacherNote] = useState("");
   const { state, start, cancel, regenerateStep, editPlan } = usePathwayStream();
 
@@ -76,24 +84,14 @@ export function PathwayBuilder() {
   // focus rather than presenting every field as equally important at once.
   const engaged = started || Boolean(topic.trim());
 
-  // Latched so a re-render cannot queue a second run: both reach the server,
-  // and only the first is aborted, and only client-side.
-  const autoSubmitted = useRef(false);
-
-  // A topic and grade in the URL mean the teacher already chose from /upload.
-  useEffect(() => {
-    if (autoSubmitted.current) return;
-    const topicParam = searchParams.get("topic");
-    const gradeParam = searchParams.get("grade");
-    if (!topicParam || !gradeParam) return;
-
-    autoSubmitted.current = true;
-    void start(topicParam, gradeParam, undefined);
-  }, [searchParams, start]);
-
   function runSubmit() {
     if (!topic.trim() || streaming) return;
     void start(topic, gradeHint, teacherNote.trim() || undefined);
+  }
+
+  function pickTopic(pickedTopic: string, gradeLevel: string) {
+    setTopic(pickedTopic);
+    setGradeHint(normalizeGrade(gradeLevel));
   }
 
   function submit(event: React.FormEvent) {
@@ -174,6 +172,7 @@ export function PathwayBuilder() {
                   </Button>
                 ))}
               </div>
+              <LessonPlanUpload disabled={streaming} onPickTopic={pickTopic} />
             </div>
           )}
 

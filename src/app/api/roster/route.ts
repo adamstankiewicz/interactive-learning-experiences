@@ -1,3 +1,4 @@
+import { rosterStudentInput } from '@/lib/roster/types';
 import { storageAdapter } from '@/lib/storage';
 
 export async function GET() {
@@ -13,21 +14,18 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Expected JSON body.' }, { status: 400 });
   }
 
-  if (!isStudentInput(body)) {
+  const parsed = rosterStudentInput.safeParse(body);
+  if (!parsed.success) {
+    // Issues are deliberately not echoed: they quote the offending input, and
+    // the input here is student PII.
     return Response.json({ error: 'Invalid student data.' }, { status: 400 });
   }
 
-  const student = await storageAdapter().createRosterStudent(body);
-  return Response.json(student, { status: 201 });
-}
-
-function isStudentInput(v: unknown): v is Parameters<ReturnType<typeof storageAdapter>['createRosterStudent']>[0] {
-  if (typeof v !== 'object' || v === null) return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.name === 'string' &&
-    typeof o.grade === 'string' &&
-    typeof o.learningStyle === 'object' &&
-    typeof o.adaptations === 'string'
-  );
+  try {
+    const student = await storageAdapter().createRosterStudent(parsed.data);
+    return Response.json(student, { status: 201 });
+  } catch (error) {
+    console.error('[roster] could not create student', error);
+    return Response.json({ error: 'Could not save this student.' }, { status: 502 });
+  }
 }

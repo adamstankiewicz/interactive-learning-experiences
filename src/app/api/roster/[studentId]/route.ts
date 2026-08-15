@@ -1,3 +1,4 @@
+import { rosterStudentInput } from '@/lib/roster/types';
 import { storageAdapter } from '@/lib/storage';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ studentId: string }> }) {
@@ -17,7 +18,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ stud
     return Response.json({ error: 'Expected JSON body.' }, { status: 400 });
   }
 
-  const updated = await storageAdapter().updateRosterStudent(studentId, body as never);
-  if (!updated) return Response.json({ error: 'Not found.' }, { status: 404 });
-  return Response.json(updated);
+  // A full-record replace, so it is validated as one. Previously the body was
+  // cast and written straight through, and a partial body silently erased
+  // every field it left out.
+  const parsed = rosterStudentInput.safeParse(body);
+  if (!parsed.success) {
+    return Response.json({ error: 'Invalid student data.' }, { status: 400 });
+  }
+
+  try {
+    const updated = await storageAdapter().updateRosterStudent(studentId, parsed.data);
+    if (!updated) return Response.json({ error: 'Not found.' }, { status: 404 });
+    return Response.json(updated);
+  } catch (error) {
+    console.error('[roster] could not update student', error);
+    return Response.json({ error: 'Could not save this student.' }, { status: 502 });
+  }
 }

@@ -1,5 +1,13 @@
 import type { RosterStudent } from './types';
 
+/**
+ * Demo fixtures, loaded only when SEED_DEMO_ROSTER=1.
+ *
+ * `adaptations` is where a teacher records IEP and accommodation detail, so
+ * these deliberately describe instructional needs rather than diagnoses: the
+ * pipeline reads them the same way, and nothing in this repo distinguishes a
+ * committed fixture from a real record once it is in the table.
+ */
 export const SEED_STUDENTS: Omit<RosterStudent, 'id'>[] = [
   {
     name: 'Maya Chen',
@@ -8,7 +16,7 @@ export const SEED_STUDENTS: Omit<RosterStudent, 'id'>[] = [
     preferredActivityTypes: ['diagramming', 'infographic-creation', 'independent-research', 'choice-board'],
     avoidActivityTypes: ['cold-call-qa', 'lecture'],
     adaptations:
-      'Needs a visual schedule posted; benefits from color-coded materials; mild anxiety around timed verbal responses — allow think time or a written response option.',
+      'Needs a visual schedule posted; benefits from color-coded materials; allow think time or a written response option instead of timed verbal answers.',
     pacingPreference: 'fast, gets bored with repetition',
     attentionSpanMinutes: 20,
     socialPreference: 'pairs',
@@ -23,7 +31,7 @@ export const SEED_STUDENTS: Omit<RosterStudent, 'id'>[] = [
     preferredActivityTypes: ['hands-on-manipulatives', 'movement-game', 'role-play-simulation', 'teach-it-back'],
     avoidActivityTypes: ['worksheet', 'silent-independent-reading'],
     adaptations:
-      'ADHD (diagnosed) — needs movement breaks every 10-15 minutes, permitted a fidget tool, and multi-step written directions broken into single-step checklists.',
+      'Needs movement breaks every 10-15 minutes, a fidget tool available, and multi-step written directions broken into single-step checklists.',
     pacingPreference: 'short bursts, high variety, novelty-driven',
     attentionSpanMinutes: 10,
     socialPreference: 'small-group',
@@ -38,7 +46,7 @@ export const SEED_STUDENTS: Omit<RosterStudent, 'id'>[] = [
     preferredActivityTypes: ['think-pair-share', 'paired-discussion', 'read-aloud-with-partner', 'audio-video-content'],
     avoidActivityTypes: ['independent-silent-reading', 'timed-written-test'],
     adaptations:
-      'English Language Learner (intermediate, home language French/Wolof) — needs vocabulary pre-teaching, visual supports paired with text, extended time on written output, and sentence starters/frames.',
+      'Still building academic English — needs vocabulary pre-teaching, visual supports paired with text, extended time on written output, and sentence starters/frames.',
     pacingPreference: 'moderate, benefits from repetition and rephrasing',
     attentionSpanMinutes: 15,
     socialPreference: 'pairs',
@@ -53,7 +61,7 @@ export const SEED_STUDENTS: Omit<RosterStudent, 'id'>[] = [
     preferredActivityTypes: ['structured-written-response', 'graphic-organizer', 'step-by-step-guided-practice'],
     avoidActivityTypes: ['open-ended-group-work', 'unannounced-schedule-change'],
     adaptations:
-      'Autism spectrum — needs predictable structure and advance notice of transitions, explicit (not implied) instructions, a reduced-sensory-load workspace option, and literal language (avoid idioms/sarcasm in prompts).',
+      'Needs predictable structure and advance notice of transitions, explicit (not implied) instructions, a reduced-sensory-load workspace option, and literal language (avoid idioms/sarcasm in prompts).',
     pacingPreference: 'steady and predictable; resists forced acceleration',
     attentionSpanMinutes: 25,
     socialPreference: 'solo',

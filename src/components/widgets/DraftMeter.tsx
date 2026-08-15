@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import { doneMessageFor, type Band, type ScoreResult } from '@/lib/draft-meter/schema';
+import { reportToConversation } from '@/lib/mcp/report';
 import type { DraftMeterSpec } from '@/lib/pathway/schema';
 
 /**
@@ -146,7 +147,10 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
    * out of mastery.
    */
   const recordScore = useCallback(
-    (scored: ScoreResult) => {
+    // `draft` is passed in rather than read from state: this callback is
+    // memoised on the spec, so closing over `text` would report whatever the
+    // box held when it was created — the empty string.
+    (scored: ScoreResult, draft: string) => {
       const t = telemetryRef.current;
 
       if (scored.band !== lastBandRef.current) {
@@ -179,8 +183,18 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
         payload: { score: scored.score, band: scored.band },
       });
       t.flush();
+
+      // Hosted in a chat, the assistant otherwise has no idea any of this
+      // happened. Reported once, at the finish line, and phrased for a reader.
+      reportToConversation(
+        [
+          `The student answered a short-response task on ${spec.standardCode} and met every check.`,
+          `Their response: "${draft}"`,
+          `It scored ${scored.score} out of 100 — ${scored.label}.`,
+        ].join(' '),
+      );
     },
-    [spec.kind, spec.learningComponentId],
+    [spec.kind, spec.learningComponentId, spec.standardCode],
   );
 
   useEffect(() => {
@@ -217,7 +231,7 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
           if (id !== seq.current) return;
           setResult(scored);
           setPhase('scored');
-          recordScore(scored);
+          recordScore(scored, draft);
         })
         .catch(() => {
           // A cancelled call is expected, not a failure. A stale one is ignored.
@@ -366,12 +380,42 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
 function StandardHelp({ text }: { text: string }) {
   const [pinned, setPinned] = useState(false);
   const helpId = useId();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+
+  /**
+   * Pinning it open needs a way back out. A tap opens it on touch, where there
+   * is no hover to end, and on the student surface that left it stuck over the
+   * question it was explaining. Clicking away or pressing Escape closes it, the
+   * way every other popover behaves.
+   */
+  useEffect(() => {
+    if (!pinned) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) setPinned(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPinned(false);
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [pinned]);
 
   return (
-    <span className="group relative mt-0.5 shrink-0">
+    <span ref={wrapRef} className="group relative mt-0.5 shrink-0">
       <button
         type="button"
-        onClick={() => setPinned((value) => !value)}
+        onClick={(event) => {
+          // Unpinning has to drop focus too, or the button stays focused and
+          // the tooltip is held open by the focus rule below.
+          if (pinned) event.currentTarget.blur();
+          setPinned((value) => !value);
+        }}
         aria-expanded={pinned}
         aria-describedby={helpId}
         aria-label="What is this asking for?"
@@ -386,7 +430,10 @@ function StandardHelp({ text }: { text: string }) {
         className={`absolute top-7 right-0 z-10 w-64 rounded-lg bg-foreground p-3 text-xs leading-[1.5] font-normal text-background shadow-lg transition-opacity ${
           pinned
             ? 'visible opacity-100'
-            : 'invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100'
+            : // `focus-within` matches a mouse click as well as a keyboard tab,
+              // which is what pinned it open and then refused to let go.
+              // `has-[:focus-visible]` is the keyboard-only version.
+              'invisible opacity-0 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100'
         }`}
       >
         {text}

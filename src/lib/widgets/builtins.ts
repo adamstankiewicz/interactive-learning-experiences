@@ -20,3 +20,5 @@ import '@/lib/widgets/definitions/narrated-card';
 import '@/lib/widgets/definitions/timeline-builder';
 import '@/lib/widgets/definitions/find-the-flaw';
 import '@/lib/widgets/definitions/draw-the-curve';
+import '@/lib/widgets/definitions/debate-ai';
+import '@/lib/widgets/definitions/writing-workshop';
