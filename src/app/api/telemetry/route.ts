@@ -1,4 +1,5 @@
 import { storageAdapter } from '@/lib/storage';
+import { generateRemediationWidget, shouldRemediate } from '@/lib/pathway/remediation';
 import { recomputeProfile } from '@/lib/student/profile';
 import { telemetryBatch } from '@/lib/student/schema';
 
@@ -49,8 +50,30 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Write failed' }, { status: 500 });
   }
 
-  if (events.some((event) => event.eventType === 'widget_completed')) {
-    await recomputeProfile(studentId);
+  const completionEvent = events.find((event) => event.eventType === 'widget_completed');
+
+  if (completionEvent) {
+    // Profile recomputation and remediation generation run in parallel — neither
+    // blocks the other, and both can use the freshly written interactions.
+    const remediationPromise =
+      shouldRemediate(completionEvent.correct) && completionEvent.stepIndex != null
+        ? generateRemediationWidget(sessionId, completionEvent.stepIndex, parsed.data.currentStep)
+        : Promise.resolve(null);
+
+    const [, remediation] = await Promise.all([
+      recomputeProfile(studentId),
+      remediationPromise,
+    ]);
+
+    if (remediation) {
+      // Persist the injected widget so any subsequent session load (e.g. page
+      // refresh) reflects the remediation step.
+      await storageAdapter().insertRemediationWidget(sessionId, remediation.insertAt, remediation.widget);
+      return Response.json(
+        { accepted: events.length, remediation: { insertAt: remediation.insertAt, widget: remediation.widget } },
+        { status: 202 },
+      );
+    }
   }
 
   return Response.json({ accepted: events.length }, { status: 202 });

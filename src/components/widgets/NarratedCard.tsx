@@ -271,7 +271,7 @@ export function NarratedCard({ spec, onComplete }: Props) {
 
                       {step.why && (isCompleted || revealedSentences >= toPlainSentences(step.body).length) && (
                         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-950/30">
-                          <p className="text-sm text-amber-900 dark:text-amber-200">
+                          <p className="text-sm text-foreground">
                             <span className="font-semibold">Why? </span>
                             {step.why}
                           </p>
