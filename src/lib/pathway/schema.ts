@@ -408,6 +408,77 @@ export const findTheFlawSpec = z.object({
 
 export type FindTheFlawSpec = z.infer<typeof findTheFlawSpec>;
 
+/**
+ * Draw the Curve: shape a line by dragging its points, then see the real one.
+ *
+ * The generalisation that gets this out of maths is dropping exact values. The
+ * x positions are fixed and labelled, the student only sets heights, and the
+ * check is on *shape* — does the line rise where it should rise, peak where it
+ * should peak. For a story's tension curve an exact number is meaningless and
+ * "the peak is at the climax, not the opening" is the entire point; the same
+ * check does honest work for a distance-time graph or a population trend.
+ *
+ * Predict first, then reveal. The student commits a shape before the real
+ * curve is drawn over the top, which is where the learning actually happens —
+ * seeing your own wrong intuition next to the right answer beats being shown
+ * the right answer cold.
+ */
+export const drawTheCurveSpec = z.object({
+  kind: z.literal('draw-the-curve'),
+  learningComponentId: z.string().nullable(),
+  prompt: z
+    .string()
+    .describe(
+      'Instruction shown above the chart, e.g. "Drag each point to show how the tension changes across the story."',
+    ),
+  xAxis: z
+    .object({
+      label: z.string().describe('What the horizontal axis runs over, e.g. "Stage of the story", "Time".'),
+      points: z
+        .array(
+          z.object({
+            id: z.string().describe('Short stable lowercase slug.'),
+            label: z
+              .string()
+              .describe('Short label under this position, 1-3 words, e.g. "Climax", "1850", "10 min".'),
+          }),
+        )
+        .describe('Give 4-7 positions in order, left to right. Short labels — they sit under the axis.'),
+    })
+    .describe('The fixed horizontal positions. The student sets heights, never x.'),
+  yAxis: z
+    .object({
+      label: z.string().describe('What the vertical axis measures, e.g. "Tension", "Distance from home".'),
+      lowLabel: z.string().describe('Two or three words for the bottom of the scale, e.g. "calm", "close".'),
+      highLabel: z.string().describe('Two or three words for the top, e.g. "intense", "far away".'),
+    })
+    .describe('The vertical scale, described in words rather than numbers — no units are ever shown.'),
+  /**
+   * The real curve, revealed after the student commits. Its *shape* is also
+   * what the answer is checked against: segment by segment, does the student's
+   * line go the same direction? Absolute heights are never compared, so a
+   * student who draws the right shape too low still gets it right.
+   */
+  actual: z
+    .array(
+      z.object({
+        pointId: z.string().describe('Must match one of the xAxis point ids.'),
+        value: z.number().describe('0-100, where 0 is the bottom of the chart and 100 the top.'),
+      }),
+    )
+    .describe('One entry per x position, in the same order. This is the correct curve.'),
+  reveal: z
+    .string()
+    .describe(
+      'Shown with the real curve once the student commits: what the true shape is and why it goes that way. Two or three sentences.',
+    ),
+  hint: z
+    .string()
+    .describe('Shown after a wrong shape. Points at what to reconsider without describing the curve.'),
+});
+
+export type DrawTheCurveSpec = z.infer<typeof drawTheCurveSpec>;
+
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
@@ -421,6 +492,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   timelineBuilderSpec,
   crosswordSpec,
   findTheFlawSpec,
+  drawTheCurveSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
@@ -445,6 +517,7 @@ export const widgetKind = z.enum([
   'narrated-card',
   'timeline-builder',
   'find-the-flaw',
+  'draw-the-curve',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 
@@ -478,6 +551,12 @@ export const pathwayStep = z.object({
       '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
       'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
       'lesson taught, not for introducing a concept the student has not met yet.',
+      '"draw-the-curve" gives labelled positions along an axis and lets the student drag each point\'s',
+      'height to predict a shape, then draws the real curve over their guess. Checked on shape, not',
+      'numbers, so it is not only for maths: tension across a story, distance over time, population',
+      'across decades, a trend across eras. Use it when the standard is about how something changes,',
+      'and prefer "practice" or "check" — the reveal is the payoff and it lands hardest once the',
+      'student has a real prediction to be wrong about.',
       '"find-the-flaw" shows a worked example containing one deliberate mistake — a solution, an',
       'experiment, an argument, a historical explanation — and asks the student to find the step',
       'where it goes wrong and say why. It is the only interaction that asks a student to judge',
