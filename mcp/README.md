@@ -3,17 +3,32 @@
 Renders our learning widgets inside Claude, via
 [MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp).
 
-## Install (nothing to clone, nothing to run)
+## Install
 
-1. Claude → **Settings → Connectors → Add custom connector**
-2. URL: `https://interactive-learning-experiences.vercel.app/api/mcp`
-3. Ask for an activity — *"show me a find-the-flaw for MS-PS1-1"*, *"a crossword for RI.8.8"*,
-   *"a draft meter for RH.6-8.1"*
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`
+(`%APPDATA%\\Claude\\` on Windows), then restart Claude:
 
-That is the whole install. The widget appears inline and is live: the draft meter
-really scores what you type, against the real standard.
+```json
+{
+  "mcpServers": {
+    "learning-widgets": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://interactive-learning-experiences.vercel.app/api/mcp"]
+    }
+  }
+}
+```
 
-Open the URL in a browser to check it is up — it answers with the widget kinds it knows.
+Then ask for an activity — *"show me a find-the-flaw for MS-PS1-1"*, *"a crossword for
+RI.8.8"*, *"a draft meter for RH.6-8.1"*. The widget appears inline and is live: the
+draft meter really scores what you type, against the real standard.
+
+Nothing to clone and nothing to run locally — `mcp-remote` just forwards to the
+deployment. Open the URL in a browser to check it is up; it answers with the widget
+kinds it knows.
+
+Claude Desktop has no "add custom connector" button in this build, which is why this
+goes through the config file rather than the UI.
 
 ## The idea
 
@@ -63,10 +78,11 @@ Claude is the host's.
 
 ## Things that cost hours, written down
 
-**A local stdio server will not render UI.** It registers, lists its tools, gets
-called — and the host never reads the `ui://` resource, so Claude rebuilds an
-imitation with its own `visualize` tool. Every MCP App that works on a desktop
-install is a remote connector. This is why the server is a route.
+**A stdio server renders UI fine** — an earlier version of this file claimed
+otherwise. When the widget was not rendering, the cause was the declaration below,
+not the transport; both were changed at once and the transport got the credit.
+`resources/read` in `~/Library/Logs/Claude/mcp-server-<name>.log` is the fact that
+settles it: if the host never read the resource, the declaration is wrong.
 
 **`_meta.ui` goes on the resource, not only the tool**, and the CSP keys are
 `connectDomains` / `resourceDomains`. Both were found by listing what the shipping
