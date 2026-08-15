@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 
 import { ActivityTrail } from '@/components/pathway/ActivityTrail';
+import { LessonPlanUpload } from '@/components/pathway/LessonPlanUpload';
 import { PathwayDocument } from '@/components/pathway/PathwayDocument';
 import { ShareLink } from '@/components/pathway/ShareLink';
 import { ThemeToggle } from '@/components/pathway/ThemeToggle';
@@ -33,6 +34,20 @@ function gradeLabel(grade: string): string {
   return grade === 'K' ? 'Kindergarten' : `Grade ${grade}`;
 }
 
+/**
+ * A lesson plan's extracted grade level is free text from the model — "4",
+ * "Grade 3", "middle school", "4-5". The select only has exact values, so
+ * this maps loosely rather than rejecting anything that isn't a bare digit.
+ * Falls back to no hint rather than guessing wrong.
+ */
+function normalizeGrade(raw: string): string {
+  if (/^k(indergarten)?$/i.test(raw.trim())) return 'K';
+  const match = raw.match(/\d+/);
+  if (!match) return '';
+  const grade = Number(match[0]);
+  return grade >= 1 && grade <= 12 ? String(grade) : '';
+}
+
 export function PathwayBuilder() {
   const teacherNoteId = useId();
   const [topic, setTopic] = useState('');
@@ -46,6 +61,11 @@ export function PathwayBuilder() {
   function runSubmit() {
     if (!topic.trim() || streaming) return;
     void start(topic, gradeHint, teacherNote.trim() || undefined);
+  }
+
+  function pickTopic(pickedTopic: string, gradeLevel: string) {
+    setTopic(pickedTopic);
+    setGradeHint(normalizeGrade(gradeLevel));
   }
 
   function submit(event: React.FormEvent) {
@@ -157,6 +177,8 @@ export function PathwayBuilder() {
               />
             </div>
           )}
+
+          {!started && <LessonPlanUpload disabled={streaming} onPickTopic={pickTopic} />}
 
           {!started && (
             <div className="mt-4">
