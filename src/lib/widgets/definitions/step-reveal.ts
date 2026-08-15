@@ -5,6 +5,7 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<StepRevealSpec>({
   kind: 'step-reveal',
   schema: stepRevealSpec,
+  assesses: false,
   component: lazy(() =>
     import('@/components/widgets/StepReveal').then((m) => ({ default: m.StepReveal })),
   ),

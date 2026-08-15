@@ -5,6 +5,8 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<FlashcardSpec>({
   kind: 'flashcard',
   schema: flashcardSpec,
+  // Reaching the last card reports success, so there is no answer to record.
+  assesses: false,
   component: lazy(() =>
     import('@/components/widgets/Flashcard').then((m) => ({ default: m.Flashcard })),
   ),
