@@ -65,6 +65,35 @@ alter table public.pathway_sessions
 create index if not exists pathway_sessions_student_idx
   on public.pathway_sessions (student_id, created_at desc);
 
+-- Closing the loop back to the teacher: a share link's whole payoff is
+-- knowing anyone actually opened it. Additive for installs from before these
+-- existed, same pattern as step_widgets above.
+alter table public.pathway_sessions add column if not exists open_count integer not null default 0;
+alter table public.pathway_sessions add column if not exists completion_count integer not null default 0;
+
+-- Atomic increments via a function rather than read-then-write from the app,
+-- so two students opening the same link at once don't lose a count to a race.
+create or replace function public.increment_pathway_session_open_count(p_session_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.pathway_sessions set open_count = open_count + 1 where id = p_session_id;
+$$;
+
+create or replace function public.increment_pathway_session_completion_count(p_session_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.pathway_sessions set completion_count = completion_count + 1 where id = p_session_id;
+$$;
+
+grant execute on function public.increment_pathway_session_open_count(uuid) to service_role;
+grant execute on function public.increment_pathway_session_completion_count(uuid) to service_role;
+
 -- ---------------------------------------------------------------------------
 -- interactions — APPEND ONLY event stream. Never updated, never deleted.
 -- ---------------------------------------------------------------------------

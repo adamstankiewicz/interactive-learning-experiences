@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 
 import { WidgetRenderer } from '@/components/widgets/registry';
@@ -68,6 +68,18 @@ export function PathwayWalkthrough({
   const finished = session.steps.length > 0 && currentStep >= session.steps.length;
   const currentWidget = session.stepWidgets[currentStep];
   const currentKind = widgetKindOf(currentWidget);
+
+  // Fires once per mount, the student's half of "close the loop back to the
+  // teacher" — the ref survives re-renders while `finished` stays true, so a
+  // parent re-render (or React Strict Mode's double-invoke) can't double-count.
+  const reportedCompletion = useRef(false);
+  useEffect(() => {
+    if (!finished || !session.sessionId || reportedCompletion.current) return;
+    reportedCompletion.current = true;
+    void fetch(`/api/pathway/session/${session.sessionId}/complete`, { method: 'POST' }).catch(() => {
+      // Best-effort — a student who finished should never see this fail.
+    });
+  }, [finished, session.sessionId]);
 
   return (
     <div className="flex w-full flex-col items-center gap-6">

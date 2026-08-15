@@ -30,7 +30,12 @@ import type {
  * a single-process deployment, not for anything that scales past one.
  */
 
-type StoredSession = PersistedSession & { gradeHint: string | null; rejectedCodes: string[] };
+type StoredSession = PersistedSession & {
+  gradeHint: string | null;
+  rejectedCodes: string[];
+  openCount: number;
+  completionCount: number;
+};
 
 type MemoryStore = {
   students: Set<string>;
@@ -82,8 +87,26 @@ export const memoryStorageAdapter: StorageAdapter = {
       plan: input.plan,
       stepWidgets: input.stepWidgets,
       rejectedCodes: input.rejectedCodes,
+      openCount: 0,
+      completionCount: 0,
     });
     return id;
+  },
+
+  async recordSessionOpen(sessionId) {
+    const session = sessions.get(sessionId);
+    if (session) session.openCount += 1;
+  },
+
+  async recordSessionCompletion(sessionId) {
+    const session = sessions.get(sessionId);
+    if (session) session.completionCount += 1;
+  },
+
+  async sessionStats(sessionId) {
+    const session = sessions.get(sessionId);
+    if (!session) return null;
+    return { openCount: session.openCount, completionCount: session.completionCount };
   },
 
   async loadSession(sessionId) {

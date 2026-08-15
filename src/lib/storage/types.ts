@@ -74,6 +74,12 @@ export interface StorageAdapter {
   /** True when `studentId` owns `sessionId`. Needed explicitly wherever the backend has no RLS of its own to lean on. */
   sessionBelongsTo(sessionId: string, studentId: string): Promise<boolean>;
 
+  /** A share link got opened — the other half of "close the loop back to the teacher." */
+  recordSessionOpen(sessionId: string): Promise<void>;
+  /** A student reached the end of the walkthrough for this session. */
+  recordSessionCompletion(sessionId: string): Promise<void>;
+  sessionStats(sessionId: string): Promise<{ openCount: number; completionCount: number } | null>;
+
   recordInteractions(events: InteractionEvent[]): Promise<void>;
 
   loadProfile(studentId: string): Promise<StudentProfile>;

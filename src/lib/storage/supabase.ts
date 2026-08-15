@@ -106,6 +106,35 @@ export const supabaseStorageAdapter: StorageAdapter = {
     return Boolean(data) && data?.student_id === studentId;
   },
 
+  async recordSessionOpen(sessionId) {
+    if (!supabaseConfigured()) return;
+    const { error } = await supabaseAdmin().rpc('increment_pathway_session_open_count', {
+      p_session_id: sessionId,
+    });
+    if (error) console.error('[storage] recordSessionOpen failed', error);
+  },
+
+  async recordSessionCompletion(sessionId) {
+    if (!supabaseConfigured()) return;
+    const { error } = await supabaseAdmin().rpc('increment_pathway_session_completion_count', {
+      p_session_id: sessionId,
+    });
+    if (error) console.error('[storage] recordSessionCompletion failed', error);
+  },
+
+  async sessionStats(sessionId) {
+    if (!supabaseConfigured()) return null;
+
+    const { data, error } = await supabaseAdmin()
+      .from('pathway_sessions')
+      .select('open_count, completion_count')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return { openCount: data.open_count, completionCount: data.completion_count };
+  },
+
   async recordInteractions(events: InteractionEvent[]) {
     if (!supabaseConfigured()) return;
 
