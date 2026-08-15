@@ -38,6 +38,13 @@ export const interactionEvent = z.object({
   elapsedMs: z.number().int().min(0),
   correct: z.boolean().nullable(),
   payload: z.record(z.string(), z.unknown()),
+  /**
+   * Zero-based index of the step this event belongs to. Present on
+   * `widget_completed` so the server can generate remediation for the right
+   * step without having to infer it from other state. Null for events that
+   * pre-date this field or don't belong to a numbered step.
+   */
+  stepIndex: z.number().int().min(0).nullable().optional(),
 });
 export type InteractionEvent = z.infer<typeof interactionEvent>;
 
@@ -45,6 +52,13 @@ export const telemetryBatch = z.object({
   sessionId: z.string().uuid(),
   studentId: z.string().uuid(),
   events: z.array(interactionEvent).min(1).max(50),
+  /**
+   * The step the student is on when this batch is flushed. Used by the
+   * remediation system to guarantee the injected widget always lands after
+   * the student's current position, even if they advanced past the failed
+   * step before the server responded.
+   */
+  currentStep: z.number().int().min(0).optional(),
 });
 export type TelemetryBatch = z.infer<typeof telemetryBatch>;
 

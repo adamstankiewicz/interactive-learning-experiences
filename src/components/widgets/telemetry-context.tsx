@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
 import type { Telemetry } from '@/hooks/useTelemetry';
 
@@ -27,14 +27,30 @@ const WidgetTelemetryContext = createContext<WidgetTelemetry>({
 export function WidgetTelemetryProvider({
   telemetry,
   standardCode,
+  stepIndex,
   children,
 }: {
   telemetry: Telemetry;
   standardCode: string | null;
+  /** Current step index — injected into widget_completed events so the server
+   *  knows which step to remediate without loading the full session on every flush. */
+  stepIndex: number;
   children: React.ReactNode;
 }) {
+  const value = useMemo<WidgetTelemetry>(() => ({
+    ...telemetry,
+    standardCode,
+    track(event) {
+      telemetry.track(
+        event.eventType === 'widget_completed'
+          ? { ...event, stepIndex }
+          : event,
+      );
+    },
+  }), [telemetry, standardCode, stepIndex]);
+
   return (
-    <WidgetTelemetryContext.Provider value={{ ...telemetry, standardCode }}>
+    <WidgetTelemetryContext.Provider value={value}>
       {children}
     </WidgetTelemetryContext.Provider>
   );

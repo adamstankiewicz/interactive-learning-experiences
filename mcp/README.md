@@ -108,6 +108,20 @@ There is no client library for any of this: `@modelcontextprotocol/app-sdk` does
 exist, and the TS SDK knows nothing about `ui://`. `mcp/host-bridge.ts` is
 hand-rolled from the wire format.
 
+## A tool call always returns a widget
+
+Prose instead of a widget renders nothing, so the student gets an apology where
+an activity should be. Three fallbacks make that not happen:
+
+- an unresolvable standard becomes a synthetic, explicitly-unverified one, and the
+  activity is built anyway with a note saying so — the same honest degradation the
+  pathway pipeline already does
+- a widget that does not fit its standard falls back to one that does
+- anything else retries once with the topic alone
+
+The note is always accurate about which of these happened. Guaranteeing a widget is
+not the same as pretending it is standards-aligned.
+
 ## Not done yet
 
 - Widgets emit telemetry into a context with no provider, so nothing a student does

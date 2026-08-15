@@ -1,15 +1,20 @@
 import Link from 'next/link';
 
-import { SessionReport } from '@/components/pathways/SessionReport';
+import { SessionReportPage } from '@/components/pathways/SessionReportPage';
+import type { PathwayPreviewData } from '@/components/pathways/PathwayPreview';
 import { storageAdapter } from '@/lib/storage';
 
-export default async function SessionReportPage({
+export default async function PathwayReportPage({
   params,
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
   const session = await storageAdapter().loadSession(sessionId);
+
+  const parentPreview: PathwayPreviewData | null = session?.plan
+    ? { plan: session.plan, stepWidgets: session.stepWidgets ?? {} }
+    : null;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
@@ -25,7 +30,11 @@ export default async function SessionReportPage({
         </h1>
       </div>
 
-      <SessionReport sessionId={sessionId} />
+      <SessionReportPage
+        sessionId={sessionId}
+        topic={session?.topic ?? ''}
+        parentPreview={parentPreview}
+      />
     </main>
   );
 }
