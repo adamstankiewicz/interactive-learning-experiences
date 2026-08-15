@@ -19,6 +19,7 @@ const MIN_GRADE = 4;
 registerWidgetCatalog<FindTheFlawSpec>({
   kind: 'find-the-flaw',
   schema: findTheFlawSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/FindTheFlaw').then((m) => ({ default: m.FindTheFlaw })),
   ),

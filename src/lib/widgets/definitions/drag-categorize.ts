@@ -5,9 +5,10 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<DragCategorizeSpec>({
   kind: 'drag-categorize',
   schema: dragCategorizeSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/DragCategorize').then((m) => ({ default: m.DragCategorize })),
   ),
   plannerDescription:
-    'Sorts items into 2-4 named buckets — use this over swiper-flashcard when there are more than two groups.',
+    'Sorts items into 2-4 named buckets — use this over swiper-flashcard when there are more than two groups, e.g. sorting terms by era or by part of speech.',
 });

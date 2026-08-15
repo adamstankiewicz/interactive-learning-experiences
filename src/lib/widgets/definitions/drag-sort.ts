@@ -5,6 +5,7 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<DragSortSpec>({
   kind: 'drag-sort',
   schema: dragSortSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/DragSort').then((m) => ({ default: m.DragSort })),
   ),

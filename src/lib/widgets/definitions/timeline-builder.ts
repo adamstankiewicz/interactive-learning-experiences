@@ -5,6 +5,7 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<TimelineBuilderSpec>({
   kind: 'timeline-builder',
   schema: timelineBuilderSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/TimelineBuilder').then((m) => ({ default: m.TimelineBuilder })),
   ),

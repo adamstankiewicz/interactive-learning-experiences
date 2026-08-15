@@ -5,10 +5,11 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<SwiperFlashcardSpec>({
   kind: 'swiper-flashcard',
   schema: swiperFlashcardSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/SwiperFlashcard').then((m) => ({ default: m.SwiperFlashcard })),
   ),
   plannerDescription:
-    'A binary sort of statements (true/false, example/non-example, prime/composite) that suits almost any subject.',
+    'A binary sort of statements (true/false, example/non-example, prime/composite) that suits almost any subject, including an "activate" step sorting prior statements or a "check" step sorting worked answers.',
   // No coverageRule — fits every standard, which is what makes it a safe fallback.
 });

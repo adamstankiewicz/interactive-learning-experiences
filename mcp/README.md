@@ -112,7 +112,8 @@ hand-rolled from the wire format.
 
 - Widgets emit telemetry into a context with no provider, so nothing a student does
   in chat reaches the database. No session, no mastery.
-- `ui/update-model-context` — the widget telling the conversation what the student
-  did — is supported by the bridge and called by nothing. That is the feedback loop.
+- Widgets now tell the conversation when a student finishes (`mcp/report-to-host.ts`),
+  which is the point of being in a chat rather than on a page: Claude can respond to
+  it. Deliberately one message at the end, not a narration of every keystroke.
 - The tool builds one widget. A `build_lesson` returning a whole pathway would be
   the obvious next tool.

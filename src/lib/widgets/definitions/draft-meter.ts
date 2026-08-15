@@ -8,6 +8,7 @@ const MIN_GRADE = 3;
 registerWidgetCatalog<DraftMeterSpec>({
   kind: 'draft-meter',
   schema: draftMeterSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/DraftMeter').then((m) => ({ default: m.DraftMeter })),
   ),

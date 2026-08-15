@@ -18,6 +18,7 @@ import { useCallback, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { TimelineBuilderSpec } from '@/lib/pathway/schema';
 import { seededShuffle } from '@/lib/widgets/shuffle';
 
@@ -183,6 +184,8 @@ export function TimelineBuilder({ spec, onComplete }: { spec: TimelineBuilderSpe
   const announcerRef = useRef<HTMLDivElement>(null);
   const firstZoneRef = useRef<HTMLDivElement>(null);
   const chipRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const completedRef = useRef(false);
+  const telemetry = useWidgetTelemetry();
   const zonesRowRef = useRef<HTMLDivElement>(null);
 
   const announce = useCallback((msg: string) => {
@@ -281,8 +284,36 @@ const sensors = useSensors(useSensor(PointerSensor));
     setFeedback(newFeedback);
     setAttempts((a) => a + 1);
     setCorrect(allCorrect);
-    if (allCorrect) onComplete?.(true);
-  }, [placement, spec.events, onComplete]);
+
+    telemetry.track({
+      eventType: 'answer_checked',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: allCorrect,
+      payload: {
+        attempt: attempts + 1,
+        misplaced: spec.events.filter((e) => placement[e.id] !== e.zoneId).length,
+        ...(allCorrect ? {} : { misconception: spec.hint }),
+      },
+    });
+
+    if (!allCorrect) return;
+    onComplete?.(true);
+
+    if (completedRef.current) return;
+    completedRef.current = true;
+
+    telemetry.track({
+      eventType: 'widget_completed',
+      widgetKind: spec.kind,
+      learningComponentId: spec.learningComponentId,
+      standardCode: telemetry.standardCode,
+      correct: true,
+      payload: { attempts: attempts + 1 },
+    });
+    telemetry.flush();
+  }, [placement, spec, onComplete, attempts, telemetry]);
 
   const bankEvents = shuffledEvents.filter((e) => placement[e.id] === null);
   const allPlaced = bankEvents.length === 0;
