@@ -1,0 +1,10 @@
+import { NarratedCard } from '@/components/widgets/NarratedCard';
+import { narratedCardSpec, type NarratedCardSpec } from '@/lib/pathway/schema';
+import { registerWidgetCatalog } from '@/lib/widgets/types';
+
+registerWidgetCatalog<NarratedCardSpec>({
+  kind: 'narrated-card',
+  schema: narratedCardSpec,
+  component: NarratedCard,
+  plannerDescription: 'Reads content aloud using browser TTS, revealing each sentence as it is spoken. Steps stack up as they complete. Good for accessibility and audio-first learners.',
+});

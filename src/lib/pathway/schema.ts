@@ -165,6 +165,74 @@ export const dragCategorizeSpec = z.object({
 });
 
 export type DragCategorizeSpec = z.infer<typeof dragCategorizeSpec>;
+
+export const markdownCardSpec = z.object({
+  kind: z.literal('markdown-card'),
+  learningComponentId: z.string().nullable(),
+  title: z.string().describe('Short heading shown above the content, e.g. "Why fractions matter"'),
+  body: z
+    .string()
+    .describe(
+      'Markdown content for the student. Use headings, bold, bullet lists, and blockquotes freely. Aim for 80-200 words — enough to re-teach a concept without overwhelming. Address the student directly ("you", "your").',
+    ),
+  tip: z
+    .string()
+    .nullable()
+    .describe(
+      'Optional one-sentence callout shown in a highlighted box at the bottom, e.g. "Remember: the denominator tells you how many equal parts the whole is split into." Null to omit.',
+    ),
+});
+
+export type MarkdownCardSpec = z.infer<typeof markdownCardSpec>;
+
+const flashcardSide = z.object({
+  text: z.string().nullable().describe('Plain text shown on this side. Null if unused.'),
+  markdown: z.string().nullable().describe('Markdown content shown below text, if richer formatting is needed. Null if unused.'),
+  imageUrl: z.string().nullable().describe('URL of an image shown on this side. Null if unused.'),
+  imageAlt: z.string().nullable().describe('Alt text for the image. Required when imageUrl is set.'),
+});
+
+export const flashcardSpec = z.object({
+  kind: z.literal('flashcard'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the deck, e.g. "Tap each card to reveal its definition."'),
+  cards: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this card'),
+        front: flashcardSide.describe('What the student sees before flipping'),
+        back: flashcardSide.describe('What is revealed after flipping'),
+      }),
+    )
+    .describe('Give 3-8 cards. Each card needs at least one field on each side.'),
+  successMessage: z.string().describe('Shown after the student works through all cards.'),
+});
+
+export type FlashcardSpec = z.infer<typeof flashcardSpec>;
+
+const stepShape = z.object({
+  id: z.string(),
+  title: z.string().describe('Short label for this step, e.g. "Step 1: Isolate the variable"'),
+  body: z.string().describe('Markdown explanation of this step. Be clear and direct. Avoid markdown headings — use bold instead.'),
+  why: z.string().nullable().describe('Optional one-sentence callout explaining the reasoning behind this step. Null to omit.'),
+});
+
+export const stepRevealSpec = z.object({
+  kind: z.literal('step-reveal'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Framing sentence shown above the steps, e.g. "Let\'s walk through this together."'),
+  steps: z.array(stepShape).describe('Give 3-6 steps.'),
+});
+export type StepRevealSpec = z.infer<typeof stepRevealSpec>;
+
+export const narratedCardSpec = z.object({
+  kind: z.literal('narrated-card'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Framing sentence shown above the steps, e.g. "Listen along as we walk through this."'),
+  steps: z.array(stepShape).describe('Give 3-6 steps. Keep body text concise — it will be read aloud sentence by sentence.'),
+});
+export type NarratedCardSpec = z.infer<typeof narratedCardSpec>;
+
 export const crosswordEntrySpec = z.object({
   answer: z
     .string()
@@ -208,6 +276,34 @@ export const crosswordSpec = z.object({
 
 export type CrosswordSpec = z.infer<typeof crosswordSpec>;
 
+export const timelineBuilderSpec = z.object({
+  kind: z.literal('timeline-builder'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the timeline, e.g. "Place each event in the correct period."'),
+  zones: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this zone'),
+        label: z.string().describe('Period or era label shown on the timeline, e.g. "1800s" or "Ancient Rome"'),
+        sublabel: z.string().nullable().describe('Optional date range or subtitle shown below the label, e.g. "1800–1899". Null to omit.'),
+      }),
+    )
+    .describe('Give 3-5 zones in chronological order, left to right.'),
+  events: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this event'),
+        label: z.string().describe('Short event name shown on the draggable chip, e.g. "Moon landing"'),
+        zoneId: z.string().describe('id of the zone this event belongs to'),
+      }),
+    )
+    .describe('Give 4-10 events spread across the zones. They will be shuffled before display.'),
+  successMessage: z.string().describe('Shown when all events are placed correctly.'),
+  hint: z.string().describe('Shown after a wrong submission; names the misconception or gives a nudge.'),
+});
+
+export type TimelineBuilderSpec = z.infer<typeof timelineBuilderSpec>;
+
 /** Discriminated union — add widget kinds here as generators are registered. */
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
@@ -215,6 +311,11 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   draftMeterSpec,
   dragSortSpec,
   dragCategorizeSpec,
+  markdownCardSpec,
+  flashcardSpec,
+  stepRevealSpec,
+  narratedCardSpec,
+  timelineBuilderSpec,
   crosswordSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
@@ -234,6 +335,11 @@ export const widgetKind = z.enum([
   'drag-sort',
   'drag-categorize',
   'crossword',
+  'markdown-card',
+  'flashcard',
+  'step-reveal',
+  'narrated-card',
+  'timeline-builder',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 

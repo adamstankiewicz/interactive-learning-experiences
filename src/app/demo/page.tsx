@@ -25,6 +25,13 @@ const WIDGETS = [
     tags: ['writing', 'argument', 'live scoring'],
   },
   {
+    slug: 'timeline-builder',
+    name: 'Timeline Builder',
+    description:
+      'Drag historical events from a bank into labeled period zones on a horizontal timeline. Supports 3–5 zones with per-event correctness feedback.',
+    tags: ['history', 'sequencing', 'timeline'],
+  },
+  {
     slug: 'drag-sort',
     name: 'Drag & Sort',
     description:
@@ -37,6 +44,33 @@ const WIDGETS = [
     description:
       'Drag items from a bank into labeled category columns. Supports 2–4 categories with all-or-nothing submission and per-item correctness feedback.',
     tags: ['sorting', 'categorization', 'classification'],
+  },
+  {
+    slug: 'flashcard',
+    name: 'Flashcard',
+    description:
+      'Tap to flip a card and reveal its back. Each side supports any combination of text, markdown, and images. Navigate through a deck and continue when done.',
+    tags: ['vocabulary', 'study', 'flip'],
+  },
+  {
+    slug: 'narrated-card',
+    name: 'Narrated Card',
+    description:
+      'Reads content aloud using the browser\'s text-to-speech engine, revealing each sentence as it is spoken. Steps stack up as they complete.',
+    tags: ['audio', 'narration', 'accessibility'],
+  },
+  {
+    slug: 'step-reveal',
+    name: 'Step Reveal',
+    description: 'Walk through a concept or worked example one step at a time. Each step stacks up so students can follow the full chain of reasoning.',
+    tags: ['worked example', 'step-by-step', 'reasoning'],
+  },
+  {
+    slug: 'markdown-card',
+    name: 'Markdown Card',
+    description:
+      'Renders LLM-generated markdown as a clean reading card — headings, bold, bullets, blockquotes, and an optional tip callout. Used to re-teach a concept a student is struggling with.',
+    tags: ['reading', 'remediation', 'markdown'],
   },
   {
     slug: 'crossword',

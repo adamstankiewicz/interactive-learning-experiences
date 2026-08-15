@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import '@/lib/widgets/builtins';
-import { widgetSpec } from '@/lib/pathway/schema';
-import { getWidgetCatalogEntry } from '@/lib/widgets/types';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { widgetSpec } from "@/lib/pathway/schema";
+import "@/lib/widgets/builtins";
+import { getWidgetCatalogEntry } from "@/lib/widgets/types";
 
 /**
  * Spec -> component, via the open widget registry (`@/lib/widgets`). Adding a
@@ -29,13 +29,21 @@ import { getWidgetCatalogEntry } from '@/lib/widgets/types';
  * generateable/validatable end to end, even though rendering itself no longer
  * needs any core-file edit.
  */
-export function WidgetRenderer({ spec, onComplete }: { spec: unknown; onComplete?: () => void }) {
+export function WidgetRenderer({
+  spec,
+  onComplete,
+}: {
+  spec: unknown;
+  onComplete?: () => void;
+}) {
   const parsed = widgetSpec.safeParse(spec);
 
   if (!parsed.success) {
     return (
       <Alert variant="warning">
-        <AlertDescription>This widget spec did not match any registered schema.</AlertDescription>
+        <AlertDescription>
+          This widget spec did not match any registered schema.
+        </AlertDescription>
       </Alert>
     );
   }
@@ -44,7 +52,10 @@ export function WidgetRenderer({ spec, onComplete }: { spec: unknown; onComplete
   if (!definition) {
     return (
       <Alert variant="warning">
-        <AlertDescription>No renderer is registered for widget kind &ldquo;{parsed.data.kind}&rdquo;.</AlertDescription>
+        <AlertDescription>
+          No renderer is registered for widget kind &ldquo;{parsed.data.kind}
+          &rdquo;.
+        </AlertDescription>
       </Alert>
     );
   }
