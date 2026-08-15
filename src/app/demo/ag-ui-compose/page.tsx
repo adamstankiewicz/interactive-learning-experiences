@@ -9,15 +9,24 @@ import type { ComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
 
 /**
  * Phase 3a research prototype #2 — the model composes a genuinely new
- * widget's structure from a five-primitive catalog (Stack, Card, Heading,
- * Text, ChoiceGroup), never one of the app's six named widget kinds. The
- * draft-meter prototype proved AG-UI can carry a continuous state-patch
- * loop over a fixed widget; this one proves the other half — a model
- * choosing *which* primitives to use and how to nest them, per topic.
- * Isolated the same way: new route, new page, nothing production touched.
+ * widget's structure from a small primitive catalog (Stack, Card, Heading,
+ * Text, ChoiceGroup, QuizGrid, ScoreTracker), never one of the app's six
+ * named widget kinds. The draft-meter prototype proved AG-UI can carry a
+ * continuous state-patch loop over a fixed widget; this one proves the
+ * other half — a model choosing *which* primitives to use and how to nest
+ * them, per topic, up to and including a real tic-tac-toe-style mini-game
+ * (QuizGrid) with turn logic, win detection, and score shared across two
+ * independent elements via json-render's own state store. Isolated the
+ * same way: new route, new page, nothing production touched.
  */
 
-const EXAMPLES = ['tectonic plates', 'the water cycle', 'figurative language', 'supply and demand'];
+const EXAMPLES = [
+  'tic-tac-toe to learn fractions',
+  'tectonic plates',
+  'the water cycle',
+  'figurative language',
+  'supply and demand',
+];
 
 type Phase = 'idle' | 'composing' | 'done' | 'error';
 
@@ -98,10 +107,11 @@ export default function AgUiComposePrototype() {
         </span>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Compose a widget on the fly</h1>
         <p className="mt-2 text-muted-foreground">
-          Not one of the app&rsquo;s six built-in widgets. The model picks from a five-primitive catalog (Stack,
-          Card, Heading, Text, ChoiceGroup) and decides the structure itself, per topic — the whole composition
-          arrives as a single AG-UI <code className="rounded bg-muted px-1 py-0.5 text-xs">CUSTOM</code> event, then
-          renders through a json-render catalog registry.
+          Not one of the app&rsquo;s six built-in widgets. The model picks from a small primitive catalog (Stack,
+          Card, Heading, Text, ChoiceGroup, and — for a playful ask — a tic-tac-toe-style QuizGrid with a
+          ScoreTracker) and decides the structure itself, per topic — the whole composition arrives as a single
+          AG-UI <code className="rounded bg-muted px-1 py-0.5 text-xs">CUSTOM</code> event, then renders through a
+          json-render catalog registry. Try &ldquo;tic-tac-toe to learn fractions.&rdquo;
         </p>
       </div>
 

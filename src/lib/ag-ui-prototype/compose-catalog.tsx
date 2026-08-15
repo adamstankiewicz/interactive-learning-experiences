@@ -4,21 +4,29 @@ import { useState } from 'react';
 import { z } from 'zod';
 import { schema } from '@json-render/react/schema';
 import { defineCatalog } from '@json-render/core';
-import { defineRegistry, type Spec } from '@json-render/react';
+import { defineRegistry, useStateStore, useStateValue, type Spec } from '@json-render/react';
 
 import { cn } from '@/lib/utils';
 import type { ComposedElement, ComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
 
 /**
- * The render half of the composition prototype. Every primitive owns its own
- * reactivity via ordinary React state (`ChoiceGroup`'s selection) — the model
- * never authors a `$state`/`$bindState` expression, only literal content and
- * structure (see `compose-schema.ts`), so there is nothing here for
- * `JSONUIProvider`'s state store to do. It's still used (see the demo page)
- * for consistency with the draft-meter prototype and because a future
- * primitive that genuinely needs cross-element state has somewhere to put it
- * without a second wiring pattern.
+ * The render half of the composition prototype. Most primitives own their
+ * reactivity via ordinary React state (`ChoiceGroup`'s selection, `QuizGrid`'s
+ * board) — the model never authors a `$state`/`$bindState` expression, only
+ * literal content and structure (see `compose-schema.ts`). `QuizGrid` and
+ * `ScoreTracker` are the one pair that genuinely needs to share state across
+ * two independent elements — the grid writes a running win count, the
+ * tracker (if the model chose to include one) reads it — so those two use
+ * `JSONUIProvider`'s state store instead of local `useState`. Everything
+ * else stays local because there's nothing to share.
  */
+
+const gridQuestionSchema = z.object({
+  id: z.string(),
+  prompt: z.string(),
+  options: z.array(z.object({ id: z.string(), label: z.string() })),
+  correctOptionId: z.string(),
+});
 
 const catalog = defineCatalog(schema, {
   components: {
@@ -46,11 +54,41 @@ const catalog = defineCatalog(schema, {
       }),
       description: 'A single-select question with immediate right/wrong feedback per option.',
     },
+    QuizGrid: {
+      props: z.object({ questions: z.array(gridQuestionSchema) }),
+      description:
+        'A 3x3 tic-tac-toe board where claiming a square requires answering a question correctly; a wrong answer gives the square to the opponent.',
+    },
+    ScoreTracker: {
+      props: z.object({ scoreLabel: z.string().nullable() }),
+      description: 'Shows a running count of QuizGrid rounds won, read from shared state.',
+    },
   },
   actions: {},
 });
 
 const GAP: Record<'sm' | 'md' | 'lg', string> = { sm: 'gap-1.5', md: 'gap-3', lg: 'gap-5' };
+
+type Mark = 'X' | 'O' | null;
+
+/** Rows, columns, both diagonals — the eight ways to win a 3x3 board. */
+const WIN_LINES = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6],
+];
+
+function checkWinner(board: Mark[]): 'X' | 'O' | 'draw' | null {
+  for (const [a, b, c] of WIN_LINES) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+  }
+  return board.every((cell) => cell !== null) ? 'draw' : null;
+}
 
 export const { registry } = defineRegistry(catalog, {
   components: {
@@ -105,6 +143,132 @@ export const { registry } = defineRegistry(catalog, {
         </fieldset>
       );
     },
+    QuizGrid: ({ props }) => {
+      const { get, set } = useStateStore();
+      const [board, setBoard] = useState<Mark[]>(() => Array<Mark>(9).fill(null));
+      const [activeCell, setActiveCell] = useState<number | null>(null);
+      const [questionIndex, setQuestionIndex] = useState(0);
+      const [winner, setWinner] = useState<'X' | 'O' | 'draw' | null>(null);
+      const [lastResult, setLastResult] = useState<'correct' | 'wrong' | null>(null);
+
+      const questions = props.questions;
+      const currentQuestion = activeCell !== null && questions.length ? questions[questionIndex % questions.length] : null;
+
+      function claimCell(index: number) {
+        if (board[index] || winner || activeCell !== null || !questions.length) return;
+        setActiveCell(index);
+        setLastResult(null);
+      }
+
+      function answer(optionId: string) {
+        if (activeCell === null || !currentQuestion) return;
+        const correct = optionId === currentQuestion.correctOptionId;
+        const mark: Mark = correct ? 'X' : 'O';
+
+        const nextBoard = [...board];
+        nextBoard[activeCell] = mark;
+        setBoard(nextBoard);
+        setActiveCell(null);
+        setQuestionIndex((i) => i + 1);
+        setLastResult(correct ? 'correct' : 'wrong');
+
+        const result = checkWinner(nextBoard);
+        if (result) {
+          setWinner(result);
+          // The one genuinely shared value: ScoreTracker (if the model included
+          // one) reads this same path — proof two independent primitives can
+          // see the same state, not just each own their own island.
+          if (result === 'X') {
+            const current = typeof get('/score') === 'number' ? (get('/score') as number) : 0;
+            set('/score', current + 1);
+          }
+        }
+      }
+
+      function playAgain() {
+        setBoard(Array<Mark>(9).fill(null));
+        setActiveCell(null);
+        setWinner(null);
+        setLastResult(null);
+        // questionIndex keeps advancing rather than resetting, so a replay
+        // doesn't immediately repeat the same first question.
+      }
+
+      return (
+        <div>
+          <div className="grid w-full max-w-[280px] grid-cols-3 gap-1.5">
+            {board.map((mark, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => claimCell(index)}
+                disabled={Boolean(mark) || Boolean(winner) || activeCell !== null}
+                className={cn(
+                  'flex aspect-square items-center justify-center rounded-lg border text-2xl font-bold transition-colors disabled:cursor-default',
+                  mark === 'X' && 'border-primary bg-primary/10 text-primary',
+                  mark === 'O' && 'border-muted-foreground/40 bg-muted text-muted-foreground',
+                  !mark && 'border-input hover:enabled:bg-muted',
+                )}
+              >
+                {mark}
+              </button>
+            ))}
+          </div>
+
+          {currentQuestion && (
+            <div className="mt-3 rounded-lg border border-input p-3">
+              <p className="text-sm font-medium">{currentQuestion.prompt}</p>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {currentQuestion.options.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => answer(option.id)}
+                    className="rounded-lg border border-input px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {lastResult && !currentQuestion && !winner && (
+            <p
+              className={cn(
+                'mt-2 text-xs font-medium',
+                lastResult === 'correct' ? 'text-success' : 'text-destructive',
+              )}
+            >
+              {lastResult === 'correct' ? 'Correct — square claimed!' : 'Not quite — the square goes to the opponent.'}
+            </p>
+          )}
+
+          {winner && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted p-3">
+              <p className="text-sm font-medium">
+                {winner === 'X' ? 'You win! 🎉' : winner === 'O' ? 'The opponent wins this round.' : "It's a draw."}
+              </p>
+              <button
+                type="button"
+                onClick={playAgain}
+                className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+              >
+                Play again
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    },
+    ScoreTracker: ({ props }) => {
+      const score = useStateValue<number>('/score');
+      return (
+        <p className="text-sm font-medium">
+          {props.scoreLabel ?? 'Wins'}: <span className="text-primary">{score ?? 0}</span>
+        </p>
+      );
+    },
   },
 });
 
@@ -146,5 +310,9 @@ function elementProps(element: ComposedElement): Record<string, unknown> {
         options: element.options ?? [],
         correctOptionId: element.correctOptionId ?? '',
       };
+    case 'QuizGrid':
+      return { questions: element.gridQuestions ?? [] };
+    case 'ScoreTracker':
+      return { scoreLabel: element.scoreLabel ?? null };
   }
 }

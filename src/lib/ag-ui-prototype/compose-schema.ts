@@ -21,7 +21,14 @@ import { z } from 'zod';
  * object array too — this follows that same proven shape instead of
  * reaching for a union again.
  */
-const composedElementType = z.enum(['Stack', 'Card', 'Heading', 'Text', 'ChoiceGroup']);
+const composedElementType = z.enum(['Stack', 'Card', 'Heading', 'Text', 'ChoiceGroup', 'QuizGrid', 'ScoreTracker']);
+
+const gridQuestion = z.object({
+  id: z.string(),
+  prompt: z.string(),
+  options: z.array(z.object({ id: z.string(), label: z.string() })).min(2).max(4),
+  correctOptionId: z.string().describe("Must exactly match one of this question's own `options` ids."),
+});
 
 export const composedElement = z.object({
   id: z.string(),
@@ -29,7 +36,9 @@ export const composedElement = z.object({
   children: z
     .array(z.string())
     .nullable()
-    .describe("Child element ids, in order. Only for 'Stack' and 'Card' — null for the other three types."),
+    .describe(
+      "Child element ids, in order. Only for 'Stack' and 'Card' — null for every other type.",
+    ),
   direction: z.enum(['row', 'column']).nullable().describe("Only for 'Stack': row for side-by-side, column for stacked."),
   gap: z.enum(['sm', 'md', 'lg']).nullable().describe("Only for 'Stack': spacing between children."),
   title: z.string().nullable().describe("Only for 'Card': a short heading, or null for none."),
@@ -47,6 +56,19 @@ export const composedElement = z.object({
       "Only for 'ChoiceGroup': 2-5 options, including at least one genuine distractor — never all-obviously-wrong.",
     ),
   correctOptionId: z.string().nullable().describe("Only for 'ChoiceGroup': must exactly match one of `options`' ids."),
+  gridQuestions: z
+    .array(gridQuestion)
+    .min(3)
+    .max(9)
+    .nullable()
+    .describe(
+      "Only for 'QuizGrid': a pool of short questions, one per claimed square (cycles if the board has more" +
+        ' empty squares left than questions supplied). 3-9 questions.',
+    ),
+  scoreLabel: z
+    .string()
+    .nullable()
+    .describe("Only for 'ScoreTracker': what's being counted, e.g. \"Rounds won\"."),
 });
 
 export type ComposedElement = z.infer<typeof composedElement>;
@@ -59,7 +81,7 @@ export const composedWidget = z.object({
 export type ComposedWidget = z.infer<typeof composedWidget>;
 
 const PRIMITIVE_GUIDE = [
-  'You compose a small interactive mini-lesson from exactly five element types — never invent a sixth.',
+  'You compose a small interactive mini-lesson from exactly seven element types — never invent an eighth.',
   'Every element shares the same flat shape; only the fields relevant to its own `type` are non-null — set',
   'every field that does not apply to null, do not omit fields.',
   "'Stack' arranges children in a row or column (uses: children, direction, gap); use it to lay out a Card",
@@ -68,12 +90,19 @@ const PRIMITIVE_GUIDE = [
   'for a section.',
   "'Heading' (uses: headingText, headingLevel) and 'Text' (uses: text) carry the actual teaching: a short",
   "hook or explanation in the topic's own terms, not generic filler.",
-  "'ChoiceGroup' (uses: question, options, correctOptionId) is the one check-for-understanding moment: a",
-  'question, 2-5 options, and which one is correct. Every composition needs exactly one.',
-  'Default to small — one root Card holding a Heading, a sentence or two of Text, and one ChoiceGroup — but',
-  'reach for a row Stack of two side-by-side Cards when the topic genuinely calls for a comparison (two',
-  'processes, two categories, before/after). Every child id referenced anywhere must exist as its own',
-  'element in `elements`.',
+  "'ChoiceGroup' (uses: question, options, correctOptionId) is a single check-for-understanding moment: a",
+  'question, 2-5 options, and which one is correct.',
+  "'QuizGrid' (uses: gridQuestions) is a 3x3 tic-tac-toe-style board where claiming a square means",
+  'answering one of `gridQuestions` correctly — answer right and the square is yours, answer wrong and it',
+  "goes to the opponent. Reach for this when the user explicitly asks for a game, a challenge, or something",
+  "competitive/replayable — it is the single most engaging primitive available, not a default choice.",
+  "'ScoreTracker' (uses: scoreLabel) shows a running count of QuizGrid rounds won — only ever pair it",
+  'alongside a QuizGrid in the same composition, never alone.',
+  'Default to small for a plain explanatory ask — one root Card holding a Heading, a sentence or two of',
+  'Text, and one ChoiceGroup. Reach for a row Stack of two side-by-side Cards when the topic genuinely',
+  'calls for a comparison (two processes, two categories, before/after). Reach for QuizGrid (optionally',
+  'with a ScoreTracker above it) when the ask is playful, game-like, or wants replay value — at most one',
+  'QuizGrid per composition. Every child id referenced anywhere must exist as its own element in `elements`.',
 ].join(' ');
 
 export function composePrompt(topic: string): { system: string; prompt: string } {
@@ -115,6 +144,15 @@ export function validateComposedWidget(widget: ComposedWidget): string | null {
     }
     if (element.type === 'Stack' && (!element.direction || !element.gap)) {
       return `"${element.id}" is a Stack missing direction/gap.`;
+    }
+    if (element.type === 'QuizGrid') {
+      if (!element.gridQuestions) return `"${element.id}" is a QuizGrid missing gridQuestions.`;
+      for (const question of element.gridQuestions) {
+        const optionIds = new Set(question.options.map((option) => option.id));
+        if (!optionIds.has(question.correctOptionId)) {
+          return `"${element.id}"'s question "${question.id}" correctOptionId matches none of its own options.`;
+        }
+      }
     }
   }
 
