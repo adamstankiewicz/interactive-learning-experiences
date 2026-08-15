@@ -139,6 +139,26 @@ const DIRECTION_WORD: Record<Direction, string> = {
   down: 'falls',
 };
 
+/**
+ * Live correctness feedback, on trial.
+ *
+ * Deliberately an experiment: it scores the shape as the student drags,
+ * exactly as the Draft Meter scores prose as they type. The argument against
+ * is that a curve has one right answer where a paragraph has none, so a live
+ * verdict can be brute-forced — wiggle a point, watch the number, stop when it
+ * stops rising — which is the opposite of predicting. Flip this to false to
+ * get the commit-then-reveal version back and compare them directly.
+ */
+const LIVE_FEEDBACK = true;
+
+/** Aggregate only, like the Draft Meter's one line — never which leg is wrong. */
+function matchLabel(matched: number, total: number): string {
+  if (matched === total) return "that's it";
+  if (matched === total - 1) return 'almost there';
+  if (matched === 0) return 'not yet';
+  return 'getting closer';
+}
+
 function describeShape(directions: Direction[], untouched: boolean): string {
   if (untouched) return 'Nothing drawn yet.';
   if (directions.every((d) => d === 'flat')) return 'Your line is flat all the way across.';
@@ -466,13 +486,43 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
         Naming your own curve is most of the skill being taught anyway.
       */}
       {!revealed && (
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <p aria-live="polite" className="text-sm font-medium text-foreground">
-            {describeShape(segments.map((s) => s.mine), untouched)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Drag each point, or tab to one and use the arrow keys.
-          </p>
+        <div className="flex flex-col gap-2">
+          {/* The Draft Meter's row, transplanted: one track, one warm label, and
+              no per-part breakdown. Live from the first drag. */}
+          {LIVE_FEEDBACK && !untouched && (
+            <div className="flex items-center gap-3.5">
+              <div className="relative h-2 flex-1 rounded-full bg-muted">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-500 ease-[cubic-bezier(.22,1,.36,1)] ${
+                    allRight ? 'bg-success' : 'bg-primary'
+                  }`}
+                  style={{
+                    width: `${Math.max(4, ((segments.length - wrongSegments) / segments.length) * 100)}%`,
+                  }}
+                />
+              </div>
+              <span
+                aria-live="polite"
+                className={`w-[104px] shrink-0 text-right text-xs font-semibold transition-colors ${
+                  allRight ? 'text-success' : 'text-muted-foreground'
+                }`}
+              >
+                {matchLabel(segments.length - wrongSegments, segments.length)}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <p
+              aria-live={LIVE_FEEDBACK ? 'off' : 'polite'}
+              className="text-sm font-medium text-foreground"
+            >
+              {describeShape(segments.map((s) => s.mine), untouched)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Drag each point, or tab to one and use the arrow keys.
+            </p>
+          </div>
         </div>
       )}
 
