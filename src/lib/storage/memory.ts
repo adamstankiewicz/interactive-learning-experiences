@@ -56,10 +56,16 @@ type MemoryStore = {
 const globalStore = globalThis as typeof globalThis & { __pathwayMemoryStore?: MemoryStore };
 
 if (!globalStore.__pathwayMemoryStore) {
+  // Opt-in, not automatic. This adapter is the fallback whenever Supabase is
+  // unconfigured, and `GET /api/roster` is unauthenticated — so seeding by
+  // default meant a misconfigured deployment served a roster of learner
+  // profiles to anyone who asked.
   const seededRosterStudents = new Map<string, RosterStudent>();
-  for (const s of SEED_STUDENTS) {
-    const id = randomUUID();
-    seededRosterStudents.set(id, { ...s, id });
+  if (process.env.SEED_DEMO_ROSTER === '1') {
+    for (const s of SEED_STUDENTS) {
+      const id = randomUUID();
+      seededRosterStudents.set(id, { ...s, id });
+    }
   }
 
   globalStore.__pathwayMemoryStore = {
@@ -228,7 +234,12 @@ export const memoryStorageAdapter: StorageAdapter = {
   },
 
   async listAssignmentsForStudent(rosterStudentId) {
-    return assignments.filter((a) => a.rosterStudentId === rosterStudentId);
+    // Newest first, matching the Supabase adapter's `order('created_at', desc)`.
+    // StudentHomepage renders this list directly, so insertion order here meant
+    // the student saw their pathways reversed depending on the backend.
+    return assignments
+      .filter((a) => a.rosterStudentId === rosterStudentId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
   async listAssignmentsForSession(sessionId) {
