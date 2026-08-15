@@ -45,3 +45,6 @@ next-env.d.ts
 
 # ...except the template, which is meant to be committed.
 !.env.example
+
+# built widget shell — run `pnpm build && node mcp/build.mjs`
+mcp/dist/

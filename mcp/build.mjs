@@ -1,0 +1,87 @@
+/**
+ * Bundle the widget shell into a single self-contained HTML file.
+ *
+ * That file is what an MCP host renders: a sandboxed iframe has no access to
+ * our stylesheet or our JS chunks, so everything has to be inlined.
+ *
+ * The CSS is lifted from the Next production build rather than compiled by a
+ * second Tailwind pipeline. It carries some classes the widgets never use,
+ * which costs a few KB and saves an entire build setup.
+ *
+ *   pnpm build && node mcp/build.mjs
+ */
+import { build } from 'esbuild';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const outDir = join(root, 'mcp', 'dist');
+mkdirSync(outDir, { recursive: true });
+
+const result = await build({
+  entryPoints: [join(root, 'mcp', 'shell.tsx')],
+  bundle: true,
+  format: 'iife',
+  jsx: 'automatic',
+  minify: true,
+  write: false,
+  tsconfig: join(root, 'tsconfig.json'),
+  define: { 'process.env.NODE_ENV': '"production"' },
+  loader: { '.css': 'empty' },
+  logLevel: 'error',
+});
+
+const js = result.outputFiles[0].text;
+
+// Turbopack emits app CSS under static/chunks, not static/css.
+const cssDir = join(root, '.next', 'static', 'chunks');
+const cssFiles = readdirSync(cssDir).filter((f) => f.endsWith('.css'));
+if (!cssFiles.length) throw new Error('No compiled CSS found — run `pnpm build` first.');
+const css = cssFiles.map((f) => readFileSync(join(cssDir, f), 'utf8')).join('\n');
+
+/** Renders standalone in a browser; an MCP host will supply the spec instead. */
+const DEMO_SPEC = {
+  kind: 'draft-meter',
+  learningComponentId: null,
+  question: 'Does this argument hold up? Say what you think — and point to what in the editorial makes you say so.',
+  placeholder: 'The editorial says…',
+  standardCode: 'RI.8.8',
+  standardDescription:
+    'Delineate and evaluate the argument and specific claims in a text, assessing whether the reasoning is sound and the evidence is relevant and sufficient.',
+  standardForStudents:
+    'You’re judging someone else’s argument. Say whether it holds up, point at a specific bit of the editorial, and explain why that bit does or doesn’t prove their point.',
+  passage: {
+    source: 'School newspaper editorial',
+    text: 'Phones should be banned from every classroom in this school. Last year, test scores in Ms. Alvarez’s class dropped by six points. A study of one thousand adults found that most people check their phones over eighty times a day. Clearly, phones are the reason our school is struggling.',
+  },
+  checks: [
+    { id: 'position', label: 'a position', lookFor: 'Says whether the argument holds up.', essential: false },
+    { id: 'source', label: 'evidence from the text', lookFor: 'Points at a specific claim in the editorial.', essential: false },
+    { id: 'why', label: 'why it does or does not fit', lookFor: 'Explains whether that evidence is relevant and sufficient.', essential: false },
+  ],
+};
+
+const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget shell</title>
+<style>${css}</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  // A host will replace this. Standalone, it is what makes the file openable.
+  window.__WIDGET_SPEC__ = ${JSON.stringify(DEMO_SPEC)};
+  window.__API_ORIGIN__ = window.__API_ORIGIN__ || 'http://localhost:3100';
+</script>
+<script>${js}</script>
+</body>
+</html>
+`;
+
+const out = join(outDir, 'widget-shell.html');
+writeFileSync(out, html);
+console.log(`${out}  ${(html.length / 1024).toFixed(0)} KB  (js ${(js.length / 1024).toFixed(0)} KB, css ${(css.length / 1024).toFixed(0)} KB)`);
