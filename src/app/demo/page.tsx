@@ -39,6 +39,13 @@ const WIDGETS = [
     tags: ['error analysis', 'any subject', 'metacognition'],
   },
   {
+    slug: 'defend-claim',
+    name: 'Defend a Claim',
+    description:
+      'Take a side on a contestable historical claim, defend it from two conflicting sources, then request feedback and revise. Every reading answers with a counterargument. Typed or dictated. History, grade 7+.',
+    tags: ['history', 'argument', 'voice', 'revision'],
+  },
+  {
     slug: 'timeline-builder',
     name: 'Timeline Builder',
     description:

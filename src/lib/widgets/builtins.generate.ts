@@ -6,6 +6,7 @@
 import '@/lib/widgets/definitions/fraction-area-model.generate';
 import '@/lib/widgets/definitions/swiper-flashcard.generate';
 import '@/lib/widgets/definitions/draft-meter.generate';
+import '@/lib/widgets/definitions/defend-claim.generate';
 import '@/lib/widgets/definitions/drag-sort.generate';
 import '@/lib/widgets/definitions/drag-categorize.generate';
 import '@/lib/widgets/definitions/crossword.generate';
