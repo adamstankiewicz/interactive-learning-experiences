@@ -9,12 +9,13 @@ registerWidgetCatalog<DraftMeterSpec>({
   kind: 'draft-meter',
   schema: draftMeterSpec,
   component: DraftMeter,
-  // Content tag alone isn't enough: abstract argumentative writing with citation
-  // isn't a K-2 task regardless of which writing/reading-evidence standard it's
-  // serving, so this also gates on grade — not just `coverage.ts`'s old regex-only check.
+  // `written-response` rather than the old argument-only pair: the meter now
+  // carries the checks its own standard asks for, so it is no longer limited to
+  // standards about argument. Content tag alone still isn't enough — writing a
+  // few analytical sentences isn't a K-2 task whichever standard it serves — so
+  // this gates on grade too.
   coverageRule: (standard) =>
-    (standard.tags.includes('writing-argument') || standard.tags.includes('reading-evidence')) &&
-    reachesGrade(standard.gradeLevels, MIN_GRADE),
+    standard.tags.includes('written-response') && reachesGrade(standard.gradeLevels, MIN_GRADE),
   plannerDescription:
-    'A short written-argument prompt, live-scored as the student types. Only for standards about writing an argument or citing textual evidence — meaningless for any other standard, and the heaviest interaction, so use it for at most one step in a pathway.',
+    'A short written response, live-scored as the student types against the three things this standard actually asks for — a claim and evidence, an interpretation and textual support, whatever fits. Good for reading comprehension, literary analysis, history sources and argument alike. Needs a standard where a few sentences of student writing is the natural evidence, and it is the heaviest interaction, so use it for at most one step in a pathway.',
 });
