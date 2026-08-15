@@ -35,8 +35,23 @@ const H = 330;
  */
 const PAD = { top: 24, right: 24, bottom: 52, left: 76 };
 
-/** Everyone starts flat down the middle, so any shape is a deliberate move. */
-const START_VALUE = 50;
+/**
+ * Everyone starts flat along the bottom.
+ *
+ * Starting mid-chart was meant to leave room to drag either way, but it reads
+ * as a line that already means something — a first look sees a drawn curve
+ * rather than an empty chart waiting to be filled. On the floor it is
+ * unmistakably nothing yet, and any shape at all is a deliberate move.
+ */
+const START_VALUE = 0;
+
+/**
+ * Mid-chart, used only where a value is genuinely unknown — a spec missing a
+ * point, or a pointer event arriving before the svg ref is set. Distinct from
+ * START_VALUE now that the student's floor is 0: falling back to the floor
+ * would silently drag a point down rather than leave it be.
+ */
+const NEUTRAL_VALUE = 50;
 
 /**
  * Below this, a segment counts as flat rather than rising or falling. Without
@@ -124,7 +139,8 @@ const DIRECTION_WORD: Record<Direction, string> = {
   down: 'falls',
 };
 
-function describeShape(directions: Direction[]): string {
+function describeShape(directions: Direction[], untouched: boolean): string {
+  if (untouched) return 'Nothing drawn yet.';
   if (directions.every((d) => d === 'flat')) return 'Your line is flat all the way across.';
 
   // Collapse runs, so four rising segments read as one climb rather than four.
@@ -143,7 +159,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
     () =>
       points.map((p) => {
         const match = spec.actual.find((a) => a.pointId === p.id);
-        return Math.min(100, Math.max(0, match?.value ?? START_VALUE));
+        return Math.min(100, Math.max(0, match?.value ?? NEUTRAL_VALUE));
       }),
     [points, spec.actual],
   );
@@ -193,7 +209,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   /** Pointer y -> chart value, in viewBox space rather than screen pixels. */
   const valueFromClientY = useCallback((clientY: number) => {
     const svg = svgRef.current;
-    if (!svg) return START_VALUE;
+    if (!svg) return NEUTRAL_VALUE;
     const rect = svg.getBoundingClientRect();
     const yInView = ((clientY - rect.top) / rect.height) * H;
     return ((PAD.top + plotH - yInView) / plotH) * 100;
@@ -452,7 +468,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
       {!revealed && (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <p aria-live="polite" className="text-sm font-medium text-foreground">
-            {describeShape(segments.map((s) => s.mine))}
+            {describeShape(segments.map((s) => s.mine), untouched)}
           </p>
           <p className="text-xs text-muted-foreground">
             Drag each point, or tab to one and use the arrow keys.
