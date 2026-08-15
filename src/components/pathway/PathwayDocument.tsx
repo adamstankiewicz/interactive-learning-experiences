@@ -395,7 +395,7 @@ function StepCard({
       {(widget || pending || note) && (
         <div className={cn('border-t border-border bg-muted/30 px-4 py-4', 'sm:pl-24')}>
           {widget ? (
-            <WidgetRenderer spec={widget} />
+            <WidgetRenderer key={state.stepWidgetSeq[index] ?? 0} spec={widget} />
           ) : pending ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Sparkles className="size-3.5 animate-pulse" aria-hidden />

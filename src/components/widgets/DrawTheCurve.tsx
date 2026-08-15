@@ -154,8 +154,10 @@ const LIVE_FEEDBACK = true;
 /** Aggregate only, like the Draft Meter's one line — never which leg is wrong. */
 function matchLabel(matched: number, total: number): string {
   if (matched === total) return "that's it";
-  if (matched === total - 1) return 'almost there';
+  // Before the total-1 check: with a single segment, nothing matched is also
+  // one short of everything, and "almost there" for a wholly wrong answer lies.
   if (matched === 0) return 'not yet';
+  if (matched === total - 1) return 'almost there';
   return 'getting closer';
 }
 
@@ -185,6 +187,9 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   );
 
   const [values, setValues] = useState<number[]>(() => points.map(() => START_VALUE));
+  // Tracked rather than inferred from `values`: the floor is a legitimate
+  // answer, so a student who drags a point back down to it has still drawn.
+  const [touched, setTouched] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -217,9 +222,15 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   const setValue = useCallback(
     (index: number, value: number) => {
       if (revealed) return;
+      setTouched(true);
       setValues((prev) => {
+        const clamped = Math.min(100, Math.max(0, Math.round(value)));
+        // pointermove fires far faster than the value changes - while clamped
+        // at either edge, or moving horizontally, every event would otherwise
+        // allocate a new array and re-render the whole chart to no effect.
+        if (prev[index] === clamped) return prev;
         const next = [...prev];
-        next[index] = Math.min(100, Math.max(0, Math.round(value)));
+        next[index] = clamped;
         return next;
       });
     },
@@ -264,7 +275,9 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
     [points, values, actual],
   );
   const wrongSegments = segments.filter((s) => s.mine !== s.theirs).length;
-  const allRight = wrongSegments === 0;
+  // A chart with no segments has nothing to get right, so it must not report
+  // success — `wrongSegments === 0` alone is vacuously true there.
+  const allRight = segments.length > 0 && wrongSegments === 0;
 
   const commit = useCallback(() => {
     setRevealed(true);
@@ -306,10 +319,11 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   const reset = useCallback(() => {
     setValues(points.map(() => START_VALUE));
     setRevealed(false);
+    setTouched(false);
   }, [points]);
 
   const legs = (vals: number[]) => curveSegments(vals.map((v, i) => ({ x: xOf(i), y: yOf(v) })));
-  const untouched = values.every((v) => v === START_VALUE);
+  const untouched = !touched;
 
   return (
     <div className="flex flex-col gap-4">
@@ -489,7 +503,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
         <div className="flex flex-col gap-2">
           {/* The Draft Meter's row, transplanted: one track, one warm label, and
               no per-part breakdown. Live from the first drag. */}
-          {LIVE_FEEDBACK && !untouched && (
+          {LIVE_FEEDBACK && !untouched && segments.length > 0 && (
             <div className="flex items-center gap-3.5">
               <div className="relative h-2 flex-1 rounded-full bg-muted">
                 <div

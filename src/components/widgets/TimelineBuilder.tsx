@@ -110,7 +110,7 @@ function TimelineZone({
   isLast: boolean;
   isKeyboardTarget: boolean;
   onKeyboardDrop: (zoneId: string) => void;
-  dropTargetRef?: React.RefObject<HTMLDivElement | null>;
+  dropTargetRef?: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({ id: zone.id });
@@ -136,7 +136,7 @@ function TimelineZone({
       <div
         ref={(el) => {
           setNodeRef(el);
-          if (dropTargetRef) (dropTargetRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+          dropTargetRef?.(el);
         }}
         role={isKeyboardTarget ? 'button' : undefined}
         tabIndex={isKeyboardTarget ? 0 : undefined}
@@ -187,6 +187,10 @@ export function TimelineBuilder({ spec, onComplete }: { spec: TimelineBuilderSpe
 
   const announce = useCallback((msg: string) => {
     if (announcerRef.current) announcerRef.current.textContent = msg;
+  }, []);
+
+  const setFirstZoneRef = useCallback((el: HTMLDivElement | null) => {
+    firstZoneRef.current = el;
   }, []);
 
 const sensors = useSensors(useSensor(PointerSensor));
@@ -316,7 +320,7 @@ const sensors = useSensors(useSensor(PointerSensor));
 
       {isKeyboardMode && (
         <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary font-medium" aria-hidden="true">
-          "{spec.events.find((e) => e.id === selectedEventId)?.label}" selected — click a zone below to place it, or press Escape to cancel.
+          &ldquo;{spec.events.find((e) => e.id === selectedEventId)?.label}&rdquo; selected — click a zone below to place it, or press Escape to cancel.
         </p>
       )}
 
@@ -396,7 +400,7 @@ const sensors = useSensors(useSensor(PointerSensor));
                 isLast={i === spec.zones.length - 1}
                 isKeyboardTarget={isKeyboardMode}
                 onKeyboardDrop={handleKeyboardDrop}
-                dropTargetRef={i === 0 ? firstZoneRef : undefined}
+                dropTargetRef={i === 0 ? setFirstZoneRef : undefined}
               >
                 {zoneEvents.map((event) => (
                   <DraggableEvent
