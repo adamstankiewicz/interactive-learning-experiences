@@ -40,10 +40,20 @@ export type ProgressionStandard = {
 /** The server returns `isError: true` for "not found", which is a normal outcome here. */
 class ToolMiss extends Error {}
 
-async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+/**
+ * One connection, reused across calls. Every call used to build a transport,
+ * run the MCP `initialize` handshake, then close again — measured at ~565ms
+ * per call against the live graph, and a pathway makes about six of them, so
+ * the handshake was most of that time and none of it was useful work.
+ */
+let connection: Promise<Client> | null = null;
+
+function connect(): Promise<Client> {
   const apiKey = process.env.LEARNING_COMMONS_API_KEY;
   if (!apiKey) {
-    throw new Error('LEARNING_COMMONS_API_KEY is not set. Copy .env.example to .env.local.');
+    return Promise.reject(
+      new Error('LEARNING_COMMONS_API_KEY is not set. Copy .env.example to .env.local.'),
+    );
   }
 
   const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
@@ -51,11 +61,29 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   });
   const client = new Client({ name: 'interactive-student-experiences', version: '0.1.0' });
 
-  await client.connect(transport);
+  return client.connect(transport).then(() => client);
+}
+
+async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  connection ??= connect();
+
+  let client: Client;
+  try {
+    client = await connection;
+  } catch (error) {
+    connection = null; // never cache a failed handshake
+    throw error;
+  }
+
   try {
     return await fn(client);
-  } finally {
-    await client.close();
+  } catch (error) {
+    // A ToolMiss is a normal "not found" answer over a healthy connection.
+    // Anything else may mean the transport is gone, so drop the cached
+    // connection and let the next call reconnect. The client is not closed
+    // here: concurrent callers may still be holding it.
+    if (!(error instanceof ToolMiss)) connection = null;
+    throw error;
   }
 }
 
