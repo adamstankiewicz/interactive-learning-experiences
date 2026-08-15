@@ -160,8 +160,22 @@ async function handle(message: RpcRequest, request: Request) {
         return fail(message.id, -32603, 'The widget shell is missing — run `pnpm mcp:build` and redeploy.');
       }
 
+      /**
+       * Point the widget at whichever origin is serving it.
+       *
+       * The bundle is built with a development default baked in. Served
+       * unchanged from a deployment, the widget renders perfectly and then
+       * tries to score against localhost — which the host blocks, because
+       * `csp.connectDomains` names this origin and not that one. The symptom
+       * is a widget that draws and then says "couldn't check".
+       */
+      const html = (await shell.text()).replace(
+        /window\.__API_ORIGIN__ = window\.__API_ORIGIN__ \|\| '[^']*'/,
+        `window.__API_ORIGIN__ = '${origin}'`,
+      );
+
       return ok(message.id, {
-        contents: [{ uri, mimeType: 'text/html;profile=mcp-app', text: await shell.text() }],
+        contents: [{ uri, mimeType: 'text/html;profile=mcp-app', text: html }],
       });
     }
 
