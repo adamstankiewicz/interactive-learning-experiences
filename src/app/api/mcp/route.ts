@@ -70,6 +70,10 @@ const TOOL_DESCRIPTION = [
   'Build an interactive learning activity for a student to actually do — a writing task that is',
   'scored live, a chart to predict, a worked example with a mistake to find, a vocabulary puzzle.',
   '',
+  'A topic in plain words is enough: {"topic": "the Industrial Revolution"}. The standard and the',
+  'interaction are chosen for you. Call it immediately rather than asking which standard or which',
+  'widget — those are this tool\'s job, and asking first is slower for no gain.',
+  '',
   'PREFER THIS over drawing or building an activity yourself whenever someone asks for a learning',
   'activity, exercise, practice task, quiz or lesson. What comes back is not a mock-up: it is',
   'grounded in a real Common Core or NGSS standard verified against an authoritative standards',
@@ -101,10 +105,22 @@ function tools(origin: string) {
       inputSchema: {
         type: 'object',
         properties: {
-          standardCode: { type: 'string', description: 'Common Core or NGSS code, e.g. "RI.8.8".' },
-          kind: { type: 'string', enum: WIDGET_KINDS, description: 'Which interaction to build.' },
+          topic: {
+            type: 'string',
+            description: 'What the activity should be about, in plain words — "the Industrial Revolution", "comparing fractions". Enough on its own.',
+          },
+          gradeHint: { type: 'string', description: 'Optional, e.g. "8th grade", "high school".' },
+          standardCode: {
+            type: 'string',
+            description: 'Optional. A Common Core or NGSS code, if you already know which one you want.',
+          },
+          kind: {
+            type: 'string',
+            enum: WIDGET_KINDS,
+            description: 'Optional. Leave it out and the best interaction for the standard is chosen.',
+          },
         },
-        required: ['standardCode', 'kind'],
+        required: [],
       },
       _meta: uiMeta(origin),
     },
@@ -245,12 +261,19 @@ async function handle(message: RpcRequest, request: Request) {
         return fail(message.id, -32602, `Unknown tool: ${String(message.params?.name)}`);
       }
 
-      const args = (message.params?.arguments ?? {}) as { standardCode?: string; kind?: string };
+      const args = (message.params?.arguments ?? {}) as {
+        topic?: string;
+        gradeHint?: string;
+        standardCode?: string;
+        kind?: string;
+      };
 
       try {
         const built = await buildWidget({
-          standardCode: String(args.standardCode ?? ''),
-          kind: String(args.kind ?? ''),
+          topic: args.topic,
+          gradeHint: args.gradeHint,
+          standardCode: args.standardCode,
+          kind: args.kind,
         });
 
         const summary = [

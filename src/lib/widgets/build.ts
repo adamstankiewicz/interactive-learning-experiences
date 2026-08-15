@@ -1,7 +1,10 @@
+import { z } from 'zod';
+
 import type { Anchor } from '@/lib/pathway/events';
 import { generateStepWidget } from '@/lib/pathway/generate';
 import { widgetKind, type PathwayPlan, type WidgetSpec } from '@/lib/pathway/schema';
 import { sourceById, verifyAcrossSources } from '@/lib/standards';
+import { generateStructured } from '@/lib/structured';
 import type { StandardRef } from '@/lib/standards/types';
 
 /**
@@ -62,21 +65,74 @@ function syntheticPlan(anchor: Anchor, kind: (typeof WIDGET_KINDS)[number]): Pat
   };
 }
 
+/**
+ * Turn a plain topic into a standard and an interaction.
+ *
+ * Everything a caller must decide before it can ask for an activity is a
+ * reason not to ask. Requiring both a standard code and a widget kind was
+ * enough friction that a model with a general-purpose alternative would often
+ * reach for that instead — so both are optional, and this fills the gap.
+ *
+ * Same shape as stage 1 of the pathway pipeline: guesses are cheap because the
+ * graph rejects the ones that do not exist.
+ */
+async function proposeFor(topic: string, gradeHint?: string) {
+  const proposal = await generateStructured({
+    schema: z.object({
+      candidates: z
+        .array(z.string())
+        .describe('2-4 standard codes, best first, in official notation — "RI.8.8", "MS-PS1-1".'),
+      kind: z.enum(WIDGET_KINDS).describe('The interaction that best suits this topic.'),
+    }),
+    system: [
+      'You map a teaching topic to a Common Core or NGSS standard and the interaction that best',
+      'teaches it. Propose codes in official notation only. A wrong guess is cheap — every code is',
+      'verified against an authoritative graph before use.',
+      'Match the interaction to the work: writing tasks for argument standards, find-the-flaw where',
+      'a worked example can contain a mistake, draw-the-curve where something changes over time,',
+      'crossword for vocabulary consolidation.',
+    ].join(' '),
+    prompt: gradeHint ? `Topic: ${topic}\nGrade: ${gradeHint}` : `Topic: ${topic}`,
+  });
+
+  return proposal;
+}
+
 export async function buildWidget(input: {
-  standardCode: string;
-  kind: string;
+  standardCode?: string;
+  kind?: string;
+  topic?: string;
+  gradeHint?: string;
   jurisdiction?: string;
 }): Promise<BuiltWidget> {
-  const standardCode = input.standardCode.trim();
-  if (!standardCode) throw new WidgetBuildError('A standardCode is required.', 400);
+  let standardCode = input.standardCode?.trim() ?? '';
+  let kind = input.kind ?? '';
+  let fallbackCodes: string[] = [];
 
-  const parsedKind = widgetKind.safeParse(input.kind);
+  if (!standardCode || !kind) {
+    if (!input.topic?.trim() && !standardCode) {
+      throw new WidgetBuildError('Give either a standardCode or a topic.', 400);
+    }
+
+    const proposal = await proposeFor(input.topic ?? standardCode, input.gradeHint);
+    if (!standardCode) {
+      [standardCode = '', ...fallbackCodes] = proposal.candidates;
+    }
+    if (!kind) kind = proposal.kind;
+  }
+
+  const parsedKind = widgetKind.safeParse(kind);
   if (!parsedKind.success) {
     throw new WidgetBuildError(`Unknown widget kind. Known kinds: ${WIDGET_KINDS.join(', ')}.`, 400);
   }
 
-  // The graph still decides whether the code exists, exactly as in the pipeline.
-  const standard = await verifyAcrossSources(standardCode, input.jurisdiction);
+  // The graph still decides whether a code exists, exactly as in the pipeline.
+  let standard = await verifyAcrossSources(standardCode, input.jurisdiction);
+  for (const candidate of fallbackCodes) {
+    if (standard) break;
+    standard = await verifyAcrossSources(candidate, input.jurisdiction);
+  }
+
   if (!standard) {
     throw new WidgetBuildError(`"${standardCode}" did not resolve against any standards source.`, 404);
   }
