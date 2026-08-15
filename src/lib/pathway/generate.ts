@@ -330,8 +330,14 @@ async function attemptStepWidget(
     fallbackNote = fallback.note;
   }
 
+  // The fallback is the last net, so nothing downstream can render a null. This
+  // throws into `generateStepWidget`'s retry rather than casting the null away.
+  if (!widget) {
+    throw new Error(`Fallback "${fallbackWidgetKind()}" produced no widget for step "${step.title}".`);
+  }
+
   return {
-    widget: widget as WidgetSpec,
+    widget,
     note: [substitutionNote, result.note, fallbackNote].filter(Boolean).join(' ') || null,
   };
 }

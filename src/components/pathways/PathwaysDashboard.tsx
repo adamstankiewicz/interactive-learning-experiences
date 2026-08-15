@@ -81,7 +81,10 @@ export function PathwaysDashboard() {
 
   useEffect(() => {
     fetch('/api/pathway/sessions?limit=50')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`sessions responded ${r.status}`);
+        return r.json();
+      })
       .then(setSessions)
       .catch(() => setError('Failed to load pathways.'));
   }, []);
