@@ -78,8 +78,9 @@ export function NarratedCard({ spec, onComplete }: Props) {
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const stoppedRef = useRef(false);
 
-  const currentStep = spec.steps[stepIndex]!;
-  const isLastStep = stepIndex === spec.steps.length - 1;
+  // Narration is self-referential: finishing a step schedules the next one.
+  // Reached through a ref so the callback does not have to depend on itself.
+  const speakStepRef = useRef<((sIdx: number) => void) | null>(null);
 
   // Cancel any ongoing speech and clean up
   const stopSpeech = useCallback(() => {
@@ -129,7 +130,7 @@ export function NarratedCard({ spec, onComplete }: Props) {
               setStepIndex(sIdx + 1);
               setActiveSentence(-1);
               setRevealedSentences(0);
-              speakStep(sIdx + 1);
+              speakStepRef.current?.(sIdx + 1);
             }, 600);
           } else {
             // All steps done
@@ -140,8 +141,11 @@ export function NarratedCard({ spec, onComplete }: Props) {
 
       window.speechSynthesis.speak(utterance);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec.steps]);
+
+  useEffect(() => {
+    speakStepRef.current = speakStep;
+  }, [speakStep]);
 
   const handlePlayPause = useCallback(() => {
     if (!window.speechSynthesis) return;

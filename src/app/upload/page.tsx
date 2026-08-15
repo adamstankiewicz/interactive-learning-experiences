@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/pathway/ThemeToggle';
@@ -19,6 +20,7 @@ type UploadResponse = {
 };
 
 export default function UploadPage() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResponse | null>(null);
@@ -67,7 +69,7 @@ export default function UploadPage() {
       topic,
       grade: gradeLevel,
     });
-    window.location.href = `/?${params.toString()}`;
+    router.push(`/?${params.toString()}`);
   };
 
   return (
