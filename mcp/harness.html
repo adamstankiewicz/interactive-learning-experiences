@@ -56,6 +56,29 @@ const SPEC = {
 
 const send = (msg) => { line('out', '→ host', msg); frame.contentWindow.postMessage(msg, '*'); };
 
+/**
+ * ?kind=draw-the-curve&code=RH.6-8.7 builds a real spec through the app
+ * instead of using the built-in draft-meter one — the fastest way to check a
+ * newly added widget renders in the bundle before trying it in Claude.
+ */
+let spec = SPEC;
+const params = new URLSearchParams(location.search);
+const wanted = params.get('kind');
+
+async function resolveSpec() {
+  if (!wanted) return;
+  line('out', `(fetching a ${wanted} spec from the app…)`);
+  const res = await fetch('http://localhost:3100/api/widget', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ standardCode: params.get('code') || 'RI.8.8', kind: wanted }),
+  });
+  const data = await res.json();
+  if (data.widget) { spec = data.widget; line('out', `(got ${data.widget.kind})`); }
+  else line('err', '(failed)', data);
+}
+const ready = resolveSpec();
+
 window.addEventListener('message', (event) => {
   const m = event.data;
   if (!m || typeof m !== 'object') return;
@@ -84,14 +107,13 @@ window.addEventListener('message', (event) => {
   // Once the view says it is ready, hand it the tool result — this is the
   // moment the spec actually reaches the widget.
   if (m.method === 'ui/notifications/initialized') {
-    send({
-      jsonrpc: '2.0',
-      method: 'ui/notifications/tool-result',
-      params: {
-        toolName: 'show_draft_meter',
-        result: { structuredContent: { spec: SPEC } },
-      },
-    });
+    void ready.then(() =>
+      send({
+        jsonrpc: '2.0',
+        method: 'ui/notifications/tool-result',
+        params: { toolName: 'show_widget', result: { structuredContent: { spec } } },
+      }),
+    );
   }
 
   if (m.id !== undefined && m.method === 'ui/update-model-context') {

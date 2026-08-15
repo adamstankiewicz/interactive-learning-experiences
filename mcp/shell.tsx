@@ -51,6 +51,8 @@ installApiShim(window.__API_ORIGIN__ ?? 'http://localhost:3000');
 /**
  * Find a widget spec anywhere in a message from the host.
  *
+ * A spec is anything carrying a `kind` the registry knows.
+ *
  * The MCP Apps lifecycle delivers tool results to the view, but the exact
  * envelope is host-specific and this is the first time we have seen Claude's.
  * So rather than guess at a path, walk the payload for the first object that
@@ -61,7 +63,11 @@ function findSpec(value: unknown, depth = 0): unknown {
   if (!value || typeof value !== 'object' || depth > 6) return null;
 
   const node = value as Record<string, unknown>;
-  if (typeof node.kind === 'string' && ('question' in node || 'prompt' in node || 'cards' in node)) {
+  // Ask the registry rather than sniffing for fields. The previous version
+  // matched on question/prompt/cards, which were the fields the three widgets
+  // that existed at the time happened to have — every widget added since was
+  // silently ignored, and the view kept rendering its fallback.
+  if (typeof node.kind === 'string' && getWidgetCatalogEntry(node.kind)) {
     return node;
   }
 

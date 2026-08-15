@@ -2,7 +2,7 @@
   "name": "interactive-student-experiences",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
+  "description": "AI-authored, standards-grounded interactive learning pathways \u2014 self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +12,9 @@
     "db:stop": "supabase stop",
     "db:status": "supabase status",
     "db:reset": "supabase db reset",
-    "db:migrate": "supabase migration up"
+    "db:migrate": "supabase migration up",
+    "mcp:build": "next build && node mcp/build.mjs",
+    "mcp:serve": "node mcp/server-http.mjs"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.55",

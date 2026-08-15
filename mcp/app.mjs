@@ -8,7 +8,7 @@
  * whether that is the reason.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -16,6 +16,33 @@ import { z } from 'zod';
 const root = dirname(fileURLToPath(import.meta.url));
 const SHELL_URI = 'ui://widget/learning-widget.html';
 const API_ORIGIN = process.env.WIDGET_API_ORIGIN ?? 'http://localhost:3100';
+
+/**
+ * The bundle is a build artifact, and a stale one fails in the worst way: the
+ * spec generates fine, the widget renders "No renderer registered for kind X",
+ * and nothing anywhere says the real problem is that nobody re-ran the build
+ * after adding a widget. Caught once already; this makes it say so.
+ */
+function warnIfStale() {
+  const bundle = join(root, 'dist', 'widget-shell.html');
+  if (!existsSync(bundle)) {
+    console.error('[mcp] mcp/dist/widget-shell.html is missing — run: pnpm build && node mcp/build.mjs');
+    return;
+  }
+
+  const built = statSync(bundle).mtimeMs;
+  const definitions = join(root, '..', 'src', 'lib', 'widgets', 'definitions');
+  const newest = Math.max(
+    ...readdirSync(definitions).map((f) => statSync(join(definitions, f)).mtimeMs),
+  );
+
+  if (newest > built) {
+    console.error(
+      '[mcp] WARNING: widget definitions are newer than the bundle. Widgets added since the last\n' +
+        '      build will render as "No renderer registered". Fix: pnpm build && node mcp/build.mjs',
+    );
+  }
+}
 
 function shellHtml() {
   const html = readFileSync(join(root, 'dist', 'widget-shell.html'), 'utf8');
@@ -25,6 +52,8 @@ function shellHtml() {
 }
 
 export function createServer() {
+  warnIfStale();
+
   const server = new McpServer({ name: 'interactive-learning-widgets', version: '0.1.0' });
 
 /**
