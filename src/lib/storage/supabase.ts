@@ -314,6 +314,29 @@ export const supabaseStorageAdapter: StorageAdapter = {
     return (data ?? []).map(rowToAssignment);
   },
 
+  async insertRemediationWidget(sessionId, insertAt, widget) {
+    if (!supabaseConfigured()) return;
+    const db = supabaseAdmin();
+
+    const { data, error } = await db
+      .from('pathway_sessions')
+      .select('step_widgets')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    const existing: Record<string, unknown> = (data.step_widgets as Record<string, unknown>) ?? {};
+    const shifted: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(existing)) {
+      const idx = Number(key);
+      shifted[String(idx >= insertAt ? idx + 1 : idx)] = val;
+    }
+    shifted[String(insertAt)] = widget;
+
+    await db.from('pathway_sessions').update({ step_widgets: shifted }).eq('id', sessionId);
+  },
+
   async listSessions(limit = 50): Promise<SessionSummary[]> {
     if (!supabaseConfigured()) return [];
 

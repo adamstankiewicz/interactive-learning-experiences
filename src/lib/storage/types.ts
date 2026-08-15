@@ -151,6 +151,14 @@ export interface StorageAdapter {
   /** All assignments where parentSessionId matches — the personalized child sessions of a parent. */
   listChildAssignments(parentSessionId: string): Promise<Assignment[]>;
 
+  /**
+   * Atomically insert a remediation widget at `insertAt`, shifting every
+   * existing widget at that index or later up by one. The plan steps list is
+   * not touched — `stepWidgets` can legally have more keys than `steps.length`
+   * once remediation kicks in.
+   */
+  insertRemediationWidget(sessionId: string, insertAt: number, widget: unknown): Promise<void>;
+
   // Pathway dashboard
   listSessions(limit?: number): Promise<SessionSummary[]>;
   sessionReport(sessionId: string): Promise<SessionStudentRow[]>;

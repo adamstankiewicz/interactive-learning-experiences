@@ -6,6 +6,8 @@ import type { InteractionEvent } from '@/lib/student/schema';
 
 type TrackInput = Omit<InteractionEvent, 'elapsedMs'> & { elapsedMs?: number };
 
+export type RemediationPayload = { insertAt: number; widget: unknown };
+
 const FLUSH_INTERVAL_MS = 4_000;
 const MAX_BATCH = 50;
 
@@ -20,7 +22,12 @@ const MAX_BATCH = 50;
  *
  * Telemetry never blocks or breaks the lesson: every failure path is swallowed.
  */
-export function useTelemetry(sessionId: string | null, studentId: string | null) {
+export function useTelemetry(
+  sessionId: string | null,
+  studentId: string | null,
+  onRemediation?: (payload: RemediationPayload) => void,
+  currentStep?: number,
+) {
   const queue = useRef<InteractionEvent[]>([]);
   // The clock is read from an effect, not the render body: `Date.now()` is
   // impure, and the render body runs (and is expected to be side-effect-free)
@@ -34,12 +41,19 @@ export function useTelemetry(sessionId: string | null, studentId: string | null)
     lastEventAt.current = mountedAt.current;
   }, []);
 
+  const onRemediationRef = useRef(onRemediation);
+  onRemediationRef.current = onRemediation;
+
+  // Ref so flush() always reads the latest step without needing to be recreated.
+  const currentStepRef = useRef(currentStep);
+  currentStepRef.current = currentStep;
+
   const flush = useCallback(
     (useBeacon = false) => {
       if (!sessionId || !studentId || queue.current.length === 0) return;
 
       const events = queue.current.splice(0, MAX_BATCH);
-      const body = JSON.stringify({ sessionId, studentId, events });
+      const body = JSON.stringify({ sessionId, studentId, events, currentStep: currentStepRef.current });
 
       if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
         navigator.sendBeacon('/api/telemetry', new Blob([body], { type: 'application/json' }));
@@ -51,7 +65,13 @@ export function useTelemetry(sessionId: string | null, studentId: string | null)
         headers: { 'Content-Type': 'application/json' },
         body,
         keepalive: true,
-      }).catch(() => {});
+      })
+        .then(async (res) => {
+          if (!res.ok || !onRemediationRef.current) return;
+          const json = await res.json().catch(() => null) as { remediation?: RemediationPayload } | null;
+          if (json?.remediation) onRemediationRef.current(json.remediation);
+        })
+        .catch(() => {});
     },
     [sessionId, studentId],
   );

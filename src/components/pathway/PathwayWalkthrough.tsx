@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { WidgetTelemetryProvider } from '@/components/widgets/telemetry-context';
-import { useTelemetry } from '@/hooks/useTelemetry';
+import { useTelemetry, type RemediationPayload } from '@/hooks/useTelemetry';
 import type { PathwayPlan } from '@/lib/pathway/schema';
 
 /**
@@ -29,22 +29,30 @@ export type WalkthroughSession = {
 };
 
 /**
- * Most widgets report completion through `onComplete` — there is a moment the
- * student is unambiguously "done" (last flashcard, all events correct, etc.).
- * Fraction Area Model, Draft Meter, and Crossword have no such moment: an area
- * model is checked as many times as a student likes, a meter just keeps scoring
- * as they type, and a crossword can sit partially solved. Those three need an
- * explicit "I'm done" action instead of an automatic one.
+ * Widgets that own their own "Continue →" / "Got it →" button and wire it to
+ * `onComplete` directly. For these the walkthrough passes `advanceStep` as
+ * `onComplete` so their internal button advances the pathway — no external
+ * button is shown.
  */
-const SELF_ADVANCING_KINDS = new Set([
-  'swiper-flashcard',
-  'drag-sort',
-  'drag-categorize',
+const HAS_OWN_CTA = new Set([
   'markdown-card',
   'flashcard',
   'step-reveal',
   'narrated-card',
+  'swiper-flashcard',
+  'drag-sort',
+  'drag-categorize',
   'timeline-builder',
+]);
+
+/**
+ * Widgets with no `onComplete` at all — no unambiguous done moment exists.
+ * The external continue button is shown and always enabled.
+ */
+const ALWAYS_ENABLED = new Set([
+  'fraction-area-model',
+  'draft-meter',
+  'crossword',
 ]);
 
 function widgetKindOf(widget: unknown): string | null {
@@ -87,9 +95,63 @@ export function PathwayWalkthrough({
     } catch { return 0; }
   });
   const [stars, setStars] = useState(() => currentStep);
-  const telemetry = useTelemetry(session.sessionId, studentId);
+  // null = show the live current step; a number = reviewing that completed step
+  const [viewingStep, setViewingStep] = useState<number | null>(null);
+
+  // Extra widgets injected at runtime by the server after detecting a struggle.
+  // Keys are absolute step indices. The effective widget map merges these on top
+  // of session.stepWidgets so injected slots take precedence.
+  const [injectedWidgets, setInjectedWidgets] = useState<Record<number, unknown>>({});
+  const [lastInjectedAt, setLastInjectedAt] = useState<number | null>(null);
+
+  // Ref so onRemediation can read the latest currentStep without being recreated.
+  const currentStepRef = useRef(currentStep);
+  useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
+
+  const onRemediation = useCallback((payload: RemediationPayload) => {
+    // Clamp to after the student's current position — the server already does
+    // this, but the student may have advanced again in the window between flush
+    // and response.
+    const insertAt = Math.max(payload.insertAt, currentStepRef.current + 1);
+    setInjectedWidgets((prev) => {
+      const shifted: Record<number, unknown> = {};
+      for (const [key, val] of Object.entries(prev)) {
+        const idx = Number(key);
+        shifted[idx >= insertAt ? idx + 1 : idx] = val;
+      }
+      shifted[insertAt] = payload.widget;
+      return shifted;
+    });
+    setLastInjectedAt(insertAt);
+  }, []);
+
+  const telemetry = useTelemetry(session.sessionId, studentId, onRemediation, currentStep);
+
+  // The effective widget map: session widgets shifted by any injections, then
+  // injected widgets overlaid on top. We recompute lazily on render rather
+  // than in an effect — the state change from onRemediation already triggers a
+  // re-render, so we just derive from current state.
+  const effectiveWidgets: Record<number, unknown> = (() => {
+    if (Object.keys(injectedWidgets).length === 0) return session.stepWidgets;
+    // Shift the session's original widgets past any injected indices.
+    const result: Record<number, unknown> = {};
+    for (const [key, val] of Object.entries(session.stepWidgets)) {
+      let idx = Number(key);
+      for (const injectedIdx of Object.keys(injectedWidgets).map(Number).sort((a, b) => a - b)) {
+        if (injectedIdx <= idx) idx += 1;
+      }
+      result[idx] = val;
+    }
+    // Overlay injected widgets.
+    Object.assign(result, injectedWidgets);
+    return result;
+  })();
+
+  // Total step count = original steps + one per injected widget.
+  const totalSteps = session.steps.length + Object.keys(injectedWidgets).length;
 
   const advanceStep = useCallback(() => {
+    setViewingStep(null);
     setStars((n) => n + 1);
     telemetry.flush();
     setCurrentStep((n) => {
@@ -101,9 +163,18 @@ export function PathwayWalkthrough({
     });
   }, [telemetry, session.sessionId]);
 
-  const finished = session.steps.length > 0 && currentStep >= session.steps.length;
-  const currentWidget = session.stepWidgets[currentStep];
+  const finished = totalSteps > 0 && currentStep >= totalSteps;
+
+  // Which step is actually rendered — review overrides current.
+  const displayStep = viewingStep ?? currentStep;
+  const isReviewing = viewingStep !== null;
+  const currentWidget = effectiveWidgets[displayStep];
   const currentKind = widgetKindOf(currentWidget);
+
+  // True once the current widget signals it's done. Resets when the displayed step changes.
+  const [widgetDone, setWidgetDone] = useState(false);
+  useEffect(() => { setWidgetDone(false); }, [displayStep]);
+  const markWidgetDone = useCallback(() => setWidgetDone(true), []);
 
   // Fires once per mount, the student's half of "close the loop back to the
   // teacher" — the ref survives re-renders while `finished` stays true, so a
@@ -148,38 +219,129 @@ export function PathwayWalkthrough({
         >
           <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
 
-          {session.steps.length > 1 && (
-            <div className="flex w-full items-center gap-1.5" aria-hidden="true">
-              {session.steps.map((_, index) => (
-                <div
-                  key={index}
-                  className={`h-1.5 flex-1 rounded-full transition-colors ${
-                    index < currentStep ? 'bg-emerald-400' : index === currentStep ? 'bg-violet-400' : 'bg-white/60'
-                  }`}
-                />
-              ))}
+          {totalSteps > 1 && (
+            <div className="flex w-full items-center gap-1.5 py-1" role="progressbar" aria-valuenow={currentStep} aria-valuemax={totalSteps}>
+              <AnimatePresence initial={false}>
+                {Array.from({ length: totalSteps }, (_, index) => {
+                  const isDone = index < currentStep;
+                  const isCurrent = index === currentStep;
+                  const isViewing = index === viewingStep;
+                  const isNewlyInjected = index === lastInjectedAt;
+                  // Map the absolute index back to an original step title, accounting
+                  // for injected slots shifting the originals forward.
+                  const injectedIndices = Object.keys(injectedWidgets).map(Number).sort((a, b) => a - b);
+                  const originalIndex = index - injectedIndices.filter((i) => i < index).length;
+                  const isInjected = injectedIndices.includes(index);
+                  const stepTitle = isInjected
+                    ? 'Extra practice'
+                    : (session.steps[originalIndex]?.title ?? `Activity ${index + 1}`);
+                  const tooltipText = (isDone || isCurrent) ? stepTitle : null;
+                  return (
+                    <div key={`step-${index}-of-${totalSteps}`} className="group relative min-w-0 flex-1 flex flex-col items-center">
+                      {tooltipText && (
+                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900/90 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-10">
+                          {tooltipText}
+                        </div>
+                      )}
+                    <motion.button
+                      type="button"
+                      aria-label={isDone ? `Review activity ${index + 1}` : `Activity ${index + 1}`}
+                      disabled={!isDone && !isCurrent}
+                      onClick={
+                        isDone ? () => setViewingStep(isViewing ? null : index)
+                        : isCurrent ? () => setViewingStep(null)
+                        : undefined
+                      }
+                      // Entry: new segments pop in from scale 0
+                      initial={{ scaleX: 0, opacity: 0 }}
+                      animate={{
+                        scaleX: 1,
+                        opacity: 1,
+                        // Newly injected segment gets an attention pulse
+                        scale: isNewlyInjected ? [1, 1.15, 0.95, 1.05, 1] : 1,
+                      }}
+                      transition={isNewlyInjected
+                        ? { duration: 0.5, ease: 'easeOut', scale: { duration: 0.6, delay: 0.15 } }
+                        : { type: 'spring', stiffness: 400, damping: 30 }
+                      }
+                      className={[
+                        'relative w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400',
+                        isViewing
+                          ? 'h-3 bg-emerald-400/70 shadow-[0_0_0_3px_rgba(52,211,153,0.6)] cursor-pointer'
+                          : isCurrent
+                            ? isReviewing
+                              ? 'h-3 bg-violet-400 cursor-pointer'
+                              : 'h-3 bg-violet-400 shadow-[0_0_0_3px_rgba(139,92,246,0.5)] cursor-pointer'
+                            : isDone
+                              ? 'h-3 bg-emerald-400/70 cursor-pointer hover:bg-emerald-400'
+                              : 'h-3 bg-white/25 cursor-default',
+                        '',
+                        'transition-[height,background-color] duration-300',
+                      ].join(' ')}
+                    >
+                      {/* Completion sweep — fills left-to-right when a step is done */}
+                      {isDone && !isViewing && (
+                        <motion.span
+                          className="absolute inset-0 rounded-full bg-emerald-400/70 origin-left"
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                        />
+                      )}
+                      {/* Dot on whichever step is currently displayed */}
+                      {index === displayStep && (
+                        <motion.span
+                          key={displayStep}
+                          className="absolute inset-0 flex items-center justify-center"
+                          initial={{ opacity: 0, scale: 0.4 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${isViewing ? 'bg-emerald-500' : 'bg-violet-500'}`} />
+                        </motion.span>
+                      )}
+                    </motion.button>
+                    </div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           )}
 
+          {isReviewing && (
+            <button
+              type="button"
+              onClick={() => setViewingStep(null)}
+              className="self-start rounded-xl border-2 border-violet-200 bg-white/80 px-3 py-1 text-sm font-bold text-violet-600 hover:bg-violet-50"
+            >
+              ← Back to current
+            </button>
+          )}
+
           {currentWidget ? (
-            <div className="w-full rounded-3xl border-4 border-violet-200 bg-white/80 p-4">
-              <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode}>
+            <div className={`w-full rounded-3xl border-4 bg-white/80 p-4 ${isReviewing ? 'border-emerald-200 opacity-90' : 'border-violet-200'}`}>
+              <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode} stepIndex={currentStep}>
                 <WidgetRenderer
-                  key={currentStep}
+                  key={displayStep}
                   spec={currentWidget}
-                  onComplete={SELF_ADVANCING_KINDS.has(currentKind ?? '') ? advanceStep : undefined}
+                  onComplete={
+                    isReviewing ? undefined
+                    : HAS_OWN_CTA.has(currentKind ?? '') ? advanceStep
+                    : markWidgetDone
+                  }
                 />
               </WidgetTelemetryProvider>
 
-              {/* Fraction area model, Draft Meter, and Crossword have no "done"
-                  moment of their own, so the student says when they're ready to move on. */}
-              {currentKind && !SELF_ADVANCING_KINDS.has(currentKind) && (
+              {/* External button for widgets that fire onComplete silently (no internal CTA),
+                  and for the three widgets that never fire onComplete at all. */}
+              {!isReviewing && !HAS_OWN_CTA.has(currentKind ?? '') && (
                 <button
                   type="button"
                   onClick={advanceStep}
-                  className="mt-4 w-full rounded-2xl bg-emerald-500 py-3 font-black text-white shadow-[0_5px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857]"
+                  disabled={!widgetDone && !ALWAYS_ENABLED.has(currentKind ?? '')}
+                  className="mt-4 w-full rounded-2xl bg-emerald-500 py-3 font-black text-white shadow-[0_5px_0_0_#047857] transition-opacity active:translate-y-1 active:shadow-[0_2px_0_0_#047857] disabled:opacity-30 disabled:shadow-[0_5px_0_0_#047857] disabled:active:translate-y-0"
                 >
-                  {currentStep + 1 === session.steps.length ? "I'm done! 🎉" : 'Next activity →'}
+                  {currentStep + 1 === totalSteps ? "I'm done! 🎉" : 'Next activity →'}
                 </button>
               )}
             </div>
@@ -200,7 +362,7 @@ export function PathwayWalkthrough({
         >
           <p className="text-center text-4xl">🎉</p>
           <p className="text-center text-xl font-black text-balance">
-            All done — {session.steps.length} activities, {stars} stars!
+            All done — {totalSteps} activities, {stars} stars!
           </p>
 
           {onRestart && (

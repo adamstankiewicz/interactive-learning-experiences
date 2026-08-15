@@ -69,7 +69,7 @@ function DraggableEvent({
           if (!isSelected) onAfterSelect?.();
         }
       }}
-      className={`inline-flex cursor-grab select-none items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`inline-flex cursor-grab select-none items-center gap-1 rounded-2xl border px-3 py-1.5 text-xs font-medium wrap-break-word transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         isSelected
           ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
           : feedback === 'correct'
@@ -422,7 +422,7 @@ const sensors = useSensors(useSensor(PointerSensor));
 
         <DragOverlay>
           {activeEvent && (
-            <div className="inline-flex cursor-grabbing select-none items-center rounded-full border border-primary bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
+            <div className="inline-flex cursor-grabbing select-none items-center rounded-2xl border border-primary bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
               {activeEvent.label}
             </div>
           )}

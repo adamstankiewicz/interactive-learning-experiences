@@ -251,6 +251,18 @@ export const memoryStorageAdapter: StorageAdapter = {
     return assignments.filter((a) => a.parentSessionId === parentSessionId);
   },
 
+  async insertRemediationWidget(sessionId, insertAt, widget) {
+    const session = sessions.get(sessionId);
+    if (!session) return;
+    const shifted: Record<number, unknown> = {};
+    for (const [key, val] of Object.entries(session.stepWidgets)) {
+      const idx = Number(key);
+      shifted[idx >= insertAt ? idx + 1 : idx] = val;
+    }
+    shifted[insertAt] = widget;
+    session.stepWidgets = shifted;
+  },
+
   async listSessions(limit = 50): Promise<SessionSummary[]> {
     const childSessionIds = new Set(assignments.map((a) => a.sessionId));
     // Build a map: parentSessionId → child session IDs, for completion rollup
