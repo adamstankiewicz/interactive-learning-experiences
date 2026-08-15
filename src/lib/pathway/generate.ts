@@ -310,8 +310,19 @@ export async function* streamPathway(
   const companions: StandardRef[] = [];
   let standard: StandardRef | null = null;
 
-  for (const candidate of proposal.candidates) {
-    const match = await verifyAcrossSources(candidate.statementCode);
+  // Started together, awaited in order. Each candidate is an independent MCP
+  // round trip (~565ms measured), and nothing in the loop body depends on the
+  // previous result — serializing them cost ~1.1s of dead wall clock on a
+  // four-candidate proposal. Verdicts still stream in candidate order.
+  const pending = proposal.candidates.map((candidate) =>
+    verifyAcrossSources(candidate.statementCode),
+  );
+  // Marks each rejection handled now so a later-awaited failure is not an
+  // unhandled rejection; awaiting still rethrows, as it did when serial.
+  for (const p of pending) p.catch(() => {});
+
+  for (const [index, candidate] of proposal.candidates.entries()) {
+    const match = await pending[index]!;
     yield { type: 'verdict', code: candidate.statementCode, resolved: Boolean(match) };
 
     if (!match) {
