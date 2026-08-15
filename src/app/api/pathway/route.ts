@@ -6,6 +6,13 @@ import { loadProfile } from '@/lib/student/profile';
 
 export const maxDuration = 120;
 
+/**
+ * The excerpt arrives from the browser, so its size is the client's word
+ * against nothing — `/api/lesson-plan` capping what it hands out says nothing
+ * about what comes back here. Same number as that cap, enforced again.
+ */
+const MAX_LESSON_PLAN_CHARS = 12_000;
+
 function errorStream(message: string, status: number) {
   return new Response(encodeEvent({ type: 'error', message }), {
     status,
@@ -14,7 +21,13 @@ function errorStream(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  let body: { topic?: unknown; gradeHint?: unknown; studentId?: unknown; teacherNote?: unknown };
+  let body: {
+    topic?: unknown;
+    gradeHint?: unknown;
+    studentId?: unknown;
+    teacherNote?: unknown;
+    lessonPlanExcerpt?: unknown;
+  };
 
   try {
     body = await request.json();
@@ -30,6 +43,10 @@ export async function POST(request: Request) {
   const studentId = typeof body.studentId === 'string' && body.studentId ? body.studentId : null;
   const teacherNote =
     typeof body.teacherNote === 'string' && body.teacherNote.trim() ? body.teacherNote.trim() : undefined;
+  const lessonPlanExcerpt =
+    typeof body.lessonPlanExcerpt === 'string' && body.lessonPlanExcerpt.trim()
+      ? body.lessonPlanExcerpt.slice(0, MAX_LESSON_PLAN_CHARS)
+      : undefined;
 
   const encoder = new TextEncoder();
 
@@ -50,7 +67,13 @@ export async function POST(request: Request) {
         const stepWidgets: Record<number, unknown> = {};
         const rejected: string[] = [];
 
-        for await (const event of streamPathway(topic, gradeHint, profile, teacherNote)) {
+        for await (const event of streamPathway(
+          topic,
+          gradeHint,
+          profile,
+          teacherNote,
+          lessonPlanExcerpt,
+        )) {
           if (event.type === 'anchor') anchor = event.anchor;
           if (event.type === 'plan') plan = event.plan;
           if (event.type === 'step-widget') stepWidgets[event.stepIndex] = event.widget;
