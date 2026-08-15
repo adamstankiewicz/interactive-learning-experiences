@@ -14,3 +14,4 @@ import '@/lib/widgets/definitions/flashcard.generate';
 import '@/lib/widgets/definitions/step-reveal.generate';
 import '@/lib/widgets/definitions/narrated-card.generate';
 import '@/lib/widgets/definitions/timeline-builder.generate';
+import '@/lib/widgets/definitions/find-the-flaw.generate';
