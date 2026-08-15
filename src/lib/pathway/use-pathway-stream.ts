@@ -33,6 +33,10 @@ export type PathwayState = {
   stepWidgets: Record<number, WidgetSpec>;
   /** Why a step's widget is a substitution, keyed the same way. */
   stepWidgetNotes: Record<number, string>;
+  /** True while a single step's widget is being redone in place. */
+  regeneratingSteps: Record<number, boolean>;
+  /** A regenerate call that failed, keyed by step index — cleared on retry. */
+  stepErrors: Record<number, string>;
   /** Set once the run is persisted; null when there is no student to persist for. */
   sessionId: string | null;
   error: string | null;
@@ -57,6 +61,8 @@ const initialState: PathwayState = {
   plan: null,
   stepWidgets: {},
   stepWidgetNotes: {},
+  regeneratingSteps: {},
+  stepErrors: {},
   sessionId: null,
   error: null,
   startedAt: null,
@@ -67,7 +73,16 @@ type Action =
   | { kind: 'start'; at: number; topic: string }
   /** Stop streaming but keep whatever already arrived on screen. */
   | { kind: 'stop'; at: number }
-  | { kind: 'event'; event: PathwayEvent; at: number };
+  | { kind: 'event'; event: PathwayEvent; at: number }
+  | { kind: 'regenerate-start'; stepIndex: number }
+  | { kind: 'regenerate-done'; stepIndex: number; widget: WidgetSpec; note: string | null }
+  | { kind: 'regenerate-error'; stepIndex: number; message: string };
+
+function withoutKey<T>(record: Record<number, T>, key: number): Record<number, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
 
 function reducer(state: PathwayState, action: Action): PathwayState {
   if (action.kind === 'start') {
@@ -85,6 +100,32 @@ function reducer(state: PathwayState, action: Action): PathwayState {
           entry.status === 'active' ? { ...entry, status: 'skipped' as StageStatus } : entry,
         ]),
       ) as PathwayState['stages'],
+    };
+  }
+
+  if (action.kind === 'regenerate-start') {
+    return {
+      ...state,
+      regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: true },
+      stepErrors: withoutKey(state.stepErrors, action.stepIndex),
+    };
+  }
+  if (action.kind === 'regenerate-done') {
+    return {
+      ...state,
+      stepWidgets: { ...state.stepWidgets, [action.stepIndex]: action.widget },
+      stepWidgetNotes: action.note
+        ? { ...state.stepWidgetNotes, [action.stepIndex]: action.note }
+        : withoutKey(state.stepWidgetNotes, action.stepIndex),
+      regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: false },
+      stepErrors: withoutKey(state.stepErrors, action.stepIndex),
+    };
+  }
+  if (action.kind === 'regenerate-error') {
+    return {
+      ...state,
+      regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: false },
+      stepErrors: { ...state.stepErrors, [action.stepIndex]: action.message },
     };
   }
 
@@ -227,5 +268,31 @@ export function usePathwayStream() {
     }
   }, [ensureStudentId]);
 
-  return { state, start, cancel };
+  const regenerateStep = useCallback(async (anchor: Anchor, plan: PathwayPlan, stepIndex: number) => {
+    dispatch({ kind: 'regenerate-start', stepIndex });
+
+    try {
+      const response = await fetch('/api/pathway/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anchor, plan, stepIndex }),
+      });
+
+      const body = (await response.json().catch(() => null)) as
+        | { widget: WidgetSpec; note: string | null }
+        | { message: string }
+        | null;
+
+      if (!response.ok || !body || !('widget' in body)) {
+        throw new Error(body && 'message' in body ? body.message : 'Could not regenerate this step.');
+      }
+
+      dispatch({ kind: 'regenerate-done', stepIndex, widget: body.widget, note: body.note });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not regenerate this step.';
+      dispatch({ kind: 'regenerate-error', stepIndex, message });
+    }
+  }, []);
+
+  return { state, start, cancel, regenerateStep };
 }

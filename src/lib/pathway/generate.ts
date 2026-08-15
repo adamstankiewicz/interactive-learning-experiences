@@ -262,7 +262,7 @@ async function attemptStepWidget(
  * that: model non-compliance on structured output is usually transient, not
  * systematic, so trying again is more useful here than surfacing the failure.
  */
-async function generateStepWidget(
+export async function generateStepWidget(
   anchor: Anchor,
   plan: PathwayPlan,
   step: PathwayPlan['steps'][number],

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Sparkles } from 'lucide-react';
+import { ChevronDown, RotateCcw, Sparkles } from 'lucide-react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,8 @@ import type { Anchor, DeepPartial } from '@/lib/pathway/events';
 import type { PathwayPlan } from '@/lib/pathway/schema';
 import type { PathwayState } from '@/lib/pathway/use-pathway-stream';
 import { cn } from '@/lib/utils';
+
+type RegenerateStep = (anchor: Anchor, plan: PathwayPlan, stepIndex: number) => Promise<void>;
 
 const PURPOSE_LABEL: Record<string, string> = {
   activate: 'Activate',
@@ -30,9 +32,20 @@ type PartialStep = DeepPartial<PathwayPlan>['steps'] extends (infer S)[] | undef
  * teacher opens this to teach, not to audit the knowledge graph — but the audit
  * has to stay one click from the claim it supports.
  */
-export function PathwayDocument({ state }: { state: PathwayState }) {
+export function PathwayDocument({
+  state,
+  onRegenerateStep,
+}: {
+  state: PathwayState;
+  onRegenerateStep?: RegenerateStep;
+}) {
   const { anchor, plan } = state;
   if (!anchor) return null;
+
+  // Regeneration replays a step through the same widget-generation call the
+  // pipeline made the first time — only meaningful once the plan is the real
+  // validated thing, not the partial shape it streams in as.
+  const regenerateStep = state.status === 'done' ? onRegenerateStep : undefined;
 
   const rejectedCodes = Object.entries(state.verdicts)
     .filter(([, resolved]) => !resolved)
@@ -82,7 +95,15 @@ export function PathwayDocument({ state }: { state: PathwayState }) {
         <Section title="The pathway" note="Each step, in order, with its interaction">
           <ol className="space-y-4">
             {plan?.steps?.map((step, index) => (
-              <StepCard key={index} step={step} index={index} state={state} />
+              <StepCard
+                key={index}
+                step={step}
+                index={index}
+                state={state}
+                onRegenerate={
+                  regenerateStep ? () => regenerateStep(anchor, plan as PathwayPlan, index) : undefined
+                }
+              />
             ))}
           </ol>
         </Section>
@@ -221,15 +242,19 @@ function StepCard({
   step,
   index,
   state,
+  onRegenerate,
 }: {
   step: PartialStep;
   index: number;
   state: PathwayState;
+  onRegenerate?: () => void;
 }) {
   const purpose = step?.purpose;
   const widget = state.stepWidgets[index];
   const note = state.stepWidgetNotes[index];
   const pending = Boolean(step?.widgetKind) && widget === undefined;
+  const regenerating = Boolean(state.regeneratingSteps[index]);
+  const regenerateError = state.stepErrors[index];
 
   return (
     <li className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
@@ -247,7 +272,19 @@ function StepCard({
           {step?.description && (
             <p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p>
           )}
+          {regenerateError && <p className="mt-1 text-xs text-destructive">{regenerateError}</p>}
         </div>
+        {onRegenerate && widget && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={regenerating}
+            className="flex shrink-0 items-center gap-1.5 self-start text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            <RotateCcw className={cn('size-3.5', regenerating && 'animate-spin')} aria-hidden />
+            {regenerating ? 'Trying again…' : 'Try a different one'}
+          </button>
+        )}
       </div>
 
       {(widget || pending || note) && (
