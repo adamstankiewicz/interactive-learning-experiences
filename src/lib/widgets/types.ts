@@ -46,8 +46,16 @@ export interface WidgetCatalogEntry<Spec = unknown> {
   // module still gets full type-checking against its own concrete component.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   component: ComponentType<{ spec: Spec; onComplete?: (...args: any[]) => void }>;
-  /** Short prose fed into the planner's widgetKind guidance — see `builtins.ts` for how these join. */
+  /** Short prose fed into the planner's widget guidance — joined in `generate.ts`. */
   plannerDescription: string;
+  /**
+   * Whether finishing this widget records whether the student was actually
+   * right. False means it emits no `widget_completed` telemetry, so a "check"
+   * step built on it would report mastery that nothing measured. Required, not
+   * optional: a new widget should have to answer this rather than default into
+   * the wrong half.
+   */
+  assesses: boolean;
   /** Omitted = fits every standard (crossword, swiper-flashcard today). */
   coverageRule?: (standard: StandardRef) => boolean;
 }

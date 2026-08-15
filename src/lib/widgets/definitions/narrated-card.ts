@@ -5,6 +5,7 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<NarratedCardSpec>({
   kind: 'narrated-card',
   schema: narratedCardSpec,
+  assesses: false,
   component: lazy(() =>
     import('@/components/widgets/NarratedCard').then((m) => ({ default: m.NarratedCard })),
   ),

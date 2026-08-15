@@ -12,11 +12,32 @@ import type { StudentProfile } from '@/lib/student/schema';
 import '@/lib/widgets/builtins';
 import '@/lib/widgets/builtins.generate';
 import { widgetContext } from '@/lib/widgets/context';
-import { fallbackWidgetKind, getWidgetCatalogEntry, getWidgetGenerator } from '@/lib/widgets/types';
+import {
+  fallbackWidgetKind,
+  getWidgetCatalogEntry,
+  getWidgetGenerator,
+  listWidgetCatalogEntries,
+} from '@/lib/widgets/types';
 
 export type { Anchor };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+/**
+ * The planner's menu of widgets, built from the registry rather than written
+ * out again here. A registered widget is a described widget, so a new one
+ * cannot ship invisible to the planner the way five of them silently had.
+ */
+function widgetGuidance(): string {
+  return listWidgetCatalogEntries()
+    .map((entry) => {
+      const caveat = entry.assesses
+        ? ''
+        : ' Records no answer, so it cannot carry a "check" step — use it to activate or model.';
+      return `"${entry.kind}" — ${entry.plannerDescription}${caveat}`;
+    })
+    .join(' ');
+}
 
 /**
  * Enforce the bounds the schema can't express (see the note in `schema.ts`).
@@ -166,6 +187,9 @@ async function* planPathway(
       'Outcomes are observable and student-facing. Steps run activate -> model -> practice -> check',
       'and each names the outcome it advances. Misconceptions are specific and diagnosable',
       '("thinks the parts need not be equal"), never generic ("finds fractions hard").',
+      'Every step also names the interactive widget the student uses to do it. Every step gets one —',
+      'this is not supporting material, it is the task. The available kinds:',
+      widgetGuidance(),
       'When prior evidence is supplied, weight the pathway toward the components the student is',
       'weakest on and directly confront misconceptions they have already demonstrated.',
       teacherNote
@@ -241,6 +265,9 @@ async function attemptStepWidget(
     substitutionNote = requested
       ? `${requested.plannerDescription.split('.')[0]} doesn't fit ${anchor.standard.code} — built a fallback activity for this step instead.`
       : `"${step.widgetKind}" isn't a registered widget — built a fallback activity for this step instead.`;
+  } else if (step.purpose === 'check' && !requested.assesses) {
+    kind = fallbackWidgetKind() as typeof step.widgetKind;
+    substitutionNote = `"${step.widgetKind}" records no answer, so it can't evidence a check step — built a fallback activity for this step instead.`;
   }
 
   const generator = getWidgetGenerator(kind);

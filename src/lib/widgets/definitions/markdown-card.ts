@@ -5,6 +5,7 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<MarkdownCardSpec>({
   kind: 'markdown-card',
   schema: markdownCardSpec,
+  assesses: false,
   component: lazy(() =>
     import('@/components/widgets/MarkdownCard').then((m) => ({ default: m.MarkdownCard })),
   ),

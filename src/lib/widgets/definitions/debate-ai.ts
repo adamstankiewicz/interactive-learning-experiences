@@ -18,6 +18,7 @@ const MIN_GRADE = 6;
 registerWidgetCatalog<DebateAiSpec>({
   kind: 'debate-ai',
   schema: debateAiSpec,
+  assesses: true,
   component: lazy(() => import('@/components/widgets/DebateAI').then((m) => ({ default: m.DebateAI }))),
   /**
    * Both halves matter. The tags keep it off procedural standards, where there

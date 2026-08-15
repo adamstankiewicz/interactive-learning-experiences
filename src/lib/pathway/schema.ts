@@ -812,56 +812,16 @@ export const pathwayStep = z.object({
    * step names which interaction does it; a second pass configures the chosen
    * widget with full context. That keeps the plan call cheap and lets each
    * widget be configured against the step it actually serves.
+   *
+   * No per-kind prose here. That guidance is built from the widget registry in
+   * `generate.ts` — see `widgetGuidance()`. Keeping a second hand-maintained
+   * copy is what let five kinds ship with no description at all, and left
+   * draft-meter described as argument-only long after it stopped being.
    */
   widgetKind: widgetKind.describe(
-    [
-      'Which interactive widget the student uses to do this step. Every step gets one — this is',
-      'not supporting material, it is the task.',
-      '"fraction-area-model" partitions a whole into equal parts to build a target fraction —',
-      'only meaningful for fractions.',
-      '"swiper-flashcard" is a binary sort of statements (true/false, example/non-example,',
-      'prime/composite) and suits almost any subject, including an "activate" step sorting prior',
-      'statements or a "check" step sorting worked answers.',
-      '"drag-sort" orders items along one dimension — chronology, magnitude, steps in a process.',
-      '"drag-categorize" sorts items into 2-4 named buckets — use this over swiper-flashcard when',
-      'there are more than two groups, e.g. sorting terms by era or by part of speech.',
-      '"draft-meter" is a short written-argument prompt, live-scored as the student types. Only for',
-      'standards about writing an argument (W, WHST) or citing textual evidence (RL/RI/RH/RST',
-      'strands 1 and 8) — it is meaningless for any other standard. It is also the heaviest',
-      'interaction: use it for at most one step in a pathway, normally "practice" or "check".',
-      '"defend-claim" gives the student a contestable historical claim and two conflicting primary',
-      'sources; they pick a side, write a defense, and then ask for feedback and revise it. History',
-      'and social-studies standards only, grade 7 and up — it needs a claim historians actually',
-      'disagree about, which a maths or science standard does not have. Prefer it over "draft-meter"',
-      'when the standard is about historical argument or sourcing; it is the heaviest interaction in',
-      'the set, so use it for at most one step, normally "practice" or "check".',
-      '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
-      'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
-      'lesson taught, not for introducing a concept the student has not met yet.',
-      '"draw-the-curve" gives labelled positions along an axis and lets the student drag each point\'s',
-      'height to predict a shape, then draws the real curve over their guess. Checked on shape, not',
-      'numbers, so it is not only for maths: tension across a story, distance over time, population',
-      'across decades, a trend across eras. Use it when the standard is about how something changes,',
-      'and prefer "practice" or "check" — the reveal is the payoff and it lands hardest once the',
-      'student has a real prediction to be wrong about.',
-      '"debate-ai" is a short back-and-forth where the assistant argues a contestable position and',
-      'does not fold. It credits evaluative moves — challenging evidence, spotting an unsupported',
-      'leap, conceding a fair point — rather than winning, so it is the one interaction that reaches',
-      'Bloom\'s evaluate. Needs a claim with a real second side, so it suits argument, history,',
-      'ethics-in-science and current-affairs standards and not procedural ones. Heavy: at most one',
-      'step, normally "practice" or "check".',
-      '"writing-workshop" is long-form writing — an essay, a lab report, a research proposal, a short',
-      'story — that the student asks to have read when they are ready, and gets back marked up:',
-      'passages underlined where they work and where they do not, each with a note. Use it when the',
-      'standard asks for an extended piece rather than a few sentences (that is draft-meter), and',
-      'give it a "practice" or "check" step of its own — it is the longest activity in the set.',
-      '"find-the-flaw" shows a worked example containing one deliberate mistake — a solution, an',
-      'experiment, an argument, a historical explanation — and asks the student to find the step',
-      'where it goes wrong and say why. It is the only interaction that asks a student to judge',
-      'finished work rather than produce or arrange it, so it suits any subject, but it requires',
-      'them to already know the correct procedure: use it for "practice" or "check", never',
-      '"activate", and never before a "model" step has shown the concept done right.',
-    ].join(' '),
+    'Which interactive widget the student uses to do this step. Every step gets one — this is not'
+      + ' supporting material, it is the task. The available kinds, and when each fits, are listed'
+      + ' in the system prompt.',
   ),
 });
 
