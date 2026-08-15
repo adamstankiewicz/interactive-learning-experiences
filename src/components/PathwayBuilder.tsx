@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { ActivityTrail } from '@/components/pathway/ActivityTrail';
 import { PathwayDocument } from '@/components/pathway/PathwayDocument';
@@ -34,8 +34,10 @@ function gradeLabel(grade: string): string {
 }
 
 export function PathwayBuilder() {
+  const teacherNoteId = useId();
   const [topic, setTopic] = useState('');
   const [gradeHint, setGradeHint] = useState('');
+  const [teacherNote, setTeacherNote] = useState('');
   const { state, start, cancel } = usePathwayStream();
 
   const streaming = state.status === 'streaming';
@@ -43,7 +45,7 @@ export function PathwayBuilder() {
 
   function runSubmit() {
     if (!topic.trim() || streaming) return;
-    void start(topic, gradeHint);
+    void start(topic, gradeHint, teacherNote.trim() || undefined);
   }
 
   function submit(event: React.FormEvent) {
@@ -136,6 +138,23 @@ export function PathwayBuilder() {
                 The more specific the topic, the better the match — e.g. &ldquo;comparing
                 fractions with unlike denominators,&rdquo; not just &ldquo;fractions.&rdquo;
               </p>
+            </div>
+          )}
+
+          {!started && (
+            <div className="mt-4">
+              <label htmlFor={teacherNoteId} className="text-xs text-muted-foreground">
+                What&rsquo;s tricky about this for your students?{' '}
+                <span className="text-muted-foreground/60">(optional, but it sharpens the pathway)</span>
+              </label>
+              <Textarea
+                id={teacherNoteId}
+                value={teacherNote}
+                onChange={(event) => setTeacherNote(event.target.value)}
+                placeholder="e.g. they mix up numerator and denominator when the fraction is improper"
+                rows={1}
+                className="mt-1.5 min-h-10 resize-none py-2 text-sm"
+              />
             </div>
           )}
 

@@ -169,7 +169,7 @@ export function usePathwayStream() {
     }
   }, []);
 
-  const start = useCallback(async (topic: string, gradeHint: string) => {
+  const start = useCallback(async (topic: string, gradeHint: string, teacherNote?: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -181,7 +181,7 @@ export function usePathwayStream() {
       const response = await fetch('/api/pathway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, gradeHint, studentId }),
+        body: JSON.stringify({ topic, gradeHint, studentId, teacherNote }),
         signal: controller.signal,
       });
 

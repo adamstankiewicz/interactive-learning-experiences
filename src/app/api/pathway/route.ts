@@ -14,7 +14,7 @@ function errorStream(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  let body: { topic?: unknown; gradeHint?: unknown; studentId?: unknown };
+  let body: { topic?: unknown; gradeHint?: unknown; studentId?: unknown; teacherNote?: unknown };
 
   try {
     body = await request.json();
@@ -28,6 +28,8 @@ export async function POST(request: Request) {
   const gradeHint =
     typeof body.gradeHint === 'string' && body.gradeHint.trim() ? body.gradeHint.trim() : undefined;
   const studentId = typeof body.studentId === 'string' && body.studentId ? body.studentId : null;
+  const teacherNote =
+    typeof body.teacherNote === 'string' && body.teacherNote.trim() ? body.teacherNote.trim() : undefined;
 
   const encoder = new TextEncoder();
 
@@ -48,7 +50,7 @@ export async function POST(request: Request) {
         const stepWidgets: Record<number, unknown> = {};
         const rejected: string[] = [];
 
-        for await (const event of streamPathway(topic, gradeHint, profile)) {
+        for await (const event of streamPathway(topic, gradeHint, profile, teacherNote)) {
           if (event.type === 'anchor') anchor = event.anchor;
           if (event.type === 'plan') plan = event.plan;
           if (event.type === 'step-widget') stepWidgets[event.stepIndex] = event.widget;

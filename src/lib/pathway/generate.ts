@@ -135,6 +135,7 @@ async function* planPathway(
   anchor: Anchor,
   gradeBand: string,
   profile: StudentProfile | null,
+  teacherNote?: string,
 ): AsyncGenerator<DeepPartial<PathwayPlan>, PathwayPlan> {
   const componentBlock = anchor.learningComponents.length
     ? anchor.learningComponents
@@ -167,6 +168,11 @@ async function* planPathway(
       '("thinks the parts need not be equal"), never generic ("finds fractions hard").',
       'When prior evidence is supplied, weight the pathway toward the components the student is',
       'weakest on and directly confront misconceptions they have already demonstrated.',
+      teacherNote
+        ? 'The teacher who wrote this pathway named something specific their students find tricky about'
+          + ' this topic, supplied below — treat it as the strongest available signal for the'
+          + ' misconceptions list, ahead of anything you would otherwise guess.'
+        : '',
       companionBlock
         ? 'Related standards are supplied below, from other subjects the topic also touches. Use them only'
           + ' if they genuinely sharpen the bigIdea or give a step a richer hook — never invent an outcome or'
@@ -192,6 +198,7 @@ async function* planPathway(
       'Prerequisite standards (unfinished learning to activate, not to reteach):',
       prerequisiteBlock,
       ...(companionBlock ? ['', 'Related standards this topic also touches (optional, weave in only if it helps):', companionBlock] : []),
+      ...(teacherNote ? ['', "What the teacher says is tricky for their students:", teacherNote] : []),
       '',
       'Prior evidence for this student:',
       profileBlock(profile),
@@ -279,6 +286,7 @@ export async function* streamPathway(
   topic: string,
   gradeHint?: string,
   profile: StudentProfile | null = null,
+  teacherNote?: string,
 ): AsyncGenerator<PathwayEvent> {
   yield { type: 'stage', stage: 'propose', status: 'active' };
   const proposal = await proposeStandardCodes(topic, gradeHint);
@@ -358,7 +366,7 @@ export async function* streamPathway(
   };
 
   yield { type: 'stage', stage: 'plan', status: 'active' };
-  const planStream = planPathway(topic, anchor, proposal.gradeBand, profile);
+  const planStream = planPathway(topic, anchor, proposal.gradeBand, profile, teacherNote);
   let planResult = await planStream.next();
 
   while (!planResult.done) {
