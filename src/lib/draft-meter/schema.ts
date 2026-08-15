@@ -58,15 +58,16 @@ export const modelScore = z.object({
   score: z
     .number()
     .describe('0-100. 0-34 developing, 35-59 approaching, 60-84 proficient, 85-100 advanced.'),
-  signals: z
-    .object({
-      stance: z.boolean().describe('Did they commit to a position rather than survey both sides?'),
-      reasoning: z.boolean().describe('Did they say why — a because, not just a what?'),
-      evidence: z
-        .boolean()
-        .describe('Did they point at something outside their own head — a fact, source, or example?'),
-    })
-    .describe('What you actually found. These drive the nudge; they are never shown as scores.'),
+  checks: z
+    .array(
+      z.object({
+        id: z.string().describe('The id of the check, copied exactly from the list you were given.'),
+        met: z.boolean().describe('Does the response meet this check?'),
+      }),
+    )
+    .describe(
+      'One entry per check you were given, same ids, same order. These drive the nudge; they are never shown to the student as scores.',
+    ),
   nudge: z
     .string()
     .nullable()
@@ -84,12 +85,22 @@ export type ScoreResult = ModelScore & {
   /** Band ladder: needs work / getting closer / almost there / strong. */
   label: string;
   /**
-   * All three signals present. The widget marks the finish line with this
-   * rather than letting the hint pill silently vanish — an empty space is
-   * ambiguous, and "you are done" is the whole point of having goalposts.
+   * Every check met. The widget marks the finish line with this rather than
+   * letting the hint silently vanish — an empty space is ambiguous, and "you
+   * are done" is the whole point of having goalposts.
    */
   criteriaMet: boolean;
+  /** The finish-line sentence, built from the spec's own check labels. */
+  doneMessage: string;
 };
+
+/** The check definitions the widget sends along with the draft. */
+export const scoreCheck = z.object({
+  id: z.string(),
+  label: z.string(),
+  lookFor: z.string(),
+  essential: z.boolean().default(false),
+});
 
 /** What the widget posts. Parsed rather than trusted — it crosses the network. */
 export const scoreRequest = z.object({
@@ -97,8 +108,8 @@ export const scoreRequest = z.object({
   question: z.string(),
   standardCode: z.string(),
   standardDescription: z.string(),
-  criteria: z.array(z.string()).default([]),
-  /** Present for reading standards; null when the argument comes from the student. */
+  checks: z.array(scoreCheck).default([]),
+  /** Present for text-dependent standards; null when the answer comes from the student. */
   passage: z
     .object({ source: z.string(), text: z.string() })
     .nullable()
@@ -106,3 +117,21 @@ export const scoreRequest = z.object({
 });
 
 export type ScoreRequest = z.infer<typeof scoreRequest>;
+
+/**
+ * The finish line, in the student's terms: "That's all three — a claim,
+ * evidence from the source, and context."
+ *
+ * Built from the spec's own labels so the sentence names what *this* standard
+ * asked for, rather than the argument trio the meter used to assume.
+ */
+export function doneMessageFor(labels: string[]): string {
+  const count = { 2: 'both', 3: 'all three', 4: 'all four' }[labels.length] ?? 'everything';
+
+  const list =
+    labels.length <= 1
+      ? (labels[0] ?? 'it')
+      : `${labels.slice(0, -1).join(', ')}${labels.length > 2 ? ',' : ''} and ${labels[labels.length - 1]}`;
+
+  return `That's ${count} — ${list}.`;
+}

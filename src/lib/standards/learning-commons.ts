@@ -36,12 +36,29 @@ const WRITING_CODE = /^W(HST)?\./;
  * than a defensible position.
  */
 const READING_EVIDENCE_CODE = /^(RL|RI|RH|RST)\.[0-9-]+\.(1|8)$/;
+/**
+ * Standards where a few sentences of student writing is the natural evidence —
+ * literature and informational reading, reading in history and in science and
+ * technical subjects, and writing in all of them.
+ *
+ * Broader than `reading-evidence` on purpose. A meter that scores a short
+ * written response against whatever the standard asks for is not only an
+ * argument tool: "what does this character value, and what shows it" and "what
+ * does this source tell you about the period" are the same shape of task.
+ * Deliberately excludes L (language conventions) and RF (foundational reading),
+ * where the evidence of learning is not a paragraph.
+ */
+const WRITTEN_RESPONSE_CODE = /^(W|WHST|RL|RI|RH|RST)\./;
+/** Reading standards: the task is about a text, so one has to be supplied. */
+const TEXT_DEPENDENT_CODE = /^(RL|RI|RH|RST)\./;
 
 function classify(code: string): string[] {
   const tags: string[] = [];
   if (FRACTION_CODE.test(code)) tags.push('fractions');
   if (WRITING_CODE.test(code)) tags.push('writing-argument');
   if (READING_EVIDENCE_CODE.test(code)) tags.push('reading-evidence');
+  if (WRITTEN_RESPONSE_CODE.test(code)) tags.push('written-response');
+  if (TEXT_DEPENDENT_CODE.test(code)) tags.push('text-dependent');
   return tags;
 }
 

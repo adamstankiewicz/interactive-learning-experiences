@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
-import type { Band, ScoreResult } from '@/lib/draft-meter/schema';
+import { doneMessageFor, type Band, type ScoreResult } from '@/lib/draft-meter/schema';
 import type { DraftMeterSpec } from '@/lib/pathway/schema';
 
 /**
@@ -106,7 +106,10 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
       learningComponentId: spec.learningComponentId,
       standardCode: telemetry.standardCode,
       correct: null,
-      payload: { mode: spec.passage ? 'cite-source' : 'argue', criteria: spec.criteria.length },
+      payload: {
+        mode: spec.passage ? 'cite-source' : 'open-response',
+        checks: spec.checks.map((c) => c.id),
+      },
     });
   }, [telemetry, spec]);
 
@@ -154,7 +157,7 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
           question: spec.question,
           standardCode: spec.standardCode,
           standardDescription: spec.standardDescription,
-          criteria: spec.criteria,
+          checks: spec.checks,
           passage: spec.passage,
         }),
         signal: controller.signal,
@@ -198,7 +201,13 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
         learningComponentId: spec.learningComponentId,
         standardCode: t.standardCode,
         correct: null,
-        payload: { score: scored.score, band: scored.band, signals: scored.signals },
+        // Which checks are missing, by id — the ids differ per standard now, so
+        // this reads as "what this student still owes *this* task".
+        payload: {
+          score: scored.score,
+          band: scored.band,
+          missing: scored.checks.filter((c) => !c.met).map((c) => c.id),
+        },
       });
     }
 
@@ -294,8 +303,10 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
               phase === 'scored' ? 'opacity-100' : 'opacity-50'
             }`}
           >
-            That&apos;s all three — a side, a reason, and evidence
-            {spec.passage ? ' from the text' : ''}.
+            {/* Named by the spec's own checks, so a history meter says "a claim,
+                evidence from the source, and context" rather than the argument
+                trio this widget used to assume everywhere. */}
+            {result?.doneMessage ?? doneMessageFor(spec.checks.map((c) => c.label))}
           </p>
         ) : hint ? (
           <div className="mt-3">

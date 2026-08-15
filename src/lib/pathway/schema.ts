@@ -109,10 +109,44 @@ export const draftMeterSpec = z.object({
         ),
     })
     .nullable(),
-  criteria: z
-    .array(z.string())
+  /**
+   * What this particular meter looks for — the rubric as data.
+   *
+   * The scorer used to hard-code one trio: take a side, say why, cite
+   * something. That is an argument rubric, and it fits an argument standard
+   * and nothing else. "What does May value most in marriage, and what shows
+   * it?" has no side to take, so a student who read the passage perfectly was
+   * still measured against a question the standard never asked.
+   *
+   * Making the checks part of the spec turns one widget into the short-written-
+   * response widget: the meter asks "did you do the things *this* standard
+   * asks for", and the answer differs by standard. Comprehension wants
+   * interpretation, textual support and accuracy; history wants a claim,
+   * source evidence and context; science wants claim, evidence, reasoning.
+   */
+  checks: z
+    .array(
+      z.object({
+        id: z
+          .string()
+          .describe('Short stable key, lowercase, one word, e.g. "claim", "evidence", "accuracy".'),
+        label: z
+          .string()
+          .describe(
+            'Student-facing noun phrase, 1-4 words, that reads inside a sentence: "a claim", "evidence from the source", "context". It is shown when the student finishes, as "That\'s all three — a claim, evidence from the source, and context."',
+          ),
+        lookFor: z
+          .string()
+          .describe('One sentence telling the scorer what counts as meeting this check.'),
+        essential: z
+          .boolean()
+          .describe(
+            'True only when getting this wrong invalidates the response however well written — reading the passage correctly, for instance. At most one check is essential, and for a pure opinion prompt none are.',
+          ),
+      }),
+    )
     .describe(
-      'Give 2-4 short phrases naming what a strong answer contains, drawn from the standard. These ground the scoring call and are never shown to the student.',
+      'Give exactly 3 checks: the three things this standard actually asks a short written response to do. Order them the way a student builds an answer.',
     ),
 });
 

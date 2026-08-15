@@ -1,6 +1,7 @@
 import { buildScoringPrompt, SCORING_SYSTEM } from '@/lib/draft-meter/prompt';
 import {
   bandForScore,
+  doneMessageFor,
   labelForBand,
   modelScore,
   type ScoreRequest,
@@ -38,20 +39,35 @@ export async function scoreDraft(input: ScoreRequest): Promise<ScoreResult> {
   // rather than let an out-of-range score push the meter fill past the track.
   const rawScore = clamp(Math.round(raw.score), 0, 100);
 
-  const criteriaMet = raw.signals.stance && raw.signals.reasoning && raw.signals.evidence;
+  // Judge only the checks that were actually asked for. A model that invents an
+  // id, or drops one, shouldn't be able to move the verdict.
+  const verdicts = new Map(raw.checks.map((c) => [c.id, c.met]));
+  const asked = input.checks.length ? input.checks : [];
+  const met = (id: string) => verdicts.get(id) === true;
+
+  const criteriaMet = asked.length > 0 && asked.every((c) => met(c.id));
 
   /**
-   * Meeting every criterion has to reach the top band, or the widget
-   * contradicts itself: the line reads "almost there" while the pill says
-   * "that's all three". The scoring prompt already states this rule — once a
-   * response takes a position, reasons, and grounds itself in the source it
-   * belongs at 85+ — but the model routinely returns three true signals
-   * alongside a score in the seventies, so the rule is enforced here.
+   * A failed essential check is not "two out of three".
    *
-   * The standard's criteria are the finish line. Anything past it is polish,
-   * and polish is not what this meter measures.
+   * The other checks measure how well a response is built; an essential one
+   * measures whether it is *right* — reading the passage correctly, getting
+   * the history straight. Without this, a fluent, well-supported misreading
+   * scores in the seventies and reads "almost there", which is the confidently
+   * wrong meter this widget exists to avoid. Capped below the top two bands so
+   * the hint keeps pointing back at the source.
    */
-  const score = criteriaMet ? Math.max(rawScore, 85) : rawScore;
+  const missedEssential = asked.some((c) => c.essential && !met(c.id));
+
+  /**
+   * Meeting every check has to reach the top band, or the widget contradicts
+   * itself: the line reads "almost there" while the finish line says "that's
+   * all three". The prompt states this rule too, but the model routinely
+   * returns every check met alongside a score in the seventies, so it is
+   * enforced here. The standard's checks are the finish line — anything past
+   * it is polish, and polish is not what this meter measures.
+   */
+  const score = missedEssential ? Math.min(rawScore, 55) : criteriaMet ? Math.max(rawScore, 85) : rawScore;
   const band = bandForScore(score);
 
   // The nudge is rendered as plain text in a pill, so strip the emphasis marks
@@ -70,6 +86,7 @@ export async function scoreDraft(input: ScoreRequest): Promise<ScoreResult> {
     band,
     label: labelForBand(band),
     criteriaMet,
+    doneMessage: doneMessageFor(asked.map((c) => c.label)),
     confidence: clamp(raw.confidence, 0, 1),
     nudge: criteriaMet || !nudge ? null : nudge,
   };
