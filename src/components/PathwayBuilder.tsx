@@ -1,6 +1,8 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 import { ActivityTrail } from '@/components/pathway/ActivityTrail';
 import { PathwayDocument } from '@/components/pathway/PathwayDocument';
@@ -35,6 +37,7 @@ function gradeLabel(grade: string): string {
 
 export function PathwayBuilder() {
   const teacherNoteId = useId();
+  const searchParams = useSearchParams();
   const [topic, setTopic] = useState('');
   const [gradeHint, setGradeHint] = useState('');
   const [teacherNote, setTeacherNote] = useState('');
@@ -42,6 +45,26 @@ export function PathwayBuilder() {
 
   const streaming = state.status === 'streaming';
   const started = state.status !== 'idle';
+
+  // Pre-fill form from URL parameters
+  useEffect(() => {
+    const topicParam = searchParams.get('topic');
+    const gradeParam = searchParams.get('grade');
+
+    if (topicParam && !topic) {
+      setTopic(topicParam);
+    }
+    if (gradeParam && !gradeHint) {
+      setGradeHint(gradeParam);
+    }
+
+    // Auto-submit if both params present and not already started
+    if (topicParam && gradeParam && !started && !streaming) {
+      setTimeout(() => {
+        start(topicParam, gradeParam, undefined);
+      }, 100);
+    }
+  }, [searchParams, topic, gradeHint, started, streaming, start]);
 
   function runSubmit() {
     if (!topic.trim() || streaming) return;
@@ -67,7 +90,12 @@ export function PathwayBuilder() {
             Pathways
           </span>
           <span className="text-xs text-muted-foreground">Standards-grounded lessons</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            <Link href="/upload">
+              <Button variant="outline" size="sm">
+                Upload File
+              </Button>
+            </Link>
             <ThemeToggle />
           </div>
         </div>
