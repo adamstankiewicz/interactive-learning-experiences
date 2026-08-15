@@ -214,6 +214,7 @@ export function DragSort({ spec, onComplete }: Props) {
       )}
 
       <DndContext
+        id="drag-sort"
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}

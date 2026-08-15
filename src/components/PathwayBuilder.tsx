@@ -136,10 +136,10 @@ export function PathwayBuilder() {
               value={gradeHint || ANY_GRADE}
               onValueChange={(value) => setGradeHint(!value || value === ANY_GRADE ? '' : value)}
             >
-              <SelectTrigger className="h-11 w-full text-base sm:w-40" aria-label="Grade level">
+              <SelectTrigger className={`h-11! w-full sm:w-40 text-sm bg-transparent dark:bg-transparent dark:hover:bg-transparent border-input/50 ${!gradeHint ? 'text-muted-foreground' : ''}`} aria-label="Grade level">
                 <SelectValue>{(value: string | null) => gradeLabel(value ?? ANY_GRADE)}</SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="p-1.5">
                 <SelectItem value={ANY_GRADE}>{gradeLabel(ANY_GRADE)}</SelectItem>
                 {GRADE_OPTIONS.map((grade) => (
                   <SelectItem key={grade} value={grade}>

@@ -134,20 +134,17 @@ function buildInitialPlacement(items: Item[]): Placement {
 function DraggableChip({
   item,
   inZone,
-  phase,
+  feedback,
   isDragging,
   chipRef,
 }: {
   item: Item;
   inZone: boolean;
-  phase: 'idle' | 'correct' | 'wrong';
+  feedback: 'correct' | 'wrong' | null;
   isDragging: boolean;
   chipRef?: (el: HTMLDivElement | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: item.id,
-    disabled: phase !== 'idle',
-  });
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: item.id });
 
   return (
     <div
@@ -159,11 +156,13 @@ function DraggableChip({
       {...attributes}
       {...listeners}
       className={`inline-flex cursor-grab select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        phase !== 'idle'
-          ? 'border-border bg-card text-foreground cursor-default'
-          : inZone
-            ? 'border-primary/40 bg-primary/10 text-foreground hover:border-primary/70'
-            : 'border-border bg-card text-foreground hover:border-muted-foreground/40'
+        feedback === 'correct'
+          ? 'border-success/50 bg-success/10 text-foreground'
+          : feedback === 'wrong'
+            ? 'border-destructive/50 bg-destructive/5 text-foreground'
+            : inZone
+              ? 'border-primary/40 bg-primary/10 text-foreground hover:border-primary/70'
+              : 'border-border bg-card text-foreground hover:border-muted-foreground/40'
       }`}
     >
       {item.label}
@@ -177,8 +176,7 @@ function DropZone({
   id,
   label,
   items,
-  placement,
-  phase,
+  feedback,
   activeId,
   isOver,
   chipRefs,
@@ -187,8 +185,7 @@ function DropZone({
   id: string;
   label?: string;
   items: Item[];
-  placement: Placement;
-  phase: 'idle' | 'correct' | 'wrong';
+  feedback: Record<string, 'correct' | 'wrong' | null>;
   activeId: string | null;
   isOver: boolean;
   chipRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
@@ -200,9 +197,7 @@ function DropZone({
     <div
       ref={setNodeRef}
       className={`flex flex-col gap-2 rounded-lg border-2 p-3 transition-colors ${
-        isOver && phase === 'idle'
-          ? 'border-primary bg-primary/8'
-          : 'border-border'
+        isOver ? 'border-primary bg-primary/8' : 'border-border'
       }`}
       style={{ minHeight: label ? '7rem' : '3.5rem' }}
     >
@@ -213,30 +208,24 @@ function DropZone({
       )}
       <div className="flex flex-wrap gap-2">
         {items.map((item) => {
-          const placed = placement[item.id];
-          const isCorrect = phase !== 'idle' && placed === item.categoryId;
-          const isWrong = phase === 'wrong' && placed !== item.categoryId;
+          const itemFeedback = feedback[item.id] ?? null;
           return (
             <div key={item.id} className="relative">
               <DraggableChip
                 item={item}
                 inZone={id !== 'bank'}
-                phase={phase}
+                feedback={itemFeedback}
                 isDragging={item.id === activeId}
                 chipRef={(el) => { chipRefs.current[item.id] = el; }}
               />
-              {phase !== 'idle' && (
+              {itemFeedback && (
                 <span
                   className={`absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold ${
-                    isCorrect
-                      ? 'bg-success text-white'
-                      : isWrong
-                        ? 'bg-destructive text-white'
-                        : 'bg-muted text-muted-foreground'
+                    itemFeedback === 'correct' ? 'bg-success text-white' : 'bg-destructive text-white'
                   }`}
                   aria-hidden="true"
                 >
-                  {isCorrect ? '✓' : isWrong ? '✗' : ''}
+                  {itemFeedback === 'correct' ? '✓' : '✗'}
                 </span>
               )}
             </div>
@@ -254,7 +243,10 @@ export function DragCategorize({ spec, onComplete }: Props) {
   const [placement, setPlacement] = useState<Placement>(() =>
     buildInitialPlacement(spec.items),
   );
-  const [phase, setPhase] = useState<'idle' | 'correct' | 'wrong'>('idle');
+  const [feedback, setFeedback] = useState<Record<string, 'correct' | 'wrong' | null>>(() =>
+    Object.fromEntries(spec.items.map((it) => [it.id, null])),
+  );
+  const [correct, setCorrect] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [shuffledItems] = useState(() => seededShuffle(spec.items, (it) => it.id));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -288,7 +280,10 @@ export function DragCategorize({ spec, onComplete }: Props) {
   );
 
   const handleDragStart = useCallback(({ active }: DragStartEvent) => {
-    setActiveId(active.id as string);
+    const id = active.id as string;
+    setActiveId(id);
+    setFeedback((prev) => ({ ...prev, [id]: null }));
+    setCorrect(false);
   }, []);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
@@ -336,29 +331,31 @@ export function DragCategorize({ spec, onComplete }: Props) {
   }, []);
 
   const handleSubmit = useCallback(() => {
-    const misplaced = spec.items.filter((it) => placement[it.id] !== it.categoryId);
-    const correct = misplaced.length === 0;
+    const newFeedback: Record<string, 'correct' | 'wrong' | null> = Object.fromEntries(
+      spec.items.map((it) => [it.id, placement[it.id] === it.categoryId ? 'correct' : 'wrong']),
+    );
+    const allCorrect = spec.items.every((it) => placement[it.id] === it.categoryId);
+    setFeedback(newFeedback);
+    setCorrect(allCorrect);
     setAttempts((a) => a + 1);
-    setPhase(correct ? 'correct' : 'wrong');
 
     telemetry.track({
       eventType: 'answer_checked',
       widgetKind: spec.kind,
       learningComponentId: spec.learningComponentId,
       standardCode: telemetry.standardCode,
-      correct,
+      correct: allCorrect,
       payload: {
         attempt: attempts + 1,
-        misplaced: misplaced.length,
-        // Which column a wrong item was dropped into is the diagnosis, so the
-        // confusion is recorded as a pair rather than as a count.
-        confusions: misplaced.map((it) => `${it.categoryId}->${placement[it.id] ?? 'unplaced'}`),
-        // The profile confirms a misconception only from a wrong answer carrying it.
-        ...(correct ? {} : { misconception: spec.hint }),
+        misplaced: spec.items.filter((it) => placement[it.id] !== it.categoryId).length,
+        confusions: spec.items
+          .filter((it) => placement[it.id] !== it.categoryId)
+          .map((it) => `${it.categoryId}->${placement[it.id] ?? 'unplaced'}`),
+        ...(!allCorrect ? { misconception: spec.hint } : {}),
       },
     });
 
-    if (!correct) return;
+    if (!allCorrect) return;
     onComplete?.(true);
 
     if (completedRef.current) return;
@@ -375,13 +372,9 @@ export function DragCategorize({ spec, onComplete }: Props) {
     telemetry.flush();
   }, [placement, spec, onComplete, attempts, telemetry]);
 
-  const handleTryAgain = useCallback(() => {
-    setPlacement(buildInitialPlacement(spec.items));
-    setPhase('idle');
-  }, [spec.items]);
-
   const allPlaced = Object.values(placement).every((v) => v !== null);
   const placedCount = Object.values(placement).filter((v) => v !== null).length;
+  const hasWrongFeedback = spec.items.some((it) => feedback[it.id] === 'wrong');
 
   const bankItems = shuffledItems.filter((it) => placement[it.id] === null);
   const itemsInCategory = (catId: string) =>
@@ -400,7 +393,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
     <div className="flex flex-col gap-4">
       <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
 
-      {phase === 'idle' && (
+      {!correct && (
         <p className="text-xs text-muted-foreground">
           Drag into a category, or press Tab to a chip, Space to pick it up, arrow keys to move
           between zones, and Space again to drop it.
@@ -408,6 +401,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
       )}
 
       <DndContext
+        id="drag-categorize"
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
@@ -453,13 +447,12 @@ export function DragCategorize({ spec, onComplete }: Props) {
         <DropZone
           id="bank"
           items={bankItems}
-          placement={placement}
-          phase={phase}
+          feedback={feedback}
           activeId={activeId}
           isOver={overId === 'bank'}
           chipRefs={chipRefs}
         >
-          {bankItems.length === 0 && phase === 'idle' && (
+          {bankItems.length === 0 && !correct && (
             <p className="text-xs text-muted-foreground">
               All items placed — check your work below.
             </p>
@@ -474,8 +467,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
               id={cat.id}
               label={cat.label}
               items={itemsInCategory(cat.id)}
-              placement={placement}
-              phase={phase}
+              feedback={feedback}
               activeId={activeId}
               isOver={overId === cat.id}
               chipRefs={chipRefs}
@@ -492,29 +484,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
         </DragOverlay>
       </DndContext>
 
-      {phase === 'idle' && (
-        <Button size="lg" className="w-full" disabled={!allPlaced} onClick={handleSubmit}>
-          {allPlaced
-            ? 'Check answers'
-            : `Place all items to check (${placedCount}/${spec.items.length})`}
-        </Button>
-      )}
-
-      {phase === 'wrong' && (
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="flex flex-col gap-3 py-4">
-            <p className="text-sm font-semibold text-destructive">
-              {attempts === 1 ? 'Not quite.' : 'Keep trying!'}
-            </p>
-            <p className="text-sm text-foreground">{spec.hint}</p>
-            <Button size="lg" variant="outline" className="w-full" onClick={handleTryAgain}>
-              Try again
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {phase === 'correct' && (
+      {correct ? (
         <Card className="border-success/30 bg-success/10">
           <CardContent className="flex flex-col gap-3 py-4">
             <p className="text-sm font-semibold text-success">
@@ -526,6 +496,17 @@ export function DragCategorize({ spec, onComplete }: Props) {
             </Button>
           </CardContent>
         </Card>
+      ) : (
+        <>
+          {hasWrongFeedback && (
+            <p className="text-sm text-muted-foreground">{spec.hint}</p>
+          )}
+          <Button size="lg" className="w-full" disabled={!allPlaced} onClick={handleSubmit}>
+            {allPlaced
+              ? 'Check answers'
+              : `Place all items to check (${placedCount}/${spec.items.length})`}
+          </Button>
+        </>
       )}
     </div>
   );
