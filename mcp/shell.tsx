@@ -13,7 +13,14 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { WidgetRenderer } from '@/components/widgets/registry';
+import { HostBridge } from './host-bridge';
+
+// Rendered straight off the catalog rather than through `WidgetRenderer`,
+// which safeParses the spec. That validation belongs where a model's output
+// enters the system, not here — the spec reached this iframe from our own
+// server, and skipping it keeps zod out of the bundle entirely.
+import '@/lib/widgets/builtins';
+import { getWidgetCatalogEntry } from '@/lib/widgets/types';
 
 declare global {
   interface Window {
@@ -69,17 +76,43 @@ function Shell() {
   const [hostSpec, setHostSpec] = useState<unknown>(null);
 
   useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      // Logged so the spike tells us the real envelope shape, not a guess.
-      console.log('[shell] host message', JSON.stringify(event.data)?.slice(0, 600));
+    const bridge = new HostBridge();
+
+    // Still forgiving about where the spec turns up: the handshake is known,
+    // but which notification carries a tool result is not, so anything the
+    // host sends gets searched.
+    window.addEventListener('message', (event: MessageEvent) => {
       const found = findSpec(event.data);
       if (found) setHostSpec(found);
-    }
+    });
 
-    window.addEventListener('message', onMessage);
-    // Announce we are ready. Harmless if the host is not listening.
-    window.parent?.postMessage({ jsonrpc: '2.0', method: 'ui/initialize', params: {} }, '*');
-    return () => window.removeEventListener('message', onMessage);
+    bridge.on('ui/notifications/host-context-changed', (params) => {
+      const styles = (params as { styles?: { variables?: Record<string, string> } })?.styles;
+      if (styles?.variables) bridge.applyHostStyles(styles.variables);
+    });
+
+    void bridge
+      .request('ui/initialize', {
+        protocolVersion: '2025-11-21',
+        appInfo: { name: 'Interactive Learning Widgets', version: '0.1.0' },
+        appCapabilities: {},
+      })
+      .then((reply) => {
+        const found = reply && findSpec(reply);
+        if (found) setHostSpec(found);
+        bridge.reportSizeOnResize();
+      });
+
+    // Slack's app reads its props off the mount node; ours accepts the same.
+    const props = document.getElementById('mcp-app-root')?.dataset.props;
+    if (props) {
+      try {
+        const found = findSpec(JSON.parse(props));
+        if (found) setHostSpec(found);
+      } catch {
+        // A malformed data-props is not worth failing the render over.
+      }
+    }
   }, []);
 
   const spec = hostSpec ?? window.__WIDGET_SPEC__;
@@ -92,9 +125,22 @@ function Shell() {
     );
   }
 
+  const kind = (spec as { kind?: string }).kind ?? '';
+  const entry = getWidgetCatalogEntry(kind);
+
+  if (!entry) {
+    return (
+      <p className="p-6 text-sm text-muted-foreground">
+        No renderer registered for widget kind “{kind}”.
+      </p>
+    );
+  }
+
+  const Component = entry.component;
+
   return (
     <div className="p-4 font-sans">
-      <WidgetRenderer spec={spec} />
+      <Component spec={spec} />
     </div>
   );
 }

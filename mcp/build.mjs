@@ -19,7 +19,41 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'mcp', 'dist');
 mkdirSync(outDir, { recursive: true });
 
+/**
+ * Zod is 320KB of this bundle — 37% — and the shell never needs it.
+ *
+ * Specs reach the iframe from our own MCP server, so re-validating them in the
+ * browser re-checks work already done server-side, where the model output
+ * actually crosses a trust boundary. It cannot simply be dropped, though: the
+ * widget definition modules import `pathway/schema.ts` for their spec types,
+ * and those schemas are built at module scope.
+ *
+ * So it is replaced with a proxy that absorbs the whole chainable API and
+ * returns itself. `z.object({...}).describe('x').nullable()` becomes a no-op.
+ * Nothing in the shell calls `.parse()`; if that ever changes, this stub is
+ * where the surprise will come from.
+ */
+const stubZod = {
+  name: 'stub-zod',
+  setup(pluginBuild) {
+    pluginBuild.onResolve({ filter: /^zod$/ }, () => ({ path: 'zod', namespace: 'stub-zod' }));
+    pluginBuild.onLoad({ filter: /.*/, namespace: 'stub-zod' }, () => ({
+      contents: `
+        const hit = () => proxy;
+        const proxy = new Proxy(hit, {
+          get: (_t, prop) => (prop === 'then' ? undefined : proxy),
+          apply: () => proxy,
+        });
+        export const z = proxy;
+        export default proxy;
+      `,
+      loader: 'js',
+    }));
+  },
+};
+
 const result = await build({
+  plugins: [stubZod],
   entryPoints: [join(root, 'mcp', 'shell.tsx')],
   bundle: true,
   format: 'iife',
@@ -72,6 +106,7 @@ const html = `<!doctype html>
 </head>
 <body>
 <div id="root"></div>
+<div id="mcp-app-root" data-props="{}" hidden></div>
 <script>
   // A host will replace this. Standalone, it is what makes the file openable.
   window.__WIDGET_SPEC__ = ${JSON.stringify(DEMO_SPEC)};

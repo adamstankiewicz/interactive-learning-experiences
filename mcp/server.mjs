@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 const root = dirname(fileURLToPath(import.meta.url));
-const SHELL_URI = 'ui://widget/shell';
+const SHELL_URI = 'ui://widget/learning-widget.html';
 const API_ORIGIN = process.env.WIDGET_API_ORIGIN ?? 'http://localhost:3100';
 
 function shellHtml() {
@@ -66,13 +66,35 @@ const DEMO_SPEC = {
 
 const server = new McpServer({ name: 'interactive-learning-widgets', version: '0.1.0' });
 
+/**
+ * `_meta.ui` goes on the RESOURCE, not only on the tool.
+ *
+ * This is the piece that was missing first time round, found by listing what
+ * the shipping first-party apps declare: Atlassian's Jira widget and Slack's
+ * message form both carry it here. And the CSP keys are `connectDomains` /
+ * `resourceDomains` — not the `connect` that seemed the obvious guess, which
+ * meant our scoring origin was never actually allow-listed.
+ */
+const UI_META = {
+  ui: {
+    resourceUri: SHELL_URI,
+    prefersBorder: false,
+    csp: {
+      connectDomains: [API_ORIGIN],
+      resourceDomains: [],
+    },
+  },
+};
+
 server.registerResource(
-  'widget-shell',
+  'learning-widget',
   SHELL_URI,
   {
-    title: 'Interactive widget shell',
-    description: 'Renders any learning widget spec.',
+    title: 'Interactive learning widget',
+    description: 'Renders any learning widget spec — draft meter, crossword, drag activities.',
     mimeType: 'text/html;profile=mcp-app',
+    annotations: { audience: ['user'], priority: 1 },
+    _meta: UI_META,
   },
   async (uri) => ({
     contents: [
@@ -97,17 +119,9 @@ server.registerTool(
         .optional()
         .describe('Optional topic. Ignored by the spike, which always returns the sample editorial.'),
     },
-    // MCP Apps: this is the whole declaration that turns a tool into a UI.
-    _meta: {
-      ui: {
-        resourceUri: SHELL_URI,
-        visibility: ['model', 'app'],
-        // The host blocks connections to undeclared origins, so the scoring
-        // endpoint has to be named here or the meter cannot score.
-        csp: { connect: [API_ORIGIN] },
-        prefersBorder: false,
-      },
-    },
+    // The host blocks connections to undeclared origins, so the scoring
+    // endpoint has to be named in csp.connectDomains or the meter cannot score.
+    _meta: UI_META,
   },
   async () => ({
     content: [
@@ -117,7 +131,7 @@ server.registerTool(
       },
     ],
     structuredContent: { spec: DEMO_SPEC },
-    _meta: { ui: { resourceUri: SHELL_URI } },
+    _meta: UI_META,
   }),
 );
 
