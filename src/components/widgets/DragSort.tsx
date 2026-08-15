@@ -25,23 +25,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { DragSortSpec } from '@/lib/pathway/schema';
+import { seededShuffle } from '@/lib/widgets/shuffle';
 
 type Item = DragSortSpec['items'][number];
 type Props = { spec: DragSortSpec; onComplete?: (correct: boolean) => void };
-
-// Deterministic shuffle — stable across re-renders, never matches correct order.
-function shuffle(items: Item[]): Item[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const seed = copy.slice(0, i + 1).reduce((acc, it) => acc + it.id.charCodeAt(0), 0);
-    const j = seed % (i + 1);
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  if (copy.map((it) => it.id).join() === items.map((it) => it.id).join()) {
-    copy.unshift(copy.pop()!);
-  }
-  return copy;
-}
 
 // ── Single sortable row ───────────────────────────────────────────────────────
 
@@ -125,7 +112,9 @@ function SortableItem({
 // ── Widget ────────────────────────────────────────────────────────────────────
 
 export function DragSort({ spec, onComplete }: Props) {
-  const [items, setItems] = useState<Item[]>(() => shuffle(spec.items));
+  const [items, setItems] = useState<Item[]>(() =>
+    seededShuffle(spec.items, (it) => it.id, spec.correctOrder),
+  );
   const [phase, setPhase] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [attempts, setAttempts] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);

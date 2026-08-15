@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { DragCategorizeSpec } from '@/lib/pathway/schema';
+import { seededShuffle } from '@/lib/widgets/shuffle';
 
 type Item = DragCategorizeSpec['items'][number];
 type Category = DragCategorizeSpec['categories'][number];
@@ -126,16 +127,6 @@ export function varyDragCategorize(base: DragCategorizeSpec, level: number): Dra
 
 function buildInitialPlacement(items: Item[]): Placement {
   return Object.fromEntries(items.map((it) => [it.id, null]));
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const seed = copy.slice(0, i + 1).reduce((acc, it) => acc + JSON.stringify(it).charCodeAt(0), 0);
-    const j = seed % (i + 1);
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
 }
 
 // ── Draggable chip ────────────────────────────────────────────────────────────
@@ -265,7 +256,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
   );
   const [phase, setPhase] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [attempts, setAttempts] = useState(0);
-  const [shuffledItems] = useState(() => shuffle(spec.items));
+  const [shuffledItems] = useState(() => seededShuffle(spec.items, (it) => it.id));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
