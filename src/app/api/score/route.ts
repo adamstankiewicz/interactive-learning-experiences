@@ -32,7 +32,9 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await scoreDraft(parsed.data));
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Scoring failed.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // The provider's message can name models, regions and quota state, so it is
+    // logged rather than returned. The widget only branches on the status.
+    console.error('[score] scoring failed', error);
+    return NextResponse.json({ error: 'Scoring failed.' }, { status: 500 });
   }
 }

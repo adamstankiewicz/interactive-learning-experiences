@@ -91,16 +91,28 @@ export type ScoreResult = ModelScore & {
   criteriaMet: boolean;
 };
 
-/** What the widget posts. Parsed rather than trusted — it crosses the network. */
+/**
+ * What the widget posts. Parsed rather than trusted — it crosses the network.
+ *
+ * Every field here is pasted into a prompt, so each one is bounded. Unlike the
+ * generation schemas, these are hard `.max()` limits rather than described
+ * bounds: nothing downstream can normalise an over-long field, and the request
+ * is cheaper to reject than to pay a model to read. The caps are far above any
+ * real draft — they exist to stop a stranger turning this route into billable
+ * inference, not to constrain a student.
+ */
+const MAX_DRAFT = 20_000;
+const MAX_PROMPT_FIELD = 2_000;
+
 export const scoreRequest = z.object({
-  response: z.string(),
-  question: z.string(),
-  standardCode: z.string(),
-  standardDescription: z.string(),
-  criteria: z.array(z.string()).default([]),
+  response: z.string().max(MAX_DRAFT),
+  question: z.string().max(MAX_PROMPT_FIELD),
+  standardCode: z.string().max(64),
+  standardDescription: z.string().max(MAX_PROMPT_FIELD),
+  criteria: z.array(z.string().max(300)).max(10).default([]),
   /** Present for reading standards; null when the argument comes from the student. */
   passage: z
-    .object({ source: z.string(), text: z.string() })
+    .object({ source: z.string().max(300), text: z.string().max(MAX_PROMPT_FIELD) })
     .nullable()
     .default(null),
 });

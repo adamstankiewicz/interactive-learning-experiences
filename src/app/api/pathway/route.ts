@@ -6,6 +6,14 @@ import { loadProfile } from '@/lib/student/profile';
 
 export const maxDuration = 120;
 
+/**
+ * Both of these are pasted into prompts, so both are bounded before they get
+ * there. A topic is a phrase; anything longer is not a topic, and running the
+ * five-stage pipeline over it is billable work done on a stranger's behalf.
+ */
+const MAX_TOPIC = 300;
+const MAX_GRADE_HINT = 60;
+
 function errorStream(message: string, status: number) {
   return new Response(encodeEvent({ type: 'error', message }), {
     status,
@@ -24,9 +32,14 @@ export async function POST(request: Request) {
 
   const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
   if (!topic) return errorStream('A topic is required.', 400);
+  if (topic.length > MAX_TOPIC) {
+    return errorStream(`A topic has to be shorter than ${MAX_TOPIC} characters.`, 400);
+  }
 
   const gradeHint =
-    typeof body.gradeHint === 'string' && body.gradeHint.trim() ? body.gradeHint.trim() : undefined;
+    typeof body.gradeHint === 'string' && body.gradeHint.trim()
+      ? body.gradeHint.trim().slice(0, MAX_GRADE_HINT)
+      : undefined;
   const studentId = typeof body.studentId === 'string' && body.studentId ? body.studentId : null;
 
   const encoder = new TextEncoder();
