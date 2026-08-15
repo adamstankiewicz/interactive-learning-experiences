@@ -53,7 +53,16 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
+/*
+ * `.light-surface` re-declares this same palette for one subtree. The student
+ * surfaces (/learn and a shared pathway) hard-code pastel light chrome — a
+ * violet/pink gradient and white cards, with no dark variants — but the widgets
+ * they host are token-themed. Without this, a student in dark mode gets
+ * `--foreground` near-white on those hard-coded white cards, i.e. invisible
+ * feedback text, and `bg-card` chips render near-black.
+ */
+:root,
+.light-surface {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
