@@ -89,6 +89,33 @@ export default function DemoIndex() {
           </li>
         ))}
       </ul>
+
+      {/* Not a seventh production widget — a research prototype for the
+          generative-widget-authoring phase, kept visually distinct rather
+          than folded into the grid above. */}
+      <div className="mt-10 border-t border-border pt-8">
+        <h2 className="text-sm font-semibold tracking-tight text-muted-foreground uppercase">
+          Prototypes
+        </h2>
+        <ul className="mt-3" role="list">
+          <li>
+            <Link
+              href="/demo/ag-ui-draft-meter"
+              className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted"
+            >
+              <span>
+                <span className="font-medium">Draft Meter, on AG-UI + json-render</span>
+                <span className="ml-2 text-muted-foreground">
+                  Phase 3a research prototype — not wired into the pathway pipeline
+                </span>
+              </span>
+              <span aria-hidden="true" className="text-muted-foreground group-hover:text-foreground">
+                →
+              </span>
+            </Link>
+          </li>
+        </ul>
+      </div>
     </main>
   );
 }

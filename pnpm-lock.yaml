@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@ag-ui/core':
+        specifier: ^0.0.58
+        version: 0.0.58
       '@ai-sdk/amazon-bedrock':
         specifier: ^5.0.55
         version: 5.0.55(zod@4.4.3)
@@ -26,6 +29,12 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.8)
+      '@json-render/core':
+        specifier: ^0.19.0
+        version: 0.19.0(zod@4.4.3)
+      '@json-render/react':
+        specifier: ^0.19.0
+        version: 0.19.0(react@19.2.8)(zod@4.4.3)
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.4.3)
@@ -101,6 +110,9 @@ importers:
         version: 5.9.3
 
 packages:
+
+  '@ag-ui/core@0.0.58':
+    resolution: {integrity: sha512-XgGb7YmhV+yMBaEmlrpsd5S+nUxq0JgSegss2t4gIFR1j7w3w0ibtKfRgcQHWeMvwZxcT5S28VEEarqtgxYYHw==}
 
   '@ai-sdk/amazon-bedrock@5.0.55':
     resolution: {integrity: sha512-p064NNPJeXNzkAaagxQKU1Ns9fq7H7iqhv9nfnX89ZHu+3mnBJDf+W6p/lcDCxJfG/naOFJOiafvHRSO40cZoA==}
@@ -609,6 +621,16 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@json-render/core@0.19.0':
+    resolution: {integrity: sha512-vvcyZ+10EDZKbEyB1J2kXOGfDaiZR2LurZGSqi2r5STHyKr+Te85DWaBxTwRGgM7U1LtIvNx85BzzjElRKoAIg==}
+    peerDependencies:
+      zod: ^4.0.0
+
+  '@json-render/react@0.19.0':
+    resolution: {integrity: sha512-kTW6b6cSNRrlEfCUf/69SLoLn+CufC968ruge9tnQlp9pDTGG/SK8pgM541FdgwMFA4zm3s5mpM3G8rdODKc/A==}
+    peerDependencies:
+      react: ^19.2.3
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
@@ -3217,6 +3239,10 @@ packages:
 
 snapshots:
 
+  '@ag-ui/core@0.0.58':
+    dependencies:
+      zod: 3.25.76
+
   '@ai-sdk/amazon-bedrock@5.0.55(zod@4.4.3)':
     dependencies:
       '@ai-sdk/anthropic': 4.0.38(zod@4.4.3)
@@ -3757,6 +3783,17 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@json-render/core@0.19.0(zod@4.4.3)':
+    dependencies:
+      zod: 4.4.3
+
+  '@json-render/react@0.19.0(react@19.2.8)(zod@4.4.3)':
+    dependencies:
+      '@json-render/core': 0.19.0(zod@4.4.3)
+      react: 19.2.8
+    transitivePeerDependencies:
+      - zod
 
   '@modelcontextprotocol/sdk@1.30.0(zod@3.25.76)':
     dependencies:
