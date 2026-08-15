@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { ActivityTrail } from '@/components/pathway/ActivityTrail';
 import { PathwayDocument } from '@/components/pathway/PathwayDocument';
+import { ShareLink } from '@/components/pathway/ShareLink';
 import { ThemeToggle } from '@/components/pathway/ThemeToggle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -164,6 +165,8 @@ export function PathwayBuilder() {
             <AlertDescription>{state.error}</AlertDescription>
           </Alert>
         )}
+
+        {state.status === 'done' && state.sessionId && <ShareLink sessionId={state.sessionId} />}
 
         <PathwayDocument state={state} />
       </main>

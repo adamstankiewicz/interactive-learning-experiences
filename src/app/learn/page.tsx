@@ -3,12 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { WidgetRenderer } from '@/components/widgets/registry';
-import { WidgetTelemetryProvider } from '@/components/widgets/telemetry-context';
-import { useTelemetry } from '@/hooks/useTelemetry';
+import { PathwayWalkthrough, type WalkthroughSession } from '@/components/pathway/PathwayWalkthrough';
 import { useVoiceIntake } from '@/hooks/useVoiceIntake';
 import type { PathwayEvent } from '@/lib/pathway/events';
-import type { PathwayPlan } from '@/lib/pathway/schema';
 
 /**
  * The student-facing counterpart to the pathway builder on `/`.
@@ -18,45 +15,18 @@ import type { PathwayPlan } from '@/lib/pathway/schema';
  * Styling is deliberately local rather than global so the design system on `/`
  * is untouched.
  *
- * A pathway is several steps now, not one widget, so a session is a
- * walkthrough: the student clears each step's activity before the next one
- * appears, and only once every step is done does the round finish.
+ * This page owns *generating* a session (voice/typed topic in, streamed
+ * pathway out); once one exists, `PathwayWalkthrough` owns walking through
+ * it — the same component `/learn/[sessionId]` uses for a persisted,
+ * shared pathway, so a live build and a shared link end in the identical
+ * student experience.
  */
-
-type Session = {
-  sessionId: string | null;
-  topic: string;
-  bigIdea: string;
-  standardCode: string | null;
-  steps: PathwayPlan['steps'];
-  /** stepIndex -> widget. A missing key means that step hasn't finished building. */
-  stepWidgets: Record<number, unknown>;
-  stepWidgetNotes: Record<number, string>;
-  currentStep: number;
-};
 
 const BUILDING_LINES = [
   'Finding the right lesson…',
   'Asking the knowledge graph…',
   'Building your activities…',
 ];
-
-/**
- * Some widgets (swiper-flashcard, drag-sort, drag-categorize) report their own
- * completion through `onComplete` — there is a moment the student is
- * unambiguously "done". Fraction area model, Draft Meter, and Crossword have
- * no such moment: an area model is checked as many times as a student likes,
- * a meter just keeps scoring as they type, and a crossword can sit
- * partially solved. Those three need an explicit "I'm done" action instead
- * of an automatic one.
- */
-const SELF_ADVANCING_KINDS = new Set(['swiper-flashcard', 'drag-sort', 'drag-categorize']);
-
-function widgetKindOf(widget: unknown): string | null {
-  return widget && typeof widget === 'object' && 'kind' in widget && typeof widget.kind === 'string'
-    ? widget.kind
-    : null;
-}
 
 export default function LearnPage() {
   // Lazy initializer: reads the cached id (if any) exactly once, at mount,
@@ -65,15 +35,12 @@ export default function LearnPage() {
   const [studentId, setStudentId] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : localStorage.getItem('studentId'),
   );
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<WalkthroughSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
-  const [stars, setStars] = useState(0);
   const [round, setRound] = useState(0);
   const [line, setLine] = useState(0);
-
-  const telemetry = useTelemetry(session?.sessionId ?? null, studentId);
 
   useEffect(() => {
     if (studentId) return;
@@ -108,7 +75,7 @@ export default function LearnPage() {
         });
         if (!response.body) throw new Error('No response from the server.');
 
-        const next: Session = {
+        const next: WalkthroughSession = {
           sessionId: null,
           topic,
           bigIdea: '',
@@ -116,7 +83,6 @@ export default function LearnPage() {
           steps: [],
           stepWidgets: {},
           stepWidgetNotes: {},
-          currentStep: 0,
         };
 
         const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -166,41 +132,9 @@ export default function LearnPage() {
 
   const voice = useVoiceIntake(build);
 
-  const advanceStep = useCallback(() => {
-    setStars((n) => n + 1);
-    telemetry.flush();
-    setSession((current) => (current ? { ...current, currentStep: current.currentStep + 1 } : current));
-  }, [telemetry]);
-
-  const finished = session
-    ? session.steps.length > 0 && session.currentStep >= session.steps.length
-    : false;
-  const currentWidget = session ? session.stepWidgets[session.currentStep] : undefined;
-  const currentKind = widgetKindOf(currentWidget);
-
   return (
     <div className="min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
-        {session && (
-          <div className="flex w-full items-center justify-between">
-            <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 text-xs font-bold text-violet-600">
-              {session.standardCode ?? '✨ exploring'}
-            </span>
-            <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
-              <motion.span
-                key={stars}
-                initial={{ scale: 1.8, rotate: -20 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-                className="text-xl"
-              >
-                ⭐
-              </motion.span>
-              <span className="text-lg font-black text-amber-600">{stars}</span>
-            </span>
-          </div>
-        )}
-
         {!session && (
           <AnimatePresence mode="wait">
             <motion.h1
@@ -275,97 +209,20 @@ export default function LearnPage() {
           </>
         )}
 
-        {session && !finished && (
-          <motion.div
+        {session && (
+          <PathwayWalkthrough
             key={round}
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-            className="flex w-full flex-col items-center gap-5"
-          >
-            <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
-
-            {session.steps.length > 1 && (
-              <div className="flex w-full items-center gap-1.5" aria-hidden="true">
-                {session.steps.map((_, index) => (
-                  <div
-                    key={index}
-                    className={`h-1.5 flex-1 rounded-full transition-colors ${
-                      index < session.currentStep
-                        ? 'bg-emerald-400'
-                        : index === session.currentStep
-                          ? 'bg-violet-400'
-                          : 'bg-white/60'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-
-            {currentWidget ? (
-              <div className="w-full rounded-3xl border-4 border-violet-200 bg-white/80 p-4">
-                <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode}>
-                  <WidgetRenderer
-                    key={session.currentStep}
-                    spec={currentWidget}
-                    onComplete={SELF_ADVANCING_KINDS.has(currentKind ?? '') ? advanceStep : undefined}
-                  />
-                </WidgetTelemetryProvider>
-
-                {/* Fraction area model, Draft Meter, and Crossword have no "done"
-                    moment of their own, so the student says when they're ready to move on. */}
-                {currentKind && !SELF_ADVANCING_KINDS.has(currentKind) && (
-                  <button
-                    type="button"
-                    onClick={advanceStep}
-                    className="mt-4 w-full rounded-2xl bg-emerald-500 py-3 font-black text-white shadow-[0_5px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857]"
-                  >
-                    {session.currentStep + 1 === session.steps.length ? "I'm done! 🎉" : 'Next activity →'}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p className="rounded-2xl border-4 border-violet-200 bg-white/80 p-4 text-center font-bold text-violet-500">
-                ✨ Building this activity…
-              </p>
-            )}
-          </motion.div>
-        )}
-
-        {session && finished && (
-          <motion.div
-            key={`${round}-done`}
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-            className="flex w-full flex-col items-center gap-5"
-          >
-            <p className="text-center text-4xl">🎉</p>
-            <p className="text-center text-xl font-black text-balance">
-              All done — {session.steps.length} activities, {stars} stars!
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => void build(session.topic)}
-                disabled={busy}
-                className="rounded-2xl bg-amber-400 px-7 py-3 font-black text-amber-950 shadow-[0_5px_0_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_0_#b45309] disabled:opacity-50"
-              >
-                {busy ? 'Building…' : 'Another one! 🚀'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSession(null);
-                  setTyped('');
-                }}
-                className="rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-black text-violet-600"
-              >
-                New topic
-              </button>
-            </div>
-          </motion.div>
+            session={session}
+            studentId={studentId}
+            onRestart={{
+              another: () => void build(session.topic),
+              newTopic: () => {
+                setSession(null);
+                setTyped('');
+              },
+              busy,
+            }}
+          />
         )}
       </main>
     </div>

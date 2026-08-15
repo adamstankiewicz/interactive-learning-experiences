@@ -40,7 +40,10 @@ create table if not exists public.pathway_sessions (
   widget         jsonb,
   -- stepIndex -> the widget generated for that step, e.g. {"0": {...}, "2": {...}}.
   step_widgets   jsonb not null default '{}'::jsonb,
-  standard_code  text generated always as (anchor -> 'standard' ->> 'statementCode') stored,
+  -- 'code', not the old 'statementCode' — the StandardsSource abstraction
+  -- renamed the in-memory field (learning-commons.ts et al.), and the JSON
+  -- persisted here follows whatever the JS object's property names are.
+  standard_code  text generated always as (anchor -> 'standard' ->> 'code') stored,
   created_at     timestamptz not null default now()
 );
 
@@ -49,6 +52,15 @@ create table if not exists public.pathway_sessions (
 -- exists, so existing installs need this run explicitly in the SQL editor.
 alter table public.pathway_sessions
   add column if not exists step_widgets jsonb not null default '{}'::jsonb;
+
+-- Migration for an install created before the StandardsSource rename: a
+-- generated column's expression can't be altered in place, so drop and
+-- recreate it. Existing rows still have `anchor->'standard'->>'statementCode'`
+-- in their stored JSON from before the rename — this only fixes newly
+-- inserted rows going forward, it does not backfill old ones.
+alter table public.pathway_sessions drop column if exists standard_code;
+alter table public.pathway_sessions
+  add column standard_code text generated always as (anchor -> 'standard' ->> 'code') stored;
 
 create index if not exists pathway_sessions_student_idx
   on public.pathway_sessions (student_id, created_at desc);

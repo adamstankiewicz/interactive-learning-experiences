@@ -145,6 +145,30 @@ export function usePathwayStream() {
     dispatch({ kind: 'stop', at: Date.now() });
   }, []);
 
+  // Same anonymous identity `/learn` mints and caches — one per browser,
+  // shared across both surfaces. Without one, `/api/pathway` has nothing to
+  // call `persistSession` with, and a build here produces nothing to share.
+  const studentIdRef = useRef<string | null>(
+    typeof window === 'undefined' ? null : localStorage.getItem('studentId'),
+  );
+
+  const ensureStudentId = useCallback(async (): Promise<string | null> => {
+    if (studentIdRef.current) return studentIdRef.current;
+
+    try {
+      const response = await fetch('/api/student', { method: 'POST' });
+      if (!response.ok) return null;
+      const data = (await response.json()) as { studentId?: string };
+      if (!data.studentId) return null;
+
+      localStorage.setItem('studentId', data.studentId);
+      studentIdRef.current = data.studentId;
+      return data.studentId;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const start = useCallback(async (topic: string, gradeHint: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -153,10 +177,11 @@ export function usePathwayStream() {
     dispatch({ kind: 'start', at: Date.now(), topic });
 
     try {
+      const studentId = await ensureStudentId();
       const response = await fetch('/api/pathway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, gradeHint }),
+        body: JSON.stringify({ topic, gradeHint, studentId }),
         signal: controller.signal,
       });
 
@@ -200,7 +225,7 @@ export function usePathwayStream() {
         at: Date.now(),
       });
     }
-  }, []);
+  }, [ensureStudentId]);
 
   return { state, start, cancel };
 }
