@@ -41,12 +41,20 @@ export function useTelemetry(
     lastEventAt.current = mountedAt.current;
   }, []);
 
+  // Kept current via an effect rather than a direct render-body assignment —
+  // both refs are only ever read later (inside `flush`'s callbacks), never
+  // during this same render, so the one-tick-later sync an effect implies
+  // costs nothing here and keeps the assignment out of the render body.
   const onRemediationRef = useRef(onRemediation);
-  onRemediationRef.current = onRemediation;
+  useEffect(() => {
+    onRemediationRef.current = onRemediation;
+  });
 
   // Ref so flush() always reads the latest step without needing to be recreated.
   const currentStepRef = useRef(currentStep);
-  currentStepRef.current = currentStep;
+  useEffect(() => {
+    currentStepRef.current = currentStep;
+  });
 
   const flush = useCallback(
     (useBeacon = false) => {
