@@ -183,7 +183,13 @@ export function PathwayBuilder() {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="overflow-hidden"
+                // `overflow-hidden` is required for the height animation, but it
+                // also clips paint effects that extend past the layout box —
+                // the pressed-button shadow on "Build pathway"/"Rebuild" is one.
+                // Bottom padding here (not on the row below) pulls the auto
+                // height calculation out far enough that the shadow fits inside
+                // the clipped box instead of getting cut off.
+                className="overflow-hidden pb-1.5"
               >
                 <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
                   <Select
