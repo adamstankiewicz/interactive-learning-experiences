@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { widgetSpec } from "@/lib/pathway/schema";
@@ -66,5 +66,12 @@ export function WidgetRenderer({
   }
 
   const Component = definition.component;
-  return <Component spec={parsed.data} onComplete={onComplete} />;
+  // Each catalog entry holds a `lazy()` component, so only the widget kinds a
+  // pathway actually renders are downloaded — the registry is a runtime map,
+  // so a static import here would put all fourteen in every route's bundle.
+  return (
+    <Suspense fallback={<div className="h-24 animate-pulse rounded-lg bg-muted/50" />}>
+      <Component spec={parsed.data} onComplete={onComplete} />
+    </Suspense>
+  );
 }

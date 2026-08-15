@@ -1,4 +1,4 @@
-import { Crossword } from '@/components/widgets/Crossword';
+import { lazy } from 'react';
 import { crosswordSpec, type CrosswordSpec } from '@/lib/pathway/schema';
 import { reachesGrade } from '@/lib/standards/grade';
 import { registerWidgetCatalog } from '@/lib/widgets/types';
@@ -8,7 +8,9 @@ const MIN_GRADE = 1;
 registerWidgetCatalog<CrosswordSpec>({
   kind: 'crossword',
   schema: crosswordSpec,
-  component: Crossword,
+  component: lazy(() =>
+    import('@/components/widgets/Crossword').then((m) => ({ default: m.Crossword })),
+  ),
   // Every standard carries vocabulary in principle, but solving a crossword needs
   // baseline independent reading — gated at grade 1, not kindergarten.
   coverageRule: (standard) => reachesGrade(standard.gradeLevels, MIN_GRADE),
