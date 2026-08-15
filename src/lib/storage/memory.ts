@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
+import { SEED_STUDENTS } from '@/lib/roster/seed';
+import type { Assignment, RosterStudent } from '@/lib/roster/types';
 import { EMPTY_PROFILE, type StudentProfile } from '@/lib/student/schema';
 import type {
   InteractionEvent,
   MasteryRollupRow,
   PersistedSession,
   RecentInteraction,
+  SessionStudentRow,
+  SessionSummary,
   StorageAdapter,
 } from '@/lib/storage/types';
 
@@ -35,6 +39,7 @@ type StoredSession = PersistedSession & {
   rejectedCodes: string[];
   openCount: number;
   completionCount: number;
+  createdAt: string;
 };
 
 type MemoryStore = {
@@ -42,22 +47,35 @@ type MemoryStore = {
   sessions: Map<string, StoredSession>;
   interactions: InteractionEvent[];
   profiles: Map<string, StudentProfile>;
+  rosterStudents: Map<string, RosterStudent>;
+  assignments: Assignment[];
+  // keyed as "sessionId:studentId" — upsert semantics, no double-counting
+  sessionOpens: Set<string>;
 };
 
 const globalStore = globalThis as typeof globalThis & { __pathwayMemoryStore?: MemoryStore };
 
 if (!globalStore.__pathwayMemoryStore) {
+  const seededRosterStudents = new Map<string, RosterStudent>();
+  for (const s of SEED_STUDENTS) {
+    const id = randomUUID();
+    seededRosterStudents.set(id, { ...s, id });
+  }
+
   globalStore.__pathwayMemoryStore = {
     students: new Set(),
     sessions: new Map(),
     interactions: [],
     profiles: new Map(),
+    rosterStudents: seededRosterStudents,
+    assignments: [],
+    sessionOpens: new Set(),
   };
 }
 
 const store: MemoryStore = globalStore.__pathwayMemoryStore;
 
-const { students, sessions, interactions, profiles } = store;
+const { students, sessions, interactions, profiles, rosterStudents, assignments, sessionOpens } = store;
 
 export const memoryStorageAdapter: StorageAdapter = {
   id: 'memory',
@@ -89,6 +107,7 @@ export const memoryStorageAdapter: StorageAdapter = {
       rejectedCodes: input.rejectedCodes,
       openCount: 0,
       completionCount: 0,
+      createdAt: new Date().toISOString(),
     });
     return id;
   },
@@ -100,9 +119,8 @@ export const memoryStorageAdapter: StorageAdapter = {
     return true;
   },
 
-  async recordSessionOpen(sessionId) {
-    const session = sessions.get(sessionId);
-    if (session) session.openCount += 1;
+  async recordSessionOpen(sessionId, studentId) {
+    sessionOpens.add(`${sessionId}:${studentId}`);
   },
 
   async recordSessionCompletion(sessionId) {
@@ -113,7 +131,8 @@ export const memoryStorageAdapter: StorageAdapter = {
   async sessionStats(sessionId) {
     const session = sessions.get(sessionId);
     if (!session) return null;
-    return { openCount: session.openCount, completionCount: session.completionCount };
+    const openCount = [...sessionOpens].filter((k) => k.startsWith(`${sessionId}:`)).length;
+    return { openCount, completionCount: session.completionCount };
   },
 
   async loadSession(sessionId) {
@@ -172,5 +191,121 @@ export const memoryStorageAdapter: StorageAdapter = {
       .slice(-limit)
       .reverse()
       .map((event) => ({ eventType: event.eventType, correct: event.correct, elapsedMs: event.elapsedMs, payload: event.payload }));
+  },
+
+  async listRosterStudents() {
+    return [...rosterStudents.values()];
+  },
+
+  async getRosterStudent(id) {
+    return rosterStudents.get(id) ?? null;
+  },
+
+  async createRosterStudent(student) {
+    const id = randomUUID();
+    const row: RosterStudent = { ...student, id };
+    rosterStudents.set(id, row);
+    return row;
+  },
+
+  async updateRosterStudent(id, student) {
+    if (!rosterStudents.has(id)) return null;
+    const row: RosterStudent = { ...student, id };
+    rosterStudents.set(id, row);
+    return row;
+  },
+
+  async createAssignment(input) {
+    const assignment: Assignment = {
+      id: randomUUID(),
+      rosterStudentId: input.rosterStudentId,
+      sessionId: input.sessionId,
+      topic: input.topic,
+      createdAt: new Date().toISOString(),
+    };
+    assignments.push(assignment);
+    return assignment;
+  },
+
+  async listAssignmentsForStudent(rosterStudentId) {
+    return assignments.filter((a) => a.rosterStudentId === rosterStudentId);
+  },
+
+  async listAssignmentsForSession(sessionId) {
+    return assignments.filter((a) => a.sessionId === sessionId);
+  },
+
+  async listSessions(limit = 50): Promise<SessionSummary[]> {
+    return [...sessions.values()]
+      .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+      .slice(0, limit)
+      .map((s) => ({
+        id: s.id,
+        topic: s.topic,
+        standardCode: (s.anchor as { standard?: { code?: string } })?.standard?.code ?? null,
+        gradeHint: s.gradeHint,
+        openCount: [...sessionOpens].filter((k) => k.startsWith(`${s.id}:`)).length,
+        completionCount: s.completionCount,
+        createdAt: s.createdAt ?? new Date().toISOString(),
+      }));
+  },
+
+  async sessionReport(sessionId): Promise<SessionStudentRow[]> {
+    // Build a map from anonymous studentId → assignment (roster link).
+    const sessionAssignments = assignments.filter((a) => a.sessionId === sessionId);
+    const sessionObj = sessions.get(sessionId);
+    // Map: anonymous studentId → { rosterStudentId, name }
+    const rosterByAnon = new Map<string, { rosterStudentId: string; name: string }>();
+    for (const a of sessionAssignments) {
+      const student = rosterStudents.get(a.rosterStudentId);
+      // The anonymous studentId is on the session row created during assignment
+      const sessionForAssignment = [...sessions.values()].find((s) => s.id === a.sessionId);
+      if (sessionForAssignment && student) {
+        rosterByAnon.set(sessionForAssignment.studentId, {
+          rosterStudentId: a.rosterStudentId,
+          name: student.name,
+        });
+      }
+    }
+
+    // Aggregate interaction events per student for this session.
+    const byStudent = new Map<string, {
+      attempts: number; correctCount: number; hintsUsed: number;
+      elapsedMs: number[]; lastSeenAt: string;
+    }>();
+
+    for (const event of interactions) {
+      if (event.sessionId !== sessionId) continue;
+      const row = byStudent.get(event.studentId) ?? { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date(0).toISOString() };
+      if (event.correct !== null) row.attempts += 1;
+      if (event.correct === true) row.correctCount += 1;
+      if (event.eventType === 'hint_requested') row.hintsUsed += 1;
+      row.elapsedMs.push(event.elapsedMs);
+      row.lastSeenAt = new Date().toISOString();
+      byStudent.set(event.studentId, row);
+    }
+
+    // Also include the session owner even with no interactions (they opened it).
+    if (sessionObj && !byStudent.has(sessionObj.studentId)) {
+      byStudent.set(sessionObj.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: sessionObj.createdAt ?? new Date().toISOString() });
+    }
+
+    return [...byStudent.entries()].map(([studentId, row]) => {
+      const sorted = [...row.elapsedMs].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const median = sorted.length === 0 ? null : sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+      const roster = rosterByAnon.get(studentId) ?? null;
+      return {
+        studentId,
+        rosterStudentId: roster?.rosterStudentId ?? null,
+        rosterStudentName: roster?.name ?? null,
+        attempts: row.attempts,
+        correctCount: row.correctCount,
+        hintsUsed: row.hintsUsed,
+        completed: row.attempts >= (sessionObj?.plan?.steps?.length ?? 0) && row.attempts > 0,
+        medianElapsedMs: median,
+        lastSeenAt: row.lastSeenAt,
+      };
+    });
   },
 };

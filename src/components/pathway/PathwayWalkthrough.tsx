@@ -53,6 +53,22 @@ function widgetKindOf(widget: unknown): string | null {
     : null;
 }
 
+function stepKey(sessionId: string) { return `pathway:step:${sessionId}`; }
+function doneKey(sessionId: string) { return `pathway:done:${sessionId}`; }
+
+export function savedProgress(sessionId: string): { step: number; stars: number; done: boolean } | null {
+  try {
+    const raw = localStorage.getItem(doneKey(sessionId));
+    if (raw) {
+      const parsed = JSON.parse(raw) as { stars: number };
+      return { step: Infinity, stars: parsed.stars ?? 0, done: true };
+    }
+    const step = Number(localStorage.getItem(stepKey(sessionId)) ?? 'NaN');
+    if (!Number.isNaN(step) && step > 0) return { step, stars: step, done: false };
+  } catch { /* localStorage unavailable */ }
+  return null;
+}
+
 export function PathwayWalkthrough({
   session,
   studentId,
@@ -63,15 +79,27 @@ export function PathwayWalkthrough({
   /** "Another one!" / "New topic" actions — omitted on a read-only shared view. */
   onRestart?: { another: () => void; newTopic: () => void; busy?: boolean };
 }) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [stars, setStars] = useState(0);
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (!session.sessionId) return 0;
+    try {
+      const step = Number(localStorage.getItem(stepKey(session.sessionId)) ?? 'NaN');
+      return Number.isNaN(step) ? 0 : step;
+    } catch { return 0; }
+  });
+  const [stars, setStars] = useState(() => currentStep);
   const telemetry = useTelemetry(session.sessionId, studentId);
 
   const advanceStep = useCallback(() => {
     setStars((n) => n + 1);
     telemetry.flush();
-    setCurrentStep((n) => n + 1);
-  }, [telemetry]);
+    setCurrentStep((n) => {
+      const next = n + 1;
+      if (session.sessionId) {
+        try { localStorage.setItem(stepKey(session.sessionId), String(next)); } catch { /* ignore */ }
+      }
+      return next;
+    });
+  }, [telemetry, session.sessionId]);
 
   const finished = session.steps.length > 0 && currentStep >= session.steps.length;
   const currentWidget = session.stepWidgets[currentStep];
@@ -84,10 +112,12 @@ export function PathwayWalkthrough({
   useEffect(() => {
     if (!finished || !session.sessionId || reportedCompletion.current) return;
     reportedCompletion.current = true;
+    // Persist completion to localStorage so the student homepage can show results.
+    try { localStorage.setItem(doneKey(session.sessionId), JSON.stringify({ stars })); } catch { /* ignore */ }
     void fetch(`/api/pathway/session/${session.sessionId}/complete`, { method: 'POST' }).catch(() => {
       // Best-effort — a student who finished should never see this fail.
     });
-  }, [finished, session.sessionId]);
+  }, [finished, session.sessionId, stars]);
 
   return (
     <div className="flex w-full flex-col items-center gap-6">

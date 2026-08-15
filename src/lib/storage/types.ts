@@ -1,6 +1,7 @@
 import type { Anchor } from '@/lib/pathway/events';
 import type { PathwayPlan } from '@/lib/pathway/schema';
 import type { StudentProfile } from '@/lib/student/schema';
+import type { Assignment, RosterStudent } from '@/lib/roster/types';
 
 /**
  * The third pluggable-provider seam, same shape as `model.ts` (LLM) and
@@ -52,6 +53,31 @@ export type RecentInteraction = {
   payload: unknown;
 };
 
+/** Lightweight row for the pathways list view. */
+export type SessionSummary = {
+  id: string;
+  topic: string;
+  standardCode: string | null;
+  gradeHint: string | null;
+  openCount: number;
+  completionCount: number;
+  createdAt: string;
+};
+
+/** Per-student performance row for the session report view. */
+export type SessionStudentRow = {
+  studentId: string;
+  /** Set when this student is also a roster student (came via an assignment). */
+  rosterStudentId: string | null;
+  rosterStudentName: string | null;
+  attempts: number;
+  correctCount: number;
+  hintsUsed: number;
+  completed: boolean;
+  medianElapsedMs: number | null;
+  lastSeenAt: string;
+};
+
 export interface StorageAdapter {
   id: string;
   /** Whether this adapter has what it needs to actually persist — the app runs stateless either way. */
@@ -99,8 +125,8 @@ export interface StorageAdapter {
    */
   updateSessionPlan(sessionId: string, studentId: string, plan: PathwayPlan): Promise<boolean>;
 
-  /** A share link got opened — the other half of "close the loop back to the teacher." */
-  recordSessionOpen(sessionId: string): Promise<void>;
+  /** A share link got opened — upserts (sessionId, studentId) so refreshes don't double-count. */
+  recordSessionOpen(sessionId: string, studentId: string): Promise<void>;
   /** A student reached the end of the walkthrough for this session. */
   recordSessionCompletion(sessionId: string): Promise<void>;
   sessionStats(sessionId: string): Promise<{ openCount: number; completionCount: number } | null>;
@@ -111,4 +137,19 @@ export interface StorageAdapter {
   saveProfile(studentId: string, profile: StudentProfile): Promise<void>;
   fetchMasteryRollup(studentId: string): Promise<MasteryRollupRow[]>;
   fetchRecentInteractions(studentId: string, limit: number): Promise<RecentInteraction[]>;
+
+  // Roster
+  listRosterStudents(): Promise<RosterStudent[]>;
+  getRosterStudent(id: string): Promise<RosterStudent | null>;
+  createRosterStudent(student: Omit<RosterStudent, 'id'>): Promise<RosterStudent>;
+  updateRosterStudent(id: string, student: Omit<RosterStudent, 'id'>): Promise<RosterStudent | null>;
+
+  // Assignments: one personalized session per roster student
+  createAssignment(input: { rosterStudentId: string; sessionId: string; topic: string }): Promise<Assignment>;
+  listAssignmentsForStudent(rosterStudentId: string): Promise<Assignment[]>;
+  listAssignmentsForSession(sessionId: string): Promise<Assignment[]>;
+
+  // Pathway dashboard
+  listSessions(limit?: number): Promise<SessionSummary[]>;
+  sessionReport(sessionId: string): Promise<SessionStudentRow[]>;
 }

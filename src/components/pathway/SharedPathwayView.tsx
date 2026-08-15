@@ -29,6 +29,16 @@ export function SharedPathwayView({ session }: { session: WalkthroughSession }) 
       .catch(() => {});
   }, [studentId]);
 
+  // Record a unique open once we have both the session and the student identity.
+  useEffect(() => {
+    if (!studentId) return;
+    void fetch(`/api/pathway/sessions/${session.sessionId}/open`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId }),
+    }).catch(() => {});
+  }, [session.sessionId, studentId]);
+
   return (
     <div className="light-surface min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
