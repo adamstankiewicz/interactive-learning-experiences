@@ -25,6 +25,13 @@ const WIDGETS = [
     tags: ['writing', 'argument', 'live scoring'],
   },
   {
+    slug: 'find-the-flaw',
+    name: 'Find the Flaw',
+    description:
+      'A worked example with one deliberate mistake — a solution, an experiment, an argument, an explanation. The student finds the step where it goes wrong, then diagnoses why. Checked locally, so there is no wait.',
+    tags: ['error analysis', 'any subject', 'metacognition'],
+  },
+  {
     slug: 'timeline-builder',
     name: 'Timeline Builder',
     description:

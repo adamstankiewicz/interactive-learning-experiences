@@ -339,6 +339,75 @@ export const timelineBuilderSpec = z.object({
 export type TimelineBuilderSpec = z.infer<typeof timelineBuilderSpec>;
 
 /** Discriminated union — add widget kinds here as generators are registered. */
+/**
+ * Find the Flaw: a worked example with one deliberate mistake in it.
+ *
+ * Every other widget asks a student to produce a correct answer or arrange
+ * given pieces. This one hands them finished work and asks them to judge it —
+ * a different act, and the one the catalogue could not previously ask for.
+ * Evaluating flawed reasoning is where misconceptions surface, because a
+ * student who cannot spot the error usually holds it.
+ *
+ * Two stages, both checked locally so there is no model call in the loop:
+ * *where* it goes wrong, then *why*. The second stage is what stops it being
+ * a one-in-five guess, and it is where the actual diagnosis happens.
+ */
+export const findTheFlawSpec = z.object({
+  kind: z.literal('find-the-flaw'),
+  learningComponentId: z.string().nullable(),
+  prompt: z
+    .string()
+    .describe(
+      'Instruction shown above the work, e.g. "This solution has one mistake. Find the step where it goes wrong."',
+    ),
+  /** What the student is looking at, so the steps have something to be about. */
+  scenario: z
+    .object({
+      title: z.string().describe('Short label for the work, e.g. "Maya\'s solution" or "A student\'s experiment".'),
+      setup: z
+        .string()
+        .describe(
+          'One or two sentences establishing the task the work was attempting — the problem posed, the question investigated, the claim argued.',
+        ),
+    })
+    .describe('The worked example being judged.'),
+  steps: z
+    .array(
+      z.object({
+        id: z.string().describe('Short stable lowercase slug.'),
+        label: z
+          .string()
+          .describe(
+            'One step of the work, stated as the worker did it. Self-contained — never "then do the next part".',
+          ),
+      }),
+    )
+    .describe('Give 4-6 steps in order. Exactly one contains the mistake; every other step is genuinely correct.'),
+  flawedStepId: z.string().describe('The id of the one step that contains the mistake.'),
+  /**
+   * Stage two: having found *where*, name *what*. The wrong options are the
+   * misdiagnoses a student plausibly makes, which is what makes this worth
+   * asking — a distractor nobody would pick teaches nothing.
+   */
+  whyOptions: z
+    .array(
+      z.object({
+        id: z.string().describe('Short stable lowercase slug.'),
+        label: z.string().describe('One sentence naming what is wrong with that step.'),
+        correct: z.boolean().describe('True for exactly one option.'),
+      }),
+    )
+    .describe('Give 3-4 options, exactly one correct. The wrong ones are plausible misdiagnoses, not filler.'),
+  explanation: z
+    .string()
+    .describe('Shown once the student has it right: what the mistake actually is and what should have happened.'),
+  hint: z
+    .string()
+    .describe('Shown after a wrong attempt. Points at what to re-check without naming the step or the answer.'),
+});
+
+export type FindTheFlawSpec = z.infer<typeof findTheFlawSpec>;
+
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
@@ -351,6 +420,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   narratedCardSpec,
   timelineBuilderSpec,
   crosswordSpec,
+  findTheFlawSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
@@ -374,6 +444,7 @@ export const widgetKind = z.enum([
   'step-reveal',
   'narrated-card',
   'timeline-builder',
+  'find-the-flaw',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 
@@ -407,6 +478,12 @@ export const pathwayStep = z.object({
       '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
       'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
       'lesson taught, not for introducing a concept the student has not met yet.',
+      '"find-the-flaw" shows a worked example containing one deliberate mistake — a solution, an',
+      'experiment, an argument, a historical explanation — and asks the student to find the step',
+      'where it goes wrong and say why. It is the only interaction that asks a student to judge',
+      'finished work rather than produce or arrange it, so it suits any subject, but it requires',
+      'them to already know the correct procedure: use it for "practice" or "check", never',
+      '"activate", and never before a "model" step has shown the concept done right.',
     ].join(' '),
   ),
 });

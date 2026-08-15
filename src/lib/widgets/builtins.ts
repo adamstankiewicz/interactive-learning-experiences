@@ -17,3 +17,4 @@ import '@/lib/widgets/definitions/flashcard';
 import '@/lib/widgets/definitions/step-reveal';
 import '@/lib/widgets/definitions/narrated-card';
 import '@/lib/widgets/definitions/timeline-builder';
+import '@/lib/widgets/definitions/find-the-flaw';
