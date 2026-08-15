@@ -289,8 +289,39 @@ async function handle(message: RpcRequest, request: Request) {
           _meta: uiMeta(origin),
         });
       } catch (error) {
+        /**
+         * Last resort: try once more with nothing but a topic.
+         *
+         * A tool call that comes back as prose renders nothing, and the
+         * student gets an apology where an activity should be. Almost every
+         * failure here is a bad standard code or an impossible pairing, both
+         * of which a topic-only retry resolves — it proposes its own standard
+         * and falls back to an unverified one rather than giving up.
+         */
+        const topic = args.topic ?? args.standardCode;
+
+        if (topic && (args.standardCode || args.kind)) {
+          try {
+            const retry = await buildWidget({ topic, gradeHint: args.gradeHint });
+            return ok(message.id, {
+              content: [
+                {
+                  type: 'text',
+                  text: `${retry.widget.kind} for ${retry.standard.code}. (${
+                    error instanceof Error ? error.message : 'The first attempt failed'
+                  })`,
+                },
+              ],
+              structuredContent: { spec: retry.widget },
+              _meta: uiMeta(origin),
+            });
+          } catch {
+            // Fall through to reporting the original failure.
+          }
+        }
+
         // A tool error is reported in the result, not as a protocol error —
-        // that way the model sees it and can correct the code or the kind.
+        // that way the model sees it and can correct its arguments.
         const text =
           error instanceof WidgetBuildError
             ? error.message
