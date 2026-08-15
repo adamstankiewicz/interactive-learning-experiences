@@ -251,6 +251,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
   const [shuffledItems] = useState(() => seededShuffle(spec.items, (it) => it.id));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
 
   const telemetry = useWidgetTelemetry();
   const shownRef = useRef(false);
@@ -291,7 +292,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
   }, []);
 
   const handleDragEnd = useCallback(
-    ({ active, over }: DragEndEvent) => {
+    ({ active, over, activatorEvent }: DragEndEvent) => {
       setActiveId(null);
       setOverId(null);
 
@@ -299,31 +300,39 @@ export function DragCategorize({ spec, onComplete }: Props) {
       const destination = over ? String(over.id) : null;
       const placedInCategory = destination && destination !== 'bank';
 
-      setPlacement((prev) => {
-        const next = { ...prev, [movedId]: placedInCategory ? destination : null };
+      const next = { ...placement, [movedId]: placedInCategory ? destination : null };
+      setPlacement(next);
 
-        // After placing into a category, focus the next unplaced bank item.
-        // Use rAF twice: once to let React re-render the new placement, once more
-        // to let dnd-kit finish returning focus to the dragged element — then
-        // we steal it away to the next chip.
-        if (placedInCategory) {
-          const nextUnplaced = shuffledItems.find(
-            (it) => it.id !== movedId && next[it.id] === null,
-          );
-          if (nextUnplaced) {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                chipRefs.current[nextUnplaced.id]?.focus();
-              });
-            });
-          }
-        }
-
-        return next;
-      });
+      // Keyboard drags only: a pointer user who drops a chip does not expect
+      // focus to jump to another chip, which also scrolls it into view.
+      if (placedInCategory && activatorEvent instanceof KeyboardEvent) {
+        const nextUnplaced = shuffledItems.find(
+          (it) => it.id !== movedId && next[it.id] === null,
+        );
+        setFocusTarget(nextUnplaced?.id ?? null);
+      }
     },
-    [shuffledItems],
+    [placement, shuffledItems],
   );
+
+  // Two frames: one for React to render the new placement, one more for dnd-kit
+  // to finish returning focus to the dragged element before we move it on.
+  useEffect(() => {
+    if (!focusTarget) return;
+
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        chipRefs.current[focusTarget]?.focus();
+        setFocusTarget(null);
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [focusTarget]);
 
   const handleDragCancel = useCallback(() => {
     setActiveId(null);

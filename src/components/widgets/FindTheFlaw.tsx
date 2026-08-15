@@ -248,6 +248,8 @@ export function FindTheFlaw({ spec, onComplete }: Props) {
               setPickedWhy(null);
               setRuledOut(new Set());
               setWrongWhy(new Set());
+              // Without this, a fresh run reports attempt 5, 6, 7… to telemetry.
+              setAttempts(0);
             }}
           >
             Try it again

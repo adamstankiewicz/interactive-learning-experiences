@@ -154,8 +154,10 @@ const LIVE_FEEDBACK = true;
 /** Aggregate only, like the Draft Meter's one line — never which leg is wrong. */
 function matchLabel(matched: number, total: number): string {
   if (matched === total) return "that's it";
-  if (matched === total - 1) return 'almost there';
+  // Before the total-1 check: with a single segment, nothing matched is also
+  // one short of everything, and "almost there" for a wholly wrong answer lies.
   if (matched === 0) return 'not yet';
+  if (matched === total - 1) return 'almost there';
   return 'getting closer';
 }
 
@@ -273,7 +275,9 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
     [points, values, actual],
   );
   const wrongSegments = segments.filter((s) => s.mine !== s.theirs).length;
-  const allRight = wrongSegments === 0;
+  // A chart with no segments has nothing to get right, so it must not report
+  // success — `wrongSegments === 0` alone is vacuously true there.
+  const allRight = segments.length > 0 && wrongSegments === 0;
 
   const commit = useCallback(() => {
     setRevealed(true);
@@ -499,7 +503,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
         <div className="flex flex-col gap-2">
           {/* The Draft Meter's row, transplanted: one track, one warm label, and
               no per-part breakdown. Live from the first drag. */}
-          {LIVE_FEEDBACK && !untouched && (
+          {LIVE_FEEDBACK && !untouched && segments.length > 0 && (
             <div className="flex items-center gap-3.5">
               <div className="relative h-2 flex-1 rounded-full bg-muted">
                 <div
