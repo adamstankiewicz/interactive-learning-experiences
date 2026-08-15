@@ -158,11 +158,21 @@ export function FindTheFlaw({ spec, onComplete }: Props) {
 
           return (
             <li key={step.id} className="flex gap-3">
-              {/* The rail. The connector stops at the last node so the sequence
-                  reads as ending rather than trailing off. */}
-              <div className="flex w-4 shrink-0 flex-col items-center" aria-hidden="true">
+              {/*
+                The rail, as three stacked pieces with no gaps between them:
+                a lead-in above the node, the node, then a length that fills
+                whatever is left of the row. Drawn this way rather than as a
+                line hanging off each node, which left the segments starting
+                below one dot and stopping short of the next — five little
+                tails instead of one line, which is exactly what made it read
+                as clunky. The lead-in height puts the node on the first line
+                of the card's text; the run below stretches through the row's
+                bottom padding so the line is genuinely continuous.
+              */}
+              <div className="flex w-3 shrink-0 flex-col items-center" aria-hidden="true">
+                <span className={`h-4 w-px ${index === 0 ? '' : 'bg-border'}`} />
                 <span
-                  className={`mt-4 size-3 shrink-0 rounded-full border-2 transition-colors ${
+                  className={`size-3 shrink-0 rounded-full border-2 transition-colors ${
                     revealed
                       ? 'border-destructive bg-destructive'
                       : isRuledOut
@@ -170,18 +180,12 @@ export function FindTheFlaw({ spec, onComplete }: Props) {
                         : 'border-muted-foreground/50 bg-card'
                   }`}
                 />
-                {!last && (
-                  <span
-                    className={`w-0.5 flex-1 transition-colors ${
-                      revealed ? 'bg-destructive/40' : 'bg-border'
-                    }`}
-                  />
-                )}
+                <span className={`w-px flex-1 ${last ? '' : 'bg-border'}`} />
               </div>
 
               {/* Full width, so the cards form a straight column beside the rail
                   rather than a ragged edge that hugs each sentence. */}
-              <div className={`min-w-0 flex-1 ${last ? '' : 'pb-2'}`}>
+              <div className={`min-w-0 flex-1 ${last ? '' : 'pb-1.5'}`}>
                 <button
                   type="button"
                   onClick={() => pickStep(step.id)}
