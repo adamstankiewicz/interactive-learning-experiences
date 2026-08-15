@@ -52,10 +52,14 @@ export function SimplePacman({ onComplete }: { onComplete?: () => void }) {
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const crashCooldownRef = useRef<boolean>(false);
+  const dotsRef = useRef(dots);
+
+  // Keep dotsRef in sync with dots state
+  useEffect(() => {
+    dotsRef.current = dots;
+  }, [dots]);
 
   const movePacman = useCallback(() => {
-    let newPacmanPos: Position | null = null;
-
     setPacman((prev) => {
       let newX = prev.x;
       let newY = prev.y;
@@ -118,21 +122,13 @@ export function SimplePacman({ onComplete }: { onComplete?: () => void }) {
         }
       }
 
-      newPacmanPos = { x: newX, y: newY };
-      return newPacmanPos;
-    });
-
-    // Check for dot collection with the new position
-    if (newPacmanPos) {
-      setDots((currentDots) => {
-        const dotIndex = currentDots.findIndex(
-          (d) => d.x === newPacmanPos!.x && d.y === newPacmanPos!.y
-        );
-        if (dotIndex === -1) return currentDots;
-
-        const newDots = [...currentDots];
+      // Check for dot collection at new position
+      const dotIndex = dotsRef.current.findIndex((d) => d.x === newX && d.y === newY);
+      if (dotIndex !== -1) {
+        const newDots = [...dotsRef.current];
         newDots.splice(dotIndex, 1);
-
+        dotsRef.current = newDots;
+        setDots(newDots);
         setScore((s) => s + 10);
 
         if (newDots.length === 0) {
@@ -140,10 +136,10 @@ export function SimplePacman({ onComplete }: { onComplete?: () => void }) {
           setWon(true);
           onComplete?.();
         }
+      }
 
-        return newDots;
-      });
-    }
+      return { x: newX, y: newY };
+    });
   }, [direction, nextDirection, onComplete]);
 
   // Timer countdown
