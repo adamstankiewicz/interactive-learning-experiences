@@ -13,7 +13,10 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { WidgetTelemetryProvider } from '@/components/widgets/telemetry-context';
+
 import { HostBridge } from './host-bridge';
+import { reportCompletionToHost } from './report-to-host';
 
 // Rendered straight off the catalog rather than through `WidgetRenderer`,
 // which safeParses the spec. That validation belongs where a model's output
@@ -46,6 +49,7 @@ declare global {
  * harness and the built file on disk still work.
  */
 const bridge = new HostBridge();
+const telemetry = reportCompletionToHost(bridge);
 let hostReady = false;
 
 function installApiShim(origin: string) {
@@ -190,10 +194,15 @@ function Shell() {
   }
 
   const Component = entry.component;
+  const standardCode = (spec as { standardCode?: string }).standardCode ?? null;
 
   return (
     <div className="p-4 font-sans">
-      <Component spec={spec} />
+      {/* Widgets report through telemetry, which had no sink in here. Giving it
+          one is what lets a finished activity reach the conversation. */}
+      <WidgetTelemetryProvider telemetry={telemetry} standardCode={standardCode}>
+        <Component spec={spec} />
+      </WidgetTelemetryProvider>
     </div>
   );
 }
