@@ -39,6 +39,7 @@ export default function LearnPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  const [voiceCapture, setVoiceCapture] = useState<string | null>(null);
   const [round, setRound] = useState(0);
   const [line, setLine] = useState(0);
 
@@ -66,6 +67,7 @@ export default function LearnPage() {
       setBusy(true);
       setError(null);
       setLine(0);
+      setVoiceCapture(null);
 
       try {
         const response = await fetch('/api/pathway', {
@@ -130,7 +132,10 @@ export default function LearnPage() {
     [studentId],
   );
 
-  const voice = useVoiceIntake(build);
+  const voice = useVoiceIntake((transcript) => {
+    setVoiceCapture(transcript);
+    setTyped(transcript);
+  });
 
   return (
     <div className="light-surface min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
@@ -177,35 +182,67 @@ export default function LearnPage() {
             <div className="min-h-8 text-center">
               {busy && <p className="text-lg font-bold text-violet-600">{BUILDING_LINES[line]}</p>}
               {!busy && voice.interim && (
-                <p className="text-lg font-bold text-violet-500 italic">“{voice.interim}”</p>
+                <p className="text-lg font-bold text-violet-500 italic">&ldquo;{voice.interim}&rdquo;</p>
               )}
               {!busy && (error || voice.error) && (
                 <p className="text-base font-bold text-rose-500">🙃 {voice.error ?? error}</p>
               )}
             </div>
 
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void build(typed);
-              }}
-              className="flex w-full gap-2"
-            >
-              <input
-                value={typed}
-                onChange={(event) => setTyped(event.target.value)}
-                placeholder={voice.supported ? '…or type it here' : 'Type what you want to learn'}
-                maxLength={200}
-                className="min-w-0 flex-1 rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-semibold outline-none placeholder:text-violet-300 focus:border-violet-400"
-              />
-              <button
-                type="submit"
-                disabled={busy || typed.trim().length < 3}
-                className="shrink-0 rounded-2xl bg-emerald-500 px-6 font-black text-white shadow-[0_5px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857] disabled:opacity-40"
+            {voiceCapture && !busy && (
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-full rounded-2xl border-4 border-violet-300 bg-white p-6 shadow-lg"
               >
-                Go!
-              </button>
-            </form>
+                <p className="mb-2 text-sm font-bold text-violet-600">Did you say:</p>
+                <p className="mb-4 text-xl font-bold text-slate-900">&ldquo;{voiceCapture}&rdquo;</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void build(voiceCapture)}
+                    className="flex-1 rounded-xl bg-emerald-500 py-3 font-black text-white shadow-[0_4px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857]"
+                  >
+                    ✓ Yes, let&apos;s go!
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoiceCapture(null);
+                      setTyped('');
+                    }}
+                    className="flex-1 rounded-xl bg-slate-300 py-3 font-black text-slate-700 shadow-[0_4px_0_0_#475569] active:translate-y-1 active:shadow-[0_2px_0_0_#475569]"
+                  >
+                    ✗ Try again
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {!voiceCapture && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void build(typed);
+                }}
+                className="flex w-full gap-2"
+              >
+                <input
+                  value={typed}
+                  onChange={(event) => setTyped(event.target.value)}
+                  placeholder={voice.supported ? '…or type it here' : 'Type what you want to learn'}
+                  maxLength={200}
+                  className="min-w-0 flex-1 rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-semibold outline-none placeholder:text-violet-300 focus:border-violet-400"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || typed.trim().length < 3}
+                  className="shrink-0 rounded-2xl bg-emerald-500 px-6 font-black text-white shadow-[0_5px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857] disabled:opacity-40"
+                >
+                  Go!
+                </button>
+              </form>
+            )}
           </>
         )}
 
