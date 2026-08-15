@@ -335,6 +335,11 @@ export const widgetKind = z.enum([
   'drag-sort',
   'drag-categorize',
   'crossword',
+  'markdown-card',
+  'flashcard',
+  'step-reveal',
+  'narrated-card',
+  'timeline-builder',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 

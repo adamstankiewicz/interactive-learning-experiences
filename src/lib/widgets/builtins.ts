@@ -12,3 +12,8 @@ import '@/lib/widgets/definitions/draft-meter';
 import '@/lib/widgets/definitions/drag-sort';
 import '@/lib/widgets/definitions/drag-categorize';
 import '@/lib/widgets/definitions/crossword';
+import '@/lib/widgets/definitions/markdown-card';
+import '@/lib/widgets/definitions/flashcard';
+import '@/lib/widgets/definitions/step-reveal';
+import '@/lib/widgets/definitions/narrated-card';
+import '@/lib/widgets/definitions/timeline-builder';

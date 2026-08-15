@@ -9,3 +9,8 @@ import '@/lib/widgets/definitions/draft-meter.generate';
 import '@/lib/widgets/definitions/drag-sort.generate';
 import '@/lib/widgets/definitions/drag-categorize.generate';
 import '@/lib/widgets/definitions/crossword.generate';
+import '@/lib/widgets/definitions/markdown-card.generate';
+import '@/lib/widgets/definitions/flashcard.generate';
+import '@/lib/widgets/definitions/step-reveal.generate';
+import '@/lib/widgets/definitions/narrated-card.generate';
+import '@/lib/widgets/definitions/timeline-builder.generate';
