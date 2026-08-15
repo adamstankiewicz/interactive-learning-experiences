@@ -165,6 +165,26 @@ export const dragCategorizeSpec = z.object({
 });
 
 export type DragCategorizeSpec = z.infer<typeof dragCategorizeSpec>;
+
+export const markdownCardSpec = z.object({
+  kind: z.literal('markdown-card'),
+  learningComponentId: z.string().nullable(),
+  title: z.string().describe('Short heading shown above the content, e.g. "Why fractions matter"'),
+  body: z
+    .string()
+    .describe(
+      'Markdown content for the student. Use headings, bold, bullet lists, and blockquotes freely. Aim for 80-200 words — enough to re-teach a concept without overwhelming. Address the student directly ("you", "your").',
+    ),
+  tip: z
+    .string()
+    .nullable()
+    .describe(
+      'Optional one-sentence callout shown in a highlighted box at the bottom, e.g. "Remember: the denominator tells you how many equal parts the whole is split into." Null to omit.',
+    ),
+});
+
+export type MarkdownCardSpec = z.infer<typeof markdownCardSpec>;
+
 export const crosswordEntrySpec = z.object({
   answer: z
     .string()
@@ -215,6 +235,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   draftMeterSpec,
   dragSortSpec,
   dragCategorizeSpec,
+  markdownCardSpec,
   crosswordSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;

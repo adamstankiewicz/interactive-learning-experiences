@@ -5,6 +5,7 @@ import { Crossword } from '@/components/widgets/Crossword';
 import { DragCategorize } from '@/components/widgets/DragCategorize';
 import { DragSort } from '@/components/widgets/DragSort';
 import { DraftMeter } from '@/components/widgets/DraftMeter';
+import { MarkdownCard } from '@/components/widgets/MarkdownCard';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
@@ -26,6 +27,8 @@ function render(spec: WidgetSpec) {
       return <DragSort spec={spec} />;
     case 'drag-categorize':
       return <DragCategorize spec={spec} />;
+    case 'markdown-card':
+      return <MarkdownCard spec={spec} />;
     case 'crossword':
       return <Crossword spec={spec} />;
   }

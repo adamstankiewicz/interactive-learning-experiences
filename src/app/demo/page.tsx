@@ -39,6 +39,13 @@ const WIDGETS = [
     tags: ['sorting', 'categorization', 'classification'],
   },
   {
+    slug: 'markdown-card',
+    name: 'Markdown Card',
+    description:
+      'Renders LLM-generated markdown as a clean reading card — headings, bold, bullets, blockquotes, and an optional tip callout. Used to re-teach a concept a student is struggling with.',
+    tags: ['reading', 'remediation', 'markdown'],
+  },
+  {
     slug: 'crossword',
     name: 'Crossword',
     description:
