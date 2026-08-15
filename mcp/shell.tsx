@@ -89,7 +89,12 @@ function Shell() {
     bridge.on('ui/notifications/host-context-changed', (params) => {
       const styles = (params as { styles?: { variables?: Record<string, string> } })?.styles;
       if (styles?.variables) bridge.applyHostStyles(styles.variables);
+      bridge.syncColorScheme(styles?.variables);
     });
+
+    // Don't wait for the host to tell us: a widget that flashes white in a
+    // dark conversation and then corrects itself looks broken either way.
+    bridge.syncColorScheme();
 
     // The spec arrives here. Method names taken from Slack's shipping bundle,
     // not guessed: the host pushes the tool's input and result to the view as

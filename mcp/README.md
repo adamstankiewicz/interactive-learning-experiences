@@ -27,11 +27,14 @@ involved. That is the fastest way to iterate on the shell.
 
 ### Two ways to connect it
 
-**A — custom connector (try this first).** The stdio route below registers and
-its tool gets called, but Claude never reads the `ui://` resource and falls
-back to rebuilding the widget with its own `visualize` tool. Every MCP App that
-*does* render on a desktop install — Slack, Atlassian, Amplitude, Figma — is a
-remote connector, so this tests whether that is the reason.
+**A — custom connector. This is the one that works.**
+
+The stdio route below registers fine and its tool gets called, but Claude never
+reads the `ui://` resource and falls back to rebuilding the widget with its own
+`visualize` tool. Every MCP App that *does* render on a desktop install —
+Slack, Atlassian, Amplitude, Figma — is a remote connector, and adding ours as
+one is what made it render. If your widget is not appearing, this is almost
+certainly why.
 
 ```bash
 node mcp/server-http.mjs     # http://localhost:3300/mcp

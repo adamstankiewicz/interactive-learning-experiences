@@ -102,6 +102,20 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Widget shell</title>
+<style>
+  /*
+   * The app gets its font from next/font, which is not in this bundle — so
+   * the font variable resolves to nothing and every widget falls back to
+   * serif. A system stack is closer to what a chat host uses anyway.
+   */
+  :root {
+    --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  /* Let the host's own surface show through instead of painting a white slab
+     inside its container. */
+  html, body { background: transparent; margin: 0; }
+</style>
 <style>${css}</style>
 </head>
 <body>

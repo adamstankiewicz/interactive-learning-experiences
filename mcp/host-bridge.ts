@@ -15,6 +15,24 @@
 
 type Pending = (message: Record<string, unknown>) => void;
 
+/**
+ * Is this colour dark? Rendered to a canvas rather than parsed, so it works
+ * for whatever the host sends — oklch, hsl, a hex, a named colour.
+ */
+function isDark(color: string): boolean {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+
+  ctx.fillStyle = '#888';
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 1, 1);
+
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+}
+
 export class HostBridge {
   private nextId = 1;
   private pending = new Map<number, Pending>();
@@ -77,6 +95,25 @@ export class HostBridge {
       .map(([key, value]) => `  ${key}: ${value};`)
       .join('\n')}\n}`;
     document.head.appendChild(style);
+  }
+
+  /**
+   * Match the host's light/dark mode.
+   *
+   * Our design system switches on a `.dark` class, not on a media query, so
+   * adopting the host's CSS variables alone leaves a white card sitting in a
+   * dark conversation. The host's own background colour is the honest signal:
+   * if it is dark, we are in dark mode. Falls back to the OS preference when
+   * the host tells us nothing.
+   */
+  syncColorScheme(variables?: Record<string, string>) {
+    const candidate =
+      variables?.['--background'] ?? variables?.['--bg'] ?? variables?.['--color-background'] ?? null;
+
+    const dark = candidate ? isDark(candidate) : window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+
+    document.documentElement.classList.toggle('dark', Boolean(dark));
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   }
 
   /** Report our height so the host can size the iframe to the content. */
