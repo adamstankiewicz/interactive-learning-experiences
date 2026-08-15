@@ -16,6 +16,8 @@ export type StageStatus = 'pending' | 'active' | 'done' | 'skipped';
 
 export type PathwayState = {
   status: 'idle' | 'streaming' | 'done' | 'error';
+  /** The topic this run was started for, so the result can title itself. */
+  topic: string;
   stages: Record<StageId, { status: StageStatus; detail?: string }>;
   candidates: Candidate[];
   /** code -> did the graph resolve it. Absent means not yet checked. */
@@ -23,10 +25,18 @@ export type PathwayState = {
   anchor: Anchor | null;
   /** Partial while the model writes, replaced by the validated plan at the end. */
   plan: DeepPartial<PathwayPlan> | null;
-  /** Appended to as each generator reports in, so widgets render as they land. */
-  widgets: WidgetSpec[];
-  /** Why a generator produced nothing — surfaced, not hidden. */
-  widgetNotes: string[];
+  /**
+   * Widget per step index, arriving one at a time as each is configured. A
+   * missing key means not yet arrived — every step gets a widget eventually,
+   * so there is no other reason for a key to be absent once the run finishes.
+   */
+  stepWidgets: Record<number, WidgetSpec>;
+  /** Why a step's widget is a substitution, keyed the same way. */
+  stepWidgetNotes: Record<number, string>;
+  /** True while a single step's widget is being redone in place. */
+  regeneratingSteps: Record<number, boolean>;
+  /** A regenerate call that failed, keyed by step index — cleared on retry. */
+  stepErrors: Record<number, string>;
   /** Set once the run is persisted; null when there is no student to persist for. */
   sessionId: string | null;
   error: string | null;
@@ -43,13 +53,16 @@ const idleStages = () =>
 
 const initialState: PathwayState = {
   status: 'idle',
+  topic: '',
   stages: idleStages(),
   candidates: [],
   verdicts: {},
   anchor: null,
   plan: null,
-  widgets: [],
-  widgetNotes: [],
+  stepWidgets: {},
+  stepWidgetNotes: {},
+  regeneratingSteps: {},
+  stepErrors: {},
   sessionId: null,
   error: null,
   startedAt: null,
@@ -57,14 +70,25 @@ const initialState: PathwayState = {
 };
 
 type Action =
-  | { kind: 'start'; at: number }
+  | { kind: 'start'; at: number; topic: string }
   /** Stop streaming but keep whatever already arrived on screen. */
   | { kind: 'stop'; at: number }
-  | { kind: 'event'; event: PathwayEvent; at: number };
+  | { kind: 'event'; event: PathwayEvent; at: number }
+  | { kind: 'regenerate-start'; stepIndex: number }
+  | { kind: 'regenerate-done'; stepIndex: number; widget: WidgetSpec; note: string | null }
+  | { kind: 'regenerate-error'; stepIndex: number; message: string }
+  /** A hand-edit to a prose field — only valid once `plan` is the full, validated thing. */
+  | { kind: 'edit-plan'; plan: PathwayPlan };
+
+function withoutKey<T>(record: Record<number, T>, key: number): Record<number, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
 
 function reducer(state: PathwayState, action: Action): PathwayState {
   if (action.kind === 'start') {
-    return { ...initialState, status: 'streaming', startedAt: action.at };
+    return { ...initialState, status: 'streaming', startedAt: action.at, topic: action.topic };
   }
   if (action.kind === 'stop') {
     return {
@@ -79,6 +103,35 @@ function reducer(state: PathwayState, action: Action): PathwayState {
         ]),
       ) as PathwayState['stages'],
     };
+  }
+
+  if (action.kind === 'regenerate-start') {
+    return {
+      ...state,
+      regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: true },
+      stepErrors: withoutKey(state.stepErrors, action.stepIndex),
+    };
+  }
+  if (action.kind === 'regenerate-done') {
+    return {
+      ...state,
+      stepWidgets: { ...state.stepWidgets, [action.stepIndex]: action.widget },
+      stepWidgetNotes: action.note
+        ? { ...state.stepWidgetNotes, [action.stepIndex]: action.note }
+        : withoutKey(state.stepWidgetNotes, action.stepIndex),
+      regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: false },
+      stepErrors: withoutKey(state.stepErrors, action.stepIndex),
+    };
+  }
+  if (action.kind === 'regenerate-error') {
+    return {
+      ...state,
+      regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: false },
+      stepErrors: { ...state.stepErrors, [action.stepIndex]: action.message },
+    };
+  }
+  if (action.kind === 'edit-plan') {
+    return { ...state, plan: action.plan };
   }
 
   const event = action.event;
@@ -102,12 +155,13 @@ function reducer(state: PathwayState, action: Action): PathwayState {
       return { ...state, plan: event.plan };
     case 'plan':
       return { ...state, plan: event.plan };
-    case 'widget':
-      // One event per generator, so both lists grow rather than being replaced.
+    case 'step-widget':
       return {
         ...state,
-        widgets: event.widget ? [...state.widgets, event.widget] : state.widgets,
-        widgetNotes: event.note ? [...state.widgetNotes, event.note] : state.widgetNotes,
+        stepWidgets: { ...state.stepWidgets, [event.stepIndex]: event.widget },
+        stepWidgetNotes: event.note
+          ? { ...state.stepWidgetNotes, [event.stepIndex]: event.note }
+          : state.stepWidgetNotes,
       };
     case 'session':
       return { ...state, sessionId: event.sessionId };
@@ -137,18 +191,43 @@ export function usePathwayStream() {
     dispatch({ kind: 'stop', at: Date.now() });
   }, []);
 
-  const start = useCallback(async (topic: string, gradeHint: string) => {
+  // Same anonymous identity `/learn` mints and caches — one per browser,
+  // shared across both surfaces. Without one, `/api/pathway` has nothing to
+  // call `persistSession` with, and a build here produces nothing to share.
+  const studentIdRef = useRef<string | null>(
+    typeof window === 'undefined' ? null : localStorage.getItem('studentId'),
+  );
+
+  const ensureStudentId = useCallback(async (): Promise<string | null> => {
+    if (studentIdRef.current) return studentIdRef.current;
+
+    try {
+      const response = await fetch('/api/student', { method: 'POST' });
+      if (!response.ok) return null;
+      const data = (await response.json()) as { studentId?: string };
+      if (!data.studentId) return null;
+
+      localStorage.setItem('studentId', data.studentId);
+      studentIdRef.current = data.studentId;
+      return data.studentId;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const start = useCallback(async (topic: string, gradeHint: string, teacherNote?: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    dispatch({ kind: 'start', at: Date.now() });
+    dispatch({ kind: 'start', at: Date.now(), topic });
 
     try {
+      const studentId = await ensureStudentId();
       const response = await fetch('/api/pathway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, gradeHint }),
+        body: JSON.stringify({ topic, gradeHint, studentId, teacherNote }),
         signal: controller.signal,
       });
 
@@ -192,7 +271,60 @@ export function usePathwayStream() {
         at: Date.now(),
       });
     }
+  }, [ensureStudentId]);
+
+  const regenerateStep = useCallback(async (anchor: Anchor, plan: PathwayPlan, stepIndex: number) => {
+    dispatch({ kind: 'regenerate-start', stepIndex });
+
+    try {
+      const response = await fetch('/api/pathway/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anchor, plan, stepIndex }),
+      });
+
+      const body = (await response.json().catch(() => null)) as
+        | { widget: WidgetSpec; note: string | null }
+        | { message: string }
+        | null;
+
+      if (!response.ok || !body || !('widget' in body)) {
+        throw new Error(body && 'message' in body ? body.message : 'Could not regenerate this step.');
+      }
+
+      dispatch({ kind: 'regenerate-done', stepIndex, widget: body.widget, note: body.note });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not regenerate this step.';
+      dispatch({ kind: 'regenerate-error', stepIndex, message });
+    }
   }, []);
 
-  return { state, start, cancel };
+  const editPlan = useCallback((plan: PathwayPlan) => {
+    dispatch({ kind: 'edit-plan', plan });
+  }, []);
+
+  // Debounced autosave: a share link is only worth handing out if it shows
+  // what the teacher actually approved, not the pipeline's first draft. Waits
+  // for typing to pause rather than saving on every keystroke, and only once
+  // there is a persisted session to overwrite — editing before that just
+  // updates local state, saved for free once `persistSession` eventually runs.
+  useEffect(() => {
+    if (!state.sessionId || !state.plan) return;
+    const plan = state.plan as PathwayPlan;
+    const sessionId = state.sessionId;
+
+    const id = setTimeout(() => {
+      void fetch(`/api/pathway/session/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      }).catch(() => {
+        // Best-effort — the teacher's local view already has the edit.
+      });
+    }, 800);
+
+    return () => clearTimeout(id);
+  }, [state.plan, state.sessionId]);
+
+  return { state, start, cancel, regenerateStep, editPlan };
 }

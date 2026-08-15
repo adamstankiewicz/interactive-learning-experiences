@@ -217,6 +217,13 @@ export function DragSort({ spec, onComplete }: Props) {
     <div className="flex flex-col gap-4">
       <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
 
+      {phase === 'idle' && (
+        <p className="text-xs text-muted-foreground">
+          Drag to reorder, or press Tab to a step, Space to pick it up, arrow keys to move it, and
+          Space again to drop it.
+        </p>
+      )}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

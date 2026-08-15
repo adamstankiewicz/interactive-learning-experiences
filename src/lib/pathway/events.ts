@@ -1,8 +1,4 @@
-import type {
-  LearningComponent,
-  ProgressionStandard,
-  StandardStatement,
-} from '@/lib/learning-commons/client';
+import type { LearningComponentRef, StandardRef } from '@/lib/standards/types';
 import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
 
 /**
@@ -10,13 +6,24 @@ import type { PathwayPlan, WidgetSpec } from '@/lib/pathway/schema';
  *
  * This module deliberately imports no model or network code: the client bundle
  * pulls `STAGES` and these types in, and dragging `generate.ts` along would
- * drag the AI SDK and server env with it.
+ * drag the AI SDK and server env with it. `standards/types.ts` is safe to
+ * import here for the same reason `learning-commons/client.ts`'s types used
+ * to be — it's just type declarations, no client code.
  */
 
 export type Anchor = {
-  standard: StandardStatement;
-  learningComponents: LearningComponent[];
-  prerequisites: ProgressionStandard[];
+  standard: StandardRef;
+  learningComponents: LearningComponentRef[];
+  prerequisites: StandardRef[];
+  /**
+   * Peer-level standards — other proposed candidates that also verified,
+   * distinct from `standard` and never structural the way it is. No
+   * decomposition, no widget coverage, no mastery rollup keyed to these;
+   * they exist to let a genuinely cross-subject topic (a science standard on
+   * forces *and* a social-studies standard on cultural origin, say) feed the
+   * plan's framing without forcing a single anchor to carry both.
+   */
+  companions: StandardRef[];
 };
 
 export type DeepPartial<T> = T extends (infer U)[]
@@ -31,11 +38,31 @@ export type DeepPartial<T> = T extends (infer U)[]
  * visible before any of it finishes.
  */
 export const STAGES = [
-  { id: 'propose', label: 'Proposing standards', active: 'Asking the model for candidate codes' },
-  { id: 'verify', label: 'Verifying against the graph', active: 'Checking each code for a real match' },
-  { id: 'graph', label: 'Loading the standard’s spine', active: 'Fetching learning components and prerequisites' },
-  { id: 'plan', label: 'Planning the pathway', active: 'Writing outcomes, misconceptions and steps' },
-  { id: 'widget', label: 'Building the widgets', active: 'Configuring the interactive activities' },
+  {
+    id: 'propose',
+    label: 'Proposing standards',
+    active: 'Guessing a few standards this topic could be teaching, before checking any of them',
+  },
+  {
+    id: 'verify',
+    label: 'Verifying against the graph',
+    active: 'Checking that your standard really covers what you asked for',
+  },
+  {
+    id: 'graph',
+    label: 'Loading the standard’s spine',
+    active: 'Pulling in what comes before and after it, so the plan builds on real prerequisites',
+  },
+  {
+    id: 'plan',
+    label: 'Planning the pathway',
+    active: 'Deciding where students tend to get stuck before writing the steps that address it',
+  },
+  {
+    id: 'widget',
+    label: 'Building the interactions',
+    active: 'Matching each step to the interactive that actually fits what it teaches',
+  },
 ] as const;
 
 export type StageId = (typeof STAGES)[number]['id'];
@@ -54,12 +81,12 @@ export type PathwayEvent =
   | { type: 'plan-partial'; plan: DeepPartial<PathwayPlan> }
   | { type: 'plan'; plan: PathwayPlan }
   /**
-   * One generator's result. Several arrive per run — one per registered
-   * generator — each as it finishes, so a widget appears the moment it is
-   * ready rather than when the slowest one is. A generator that declined
-   * sends its reason instead of a spec.
+   * One per step, emitted as its widget finishes configuring so each appears
+   * against its step rather than all at once at the end. `note` is set when
+   * the requested kind didn't fit and a different one was substituted — the
+   * substitution is transparent, not silent, but it isn't a failure either.
    */
-  | { type: 'widget'; widget: WidgetSpec | null; note: string | null }
+  | { type: 'step-widget'; stepIndex: number; widget: WidgetSpec; note: string | null }
   /** Persisted session id, once there is one. Telemetry attaches to it. */
   | { type: 'session'; sessionId: string | null }
   | { type: 'error'; message: string }

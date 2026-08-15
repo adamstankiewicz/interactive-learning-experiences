@@ -39,6 +39,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-tint-foreground: var(--primary-tint-foreground);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -59,8 +60,22 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /*
+   * The one confident brand hue. The base shadcn theme this builds on ships
+   * pure greyscale; this app has two faces — a teacher-facing builder and a
+   * student-facing /learn — and they need to read as the same product.
+   * /learn already has a violet identity (its gradient background, its mic
+   * button), so primary is built around that hue rather than introducing a
+   * third color language. Chosen for contrast, not just vibe: 6.31:1 against
+   * --primary-foreground, comfortably past the 4.5:1 text floor everything
+   * else in this file holds to.
+   */
+  --primary: oklch(0.5 0.2 292);
   --primary-foreground: oklch(0.985 0 0);
+  /* For brand-hued text sitting on a light primary-tinted surface (a badge,
+     not a solid button) — identical to --primary in light mode, where it
+     already clears 4.5:1; dark mode needs its own lighter value below. */
+  --primary-tint-foreground: var(--primary);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -68,9 +83,10 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  /* Widget feedback and manipulative fills. Nova's palette is greyscale, so
-     these are the only chromatic tokens: correct, needs-another-look, and the
-     "student selected this part" fill shared by every manipulative. */
+  /* Widget feedback and manipulative fills. The base theme's palette is
+     greyscale, so these are the only chromatic tokens: correct,
+     needs-another-look, and the "student selected this part" fill shared
+     by every manipulative. */
   /* Lightness is set so feedback text clears WCAG AA (4.5:1) against --card,
      matching the shipped --destructive. The obvious emerald/amber sit at
      ~3.5:1 and fail — this is student-facing copy, so it has to hold. */
@@ -82,13 +98,20 @@
   --selected-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Focus rings pick up the brand hue too, at low chroma — a warm glow
+     instead of a flat grey outline, without competing with --primary itself. */
+  --ring: oklch(0.708 0.08 292);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  /* Rounder than the base theme's default (10px), short of /learn's explicit
+     rounded-2xl/3xl treatments on its own bespoke elements — the "same
+     warmth, calmer register" the builder and /learn are meant to share.
+     Radius alone never affects text contrast, so this is safe to raise
+     without re-checking any of the ratios documented above. */
+  --radius: 0.875rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -106,8 +129,22 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  /*
+   * The base theme's dark mode default inverts to a near-white button with
+   * dark text — a convention for a *monochrome* primary. A hued one reads
+   * better the conventional way: a rich, visible fill with light text on
+   * top. Lightened
+   * from the light-mode value to stay legible against a near-black page
+   * (3.63:1 against --card) while still clearing 4.5:1 against its own
+   * --primary-foreground text.
+   */
+  --primary: oklch(0.565 0.19 292);
+  --primary-foreground: oklch(0.985 0 0);
+  /* --primary itself is tuned to sit under light text as a button fill
+     (3.63:1 against --card is fine for a large filled area, but text this
+     small needs 4.5:1) — too dark to also work as small text on a dark,
+     lightly-tinted card. Lightened until it clears 4.5:1 in that role. */
+  --primary-tint-foreground: oklch(0.65 0.16 292);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -121,7 +158,7 @@
   --selected-foreground: oklch(0.205 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.556 0.08 292);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

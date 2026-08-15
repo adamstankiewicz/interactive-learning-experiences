@@ -226,11 +226,49 @@ export const learningOutcome = z.object({
   evidence: z.string().describe('What a student does that shows they reached this outcome'),
 });
 
+/** The widget kinds the registry can render. Keep in step with `widgetSpec`. */
+export const widgetKind = z.enum([
+  'fraction-area-model',
+  'swiper-flashcard',
+  'draft-meter',
+  'drag-sort',
+  'drag-categorize',
+  'crossword',
+]);
+export type WidgetKind = z.infer<typeof widgetKind>;
+
 export const pathwayStep = z.object({
   title: z.string(),
   purpose: z.enum(['activate', 'model', 'practice', 'check']),
   description: z.string(),
   outcomeIndex: z.number().int().describe('Zero-based index into outcomes[] this step advances'),
+  /**
+   * Composition happens here. Every step is something a student does, so every
+   * step names which interaction does it; a second pass configures the chosen
+   * widget with full context. That keeps the plan call cheap and lets each
+   * widget be configured against the step it actually serves.
+   */
+  widgetKind: widgetKind.describe(
+    [
+      'Which interactive widget the student uses to do this step. Every step gets one — this is',
+      'not supporting material, it is the task.',
+      '"fraction-area-model" partitions a whole into equal parts to build a target fraction —',
+      'only meaningful for fractions.',
+      '"swiper-flashcard" is a binary sort of statements (true/false, example/non-example,',
+      'prime/composite) and suits almost any subject, including an "activate" step sorting prior',
+      'statements or a "check" step sorting worked answers.',
+      '"drag-sort" orders items along one dimension — chronology, magnitude, steps in a process.',
+      '"drag-categorize" sorts items into 2-4 named buckets — use this over swiper-flashcard when',
+      'there are more than two groups, e.g. sorting terms by era or by part of speech.',
+      '"draft-meter" is a short written-argument prompt, live-scored as the student types. Only for',
+      'standards about writing an argument (W, WHST) or citing textual evidence (RL/RI/RH/RST',
+      'strands 1 and 8) — it is meaningless for any other standard. It is also the heaviest',
+      'interaction: use it for at most one step in a pathway, normally "practice" or "check".',
+      '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
+      'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
+      'lesson taught, not for introducing a concept the student has not met yet.',
+    ].join(' '),
+  ),
 });
 
 /** What the model authors, given graph-verified facts. */

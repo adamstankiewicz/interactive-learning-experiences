@@ -1,13 +1,18 @@
 {
   "name": "interactive-student-experiences",
   "version": "0.1.0",
-  "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:migrate": "supabase migration up"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.55",
@@ -39,6 +44,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "supabase": "^2.114.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

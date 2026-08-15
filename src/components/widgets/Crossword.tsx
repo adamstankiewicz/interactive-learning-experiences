@@ -48,6 +48,22 @@ const ARROWS: Record<string, { direction: Direction; delta: number }> = {
   ArrowUp: { direction: 'down', delta: -1 },
 };
 
+/**
+ * Derives a smaller (easier) or larger (harder) puzzle from the same term
+ * list — a pure slice of `entries`, no invented vocabulary and no new model
+ * call. Entries are described as "most central first," so slicing from the
+ * front keeps the essential terms and drops only the longer tail of
+ * prerequisite vocabulary first. `layoutCrossword` is pure and already
+ * tolerates a term that fails to interlock, so a smaller slice is always a
+ * safe input. Level 0-100 maps linearly onto minEntries..entries.length.
+ */
+export function varyCrossword(base: CrosswordSpec, level: number, minEntries = 6): CrosswordSpec {
+  const floor = Math.min(minEntries, base.entries.length);
+  const count = Math.max(floor, Math.round((level / 100) * (base.entries.length - floor)) + floor);
+
+  return { ...base, entries: base.entries.slice(0, count) };
+}
+
 export function Crossword({ spec }: { spec: CrosswordSpec }) {
   const telemetry = useWidgetTelemetry();
   const layout = useMemo(() => layoutCrossword(spec.entries), [spec.entries]);

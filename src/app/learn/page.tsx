@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { WidgetRenderer } from '@/components/widgets/registry';
-import { WidgetTelemetryProvider } from '@/components/widgets/telemetry-context';
-import { useTelemetry } from '@/hooks/useTelemetry';
+import { PathwayWalkthrough, type WalkthroughSession } from '@/components/pathway/PathwayWalkthrough';
 import { useVoiceIntake } from '@/hooks/useVoiceIntake';
 import type { PathwayEvent } from '@/lib/pathway/events';
 
@@ -16,42 +14,36 @@ import type { PathwayEvent } from '@/lib/pathway/events';
  * planning artifact for a teacher, this is a thing a nine-year-old touches.
  * Styling is deliberately local rather than global so the design system on `/`
  * is untouched.
+ *
+ * This page owns *generating* a session (voice/typed topic in, streamed
+ * pathway out); once one exists, `PathwayWalkthrough` owns walking through
+ * it — the same component `/learn/[sessionId]` uses for a persisted,
+ * shared pathway, so a live build and a shared link end in the identical
+ * student experience.
  */
-
-type Session = {
-  sessionId: string | null;
-  topic: string;
-  bigIdea: string;
-  standardCode: string | null;
-  /** Every generator that produced something, in the order the stream sent them. */
-  widgets: unknown[];
-  widgetNotes: string[];
-};
 
 const BUILDING_LINES = [
   'Finding the right lesson…',
   'Asking the knowledge graph…',
-  'Building your cards…',
+  'Building your activities…',
 ];
 
 export default function LearnPage() {
-  const [studentId, setStudentId] = useState<string | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  // Lazy initializer: reads the cached id (if any) exactly once, at mount,
+  // rather than a synchronous setState from an effect. `typeof window` guards
+  // the server-rendered pass this 'use client' page still gets before hydration.
+  const [studentId, setStudentId] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : localStorage.getItem('studentId'),
+  );
+  const [session, setSession] = useState<WalkthroughSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
-  const [stars, setStars] = useState(0);
   const [round, setRound] = useState(0);
   const [line, setLine] = useState(0);
 
-  const telemetry = useTelemetry(session?.sessionId ?? null, studentId);
-
   useEffect(() => {
-    const cached = localStorage.getItem('studentId');
-    if (cached) {
-      setStudentId(cached);
-      return;
-    }
+    if (studentId) return;
     void fetch('/api/student', { method: 'POST' })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { studentId?: string } | null) => {
@@ -60,7 +52,7 @@ export default function LearnPage() {
         setStudentId(data.studentId);
       })
       .catch(() => {});
-  }, []);
+  }, [studentId]);
 
   useEffect(() => {
     if (!busy) return;
@@ -83,15 +75,14 @@ export default function LearnPage() {
         });
         if (!response.body) throw new Error('No response from the server.');
 
-        // The route streams newline-delimited events. Only the settled ones
-        // matter here — the stage-by-stage detail is for the teacher view.
-        const next: Session = {
+        const next: WalkthroughSession = {
           sessionId: null,
           topic,
           bigIdea: '',
           standardCode: null,
-          widgets: [],
-          widgetNotes: [],
+          steps: [],
+          stepWidgets: {},
+          stepWidgetNotes: {},
         };
 
         const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -110,13 +101,16 @@ export default function LearnPage() {
             if (!raw.trim()) continue;
             const event = JSON.parse(raw) as PathwayEvent;
 
-            if (event.type === 'anchor') next.standardCode = event.anchor.standard.statementCode;
-            if (event.type === 'plan') next.bigIdea = event.plan.bigIdea;
-            // One event per generator, so collect rather than overwrite —
-            // otherwise only the last generator to finish reaches the student.
-            if (event.type === 'widget') {
-              if (event.widget) next.widgets.push(event.widget);
-              if (event.note) next.widgetNotes.push(event.note);
+            if (event.type === 'anchor') {
+              next.standardCode = event.anchor.standard.verified ? event.anchor.standard.code : null;
+            }
+            if (event.type === 'plan') {
+              next.bigIdea = event.plan.bigIdea;
+              next.steps = event.plan.steps;
+            }
+            if (event.type === 'step-widget') {
+              next.stepWidgets[event.stepIndex] = event.widget;
+              if (event.note) next.stepWidgetNotes[event.stepIndex] = event.note;
             }
             if (event.type === 'session') next.sessionId = event.sessionId;
             if (event.type === 'error') failure = event.message;
@@ -138,34 +132,9 @@ export default function LearnPage() {
 
   const voice = useVoiceIntake(build);
 
-  const onWidgetComplete = useCallback(() => {
-    setStars((n) => n + 1);
-    telemetry.flush();
-  }, [telemetry]);
-
   return (
     <div className="min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
-        {session && (
-          <div className="flex w-full items-center justify-between">
-            <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 text-xs font-bold text-violet-600">
-              {session.standardCode ?? 'no standard'}
-            </span>
-            <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
-              <motion.span
-                key={stars}
-                initial={{ scale: 1.8, rotate: -20 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-                className="text-xl"
-              >
-                ⭐
-              </motion.span>
-              <span className="text-lg font-black text-amber-600">{stars}</span>
-            </span>
-          </div>
-        )}
-
         {!session && (
           <AnimatePresence mode="wait">
             <motion.h1
@@ -241,56 +210,19 @@ export default function LearnPage() {
         )}
 
         {session && (
-          <motion.div
+          <PathwayWalkthrough
             key={round}
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-            className="flex w-full flex-col items-center gap-5"
-          >
-            <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
-
-            {session.widgets.length > 0 ? (
-              <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode}>
-                {session.widgets.map((widget, index) => (
-                  <div
-                    key={index}
-                    className="w-full rounded-3xl border-4 border-violet-200 bg-white/80 p-4"
-                  >
-                    <WidgetRenderer spec={widget} />
-                  </div>
-                ))}
-              </WidgetTelemetryProvider>
-            ) : (
-              <p className="rounded-2xl border-4 border-amber-200 bg-amber-50 p-4 text-center font-bold text-amber-900">
-                {session.widgetNotes[0] ?? 'No activity for this topic yet.'}
-              </p>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  onWidgetComplete();
-                  void build(session.topic);
-                }}
-                disabled={busy}
-                className="rounded-2xl bg-amber-400 px-7 py-3 font-black text-amber-950 shadow-[0_5px_0_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_0_#b45309] disabled:opacity-50"
-              >
-                {busy ? 'Building…' : 'Another one! 🚀'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSession(null);
-                  setTyped('');
-                }}
-                className="rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-black text-violet-600"
-              >
-                New topic
-              </button>
-            </div>
-          </motion.div>
+            session={session}
+            studentId={studentId}
+            onRestart={{
+              another: () => void build(session.topic),
+              newTopic: () => {
+                setSession(null);
+                setTyped('');
+              },
+              busy,
+            }}
+          />
         )}
       </main>
     </div>

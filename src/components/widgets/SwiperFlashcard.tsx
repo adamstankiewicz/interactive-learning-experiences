@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { SwiperFlashcardSpec } from '@/lib/pathway/schema';
+import { cn } from '@/lib/utils';
 
 type CardData = SwiperFlashcardSpec['cards'][number];
 type SwipeDirection = 'up' | 'down';
@@ -43,6 +44,11 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
   const telemetry = useWidgetTelemetry();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<CardResult[]>([]);
+  // Mirrors `results` so `handleNext` can read the latest value synchronously.
+  // Not a stale-closure workaround via a setState updater's `prev` — calling
+  // `onComplete` (which sets state in the *parent*) from inside a setState
+  // updater runs it during this component's own render, which React disallows.
+  const resultsRef = useRef<CardResult[]>([]);
   const [swipeState, setSwipeState] = useState<{
     direction: SwipeDirection;
     phase: 'animating' | 'revealing';
@@ -177,8 +183,9 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
         }
         // Clear imperative drag styles so className-driven reveal colors take over
         resetLabelHighlight();
-        // Record the result now so onComplete can fire from handleNext
-        setResults((prev) => [...prev, { cardIndex: currentIndex, direction, correct }]);
+        // Record the result now so handleNext can read it synchronously.
+        resultsRef.current = [...resultsRef.current, { cardIndex: currentIndex, direction, correct }];
+        setResults(resultsRef.current);
       }, 320);
     },
     [
@@ -195,21 +202,26 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
 
   const handleNext = useCallback(() => {
     if (swipeState?.phase !== 'revealing') return;
-    setResults((prev) => {
-      if (currentIndex + 1 === spec.cards.length) {
-        telemetry.track({
-          eventType: 'widget_completed',
-          widgetKind: spec.kind,
-          learningComponentId: spec.learningComponentId,
-          standardCode: telemetry.standardCode,
-          correct: prev.every((entry) => entry.correct),
-          payload: { correct: prev.filter((entry) => entry.correct).length, total: prev.length },
-        });
-        telemetry.flush();
-        onComplete?.(prev);
-      }
-      return prev;
-    });
+
+    // A plain read and a plain call, not a setState updater: this runs from a
+    // click handler, which is the safe place to trigger the parent's state.
+    if (currentIndex + 1 === spec.cards.length) {
+      const finalResults = resultsRef.current;
+      telemetry.track({
+        eventType: 'widget_completed',
+        widgetKind: spec.kind,
+        learningComponentId: spec.learningComponentId,
+        standardCode: telemetry.standardCode,
+        correct: finalResults.every((entry) => entry.correct),
+        payload: {
+          correct: finalResults.filter((entry) => entry.correct).length,
+          total: finalResults.length,
+        },
+      });
+      telemetry.flush();
+      onComplete?.(finalResults);
+    }
+
     setCurrentIndex((i) => i + 1);
     setSwipeState(null);
     // Defer until the next card's buttons are rendered
@@ -334,21 +346,22 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
       <div
         ref={leftLabelRef}
         style={{ transition: 'opacity 80ms, transform 80ms' }}
-        className={`flex h-12 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold ${
+        className={cn(
+          'flex h-12 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold',
           isRevealing
             ? swipeState?.direction === 'up'
               ? card.correctDirection === 'up'
-                ? 'border-success bg-success text-white'       // selected + correct = solid green
-                : 'border-destructive bg-destructive text-white' // selected + wrong  = solid red
+                ? 'border-success bg-success text-white' // selected + correct = solid green
+                : 'border-destructive bg-destructive text-white' // selected + wrong = solid red
               : card.correctDirection === 'up'
-                ? 'border-success text-success'                // not selected + correct = outlined green
+                ? 'border-success text-success' // not selected + correct = outlined green
                 : 'border-muted-foreground/30 text-muted-foreground/30' // not selected + wrong = dim
             : isSwipingUp
               ? 'border-destructive text-destructive'
               : isSwipingDown
                 ? 'border-muted-foreground/20 text-muted-foreground/20'
-                : 'border-muted-foreground/40 text-muted-foreground'
-        }`}
+                : 'border-muted-foreground/40 text-muted-foreground',
+        )}
         aria-hidden="true"
       >
         {card.upLabel}
@@ -365,7 +378,7 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
         {isRevealing ? (
           <Card role="status" className="min-h-36">
             <CardContent className="flex min-h-36 flex-col items-center justify-center gap-3 text-center">
-              <p className={`text-sm font-semibold ${swipedCorrect ? 'text-success' : 'text-destructive'}`}>
+              <p className={cn('text-sm font-semibold', swipedCorrect ? 'text-success' : 'text-destructive')}>
                 {swipedCorrect
                   ? CORRECT_REACTIONS[currentIndex % CORRECT_REACTIONS.length]
                   : INCORRECT_REACTIONS[currentIndex % INCORRECT_REACTIONS.length]}
@@ -389,21 +402,22 @@ export function SwiperFlashcard({ spec, onComplete }: Props) {
       <div
         ref={rightLabelRef}
         style={{ transition: 'opacity 80ms, transform 80ms' }}
-        className={`flex h-12 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold ${
+        className={cn(
+          'flex h-12 items-center justify-center rounded-lg border-2 text-center text-sm font-semibold',
           isRevealing
             ? swipeState?.direction === 'down'
               ? card.correctDirection === 'down'
-                ? 'border-success bg-success text-white'       // selected + correct = solid green
-                : 'border-destructive bg-destructive text-white' // selected + wrong  = solid red
+                ? 'border-success bg-success text-white' // selected + correct = solid green
+                : 'border-destructive bg-destructive text-white' // selected + wrong = solid red
               : card.correctDirection === 'down'
-                ? 'border-success text-success'                // not selected + correct = outlined green
+                ? 'border-success text-success' // not selected + correct = outlined green
                 : 'border-muted-foreground/30 text-muted-foreground/30' // not selected + wrong = dim
             : isSwipingDown
               ? 'border-success text-success'
               : isSwipingUp
                 ? 'border-muted-foreground/20 text-muted-foreground/20'
-                : 'border-muted-foreground/40 text-muted-foreground'
-        }`}
+                : 'border-muted-foreground/40 text-muted-foreground',
+        )}
         aria-hidden="true"
       >
         {card.downLabel}
