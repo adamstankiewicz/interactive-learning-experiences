@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { WidgetThumb } from '@/components/demo/WidgetThumb';
 
 const WIDGETS = [
   {
@@ -124,6 +125,7 @@ export default function DemoIndex() {
             <Link href={`/demo/${w.slug}`} className="group block h-full">
               <Card className="h-full transition-shadow group-hover:ring-2 group-hover:ring-ring">
                 <CardHeader>
+                  <WidgetThumb slug={w.slug} />
                   <CardTitle>{w.name}</CardTitle>
                   <CardDescription>{w.description}</CardDescription>
                 </CardHeader>
