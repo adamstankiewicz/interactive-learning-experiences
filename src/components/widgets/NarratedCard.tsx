@@ -3,9 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { NarratedCardSpec } from '@/lib/pathway/schema';
 
 type Props = { spec: NarratedCardSpec; onComplete?: (correct: boolean) => void };
+
+// Base speech rate at 1x, scaled by the student's chosen speed multiplier.
+const BASE_RATE = 0.92;
+const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5] as const;
 
 // Split plain text into sentences. Strips markdown markers so the TTS
 // doesn't read "asterisk asterisk" aloud.
@@ -74,9 +85,14 @@ export function NarratedCard({ spec, onComplete }: Props) {
   const [revealedSentences, setRevealedSentences] = useState(0);
   // How many steps have been fully narrated (so previous steps show fully)
   const [completedSteps, setCompletedSteps] = useState(0);
+  // Playback speed multiplier applied on top of BASE_RATE (1 = normal)
+  const [speed, setSpeed] = useState<number>(1);
 
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const stoppedRef = useRef(false);
+  // Mirrors `speed` so in-flight utterance creation always reads the latest
+  // value, even when the speed changes mid-step (state updates are async).
+  const speedRef = useRef(speed);
 
   const currentStep = spec.steps[stepIndex]!;
   const isLastStep = stepIndex === spec.steps.length - 1;
@@ -88,8 +104,8 @@ export function NarratedCard({ spec, onComplete }: Props) {
     utterancesRef.current = [];
   }, []);
 
-  // Speak all sentences of the current step, then advance
-  const speakStep = useCallback((sIdx: number) => {
+  // Speak the sentences of the current step starting at `startAt`, then advance
+  const speakStep = useCallback((sIdx: number, startAt = 0) => {
     if (!window.speechSynthesis) return;
     stoppedRef.current = false;
 
@@ -103,9 +119,10 @@ export function NarratedCard({ spec, onComplete }: Props) {
       : sentences;
 
     // Queue utterances
-    allSentences.forEach((text, i) => {
+    allSentences.slice(startAt).forEach((text, offset) => {
+      const i = startAt + offset;
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.92;
+      utterance.rate = BASE_RATE * speedRef.current;
       utterance.pitch = 1;
 
       utterance.onstart = () => {
@@ -159,6 +176,41 @@ export function NarratedCard({ spec, onComplete }: Props) {
       }
     }
   }, [playing, speakStep, stepIndex]);
+
+  // Change playback speed. If a step is actively being narrated, restart
+  // the in-flight utterance at the new rate from the current sentence.
+  const handleSpeedChange = useCallback(
+    (nextSpeed: number) => {
+      setSpeed(nextSpeed);
+      speedRef.current = nextSpeed;
+
+      if (playing) {
+        stoppedRef.current = true;
+        window.speechSynthesis?.cancel();
+        speakStep(stepIndex, activeSentence === -1 ? 0 : activeSentence);
+      }
+    },
+    [playing, activeSentence, stepIndex, speakStep],
+  );
+
+  // Skip narration of the current step and jump straight to the next one
+  // (or finish the widget if this was the last step).
+  const handleSkipAhead = useCallback(() => {
+    stoppedRef.current = true;
+    window.speechSynthesis?.cancel();
+
+    const nextIndex = stepIndex + 1;
+    setCompletedSteps((c) => Math.max(c, stepIndex + 1));
+    setActiveSentence(-1);
+    setRevealedSentences(0);
+
+    if (nextIndex < spec.steps.length) {
+      setStepIndex(nextIndex);
+      if (playing) speakStep(nextIndex);
+    } else {
+      setPlaying(false);
+    }
+  }, [playing, stepIndex, speakStep, spec.steps.length]);
 
   // Cancel speech on unmount
   useEffect(() => {
@@ -231,6 +283,31 @@ export function NarratedCard({ spec, onComplete }: Props) {
       </ul>
 
       {/* Controls */}
+      {!allDone && (
+        <div className="flex items-center gap-2">
+          <Select value={String(speed)} onValueChange={(value) => handleSpeedChange(Number(value))}>
+            <SelectTrigger className="w-24 text-sm" aria-label="Playback speed">
+              <SelectValue>{(value: string) => `${value}x`}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {SPEED_OPTIONS.map((option) => (
+                <SelectItem key={option} value={String(option)}>
+                  {option}x
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="ghost"
+            className="ml-auto text-muted-foreground"
+            onClick={handleSkipAhead}
+          >
+            Skip ahead ⏭
+          </Button>
+        </div>
+      )}
+
       {allDone ? (
         <Button size="lg" className="w-full" onClick={() => onComplete?.(true)}>
           Continue to next section
