@@ -1,4 +1,4 @@
-import { DraftMeter } from '@/components/widgets/DraftMeter';
+import { lazy } from 'react';
 import { draftMeterSpec, type DraftMeterSpec } from '@/lib/pathway/schema';
 import { reachesGrade } from '@/lib/standards/grade';
 import { registerWidgetCatalog } from '@/lib/widgets/types';
@@ -8,7 +8,9 @@ const MIN_GRADE = 3;
 registerWidgetCatalog<DraftMeterSpec>({
   kind: 'draft-meter',
   schema: draftMeterSpec,
-  component: DraftMeter,
+  component: lazy(() =>
+    import('@/components/widgets/DraftMeter').then((m) => ({ default: m.DraftMeter })),
+  ),
   // `written-response` rather than the old argument-only pair: the meter now
   // carries the checks its own standard asks for, so it is no longer limited to
   // standards about argument. Content tag alone still isn't enough — writing a
