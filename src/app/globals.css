@@ -61,13 +61,14 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   /*
-   * The one confident brand hue. Nova ships pure greyscale; this app has two
-   * faces — a teacher-facing builder and a student-facing /learn — and they
-   * need to read as the same product. /learn already has a violet identity
-   * (its gradient background, its mic button), so primary is built around
-   * that hue rather than introducing a third color language. Chosen for
-   * contrast, not just vibe: 6.31:1 against --primary-foreground, comfortably
-   * past the 4.5:1 text floor everything else in this file holds to.
+   * The one confident brand hue. The base shadcn theme this builds on ships
+   * pure greyscale; this app has two faces — a teacher-facing builder and a
+   * student-facing /learn — and they need to read as the same product.
+   * /learn already has a violet identity (its gradient background, its mic
+   * button), so primary is built around that hue rather than introducing a
+   * third color language. Chosen for contrast, not just vibe: 6.31:1 against
+   * --primary-foreground, comfortably past the 4.5:1 text floor everything
+   * else in this file holds to.
    */
   --primary: oklch(0.5 0.2 292);
   --primary-foreground: oklch(0.985 0 0);
@@ -82,9 +83,10 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  /* Widget feedback and manipulative fills. Nova's palette is greyscale, so
-     these are the only chromatic tokens: correct, needs-another-look, and the
-     "student selected this part" fill shared by every manipulative. */
+  /* Widget feedback and manipulative fills. The base theme's palette is
+     greyscale, so these are the only chromatic tokens: correct,
+     needs-another-look, and the "student selected this part" fill shared
+     by every manipulative. */
   /* Lightness is set so feedback text clears WCAG AA (4.5:1) against --card,
      matching the shipped --destructive. The obvious emerald/amber sit at
      ~3.5:1 and fail — this is student-facing copy, so it has to hold. */
@@ -104,7 +106,12 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  /* Rounder than the base theme's default (10px), short of /learn's explicit
+     rounded-2xl/3xl treatments on its own bespoke elements — the "same
+     warmth, calmer register" the builder and /learn are meant to share.
+     Radius alone never affects text contrast, so this is safe to raise
+     without re-checking any of the ratios documented above. */
+  --radius: 0.875rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -123,9 +130,10 @@
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
   /*
-   * Nova's dark mode default inverts to a near-white button with dark text —
-   * a convention for a *monochrome* primary. A hued one reads better the
-   * conventional way: a rich, visible fill with light text on top. Lightened
+   * The base theme's dark mode default inverts to a near-white button with
+   * dark text — a convention for a *monochrome* primary. A hued one reads
+   * better the conventional way: a rich, visible fill with light text on
+   * top. Lightened
    * from the light-mode value to stay legible against a near-black page
    * (3.63:1 against --card) while still clearing 4.5:1 against its own
    * --primary-foreground text.

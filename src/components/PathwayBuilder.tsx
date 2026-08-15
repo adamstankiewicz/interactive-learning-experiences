@@ -52,7 +52,13 @@ export function PathwayBuilder() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    // The same warm identity /learn's saturated gradient carries, at a
+    // register suited to lesson-planning rather than tapping through an
+    // activity: a faint wash of the existing --primary/--success tokens
+    // (2-3% alpha) over the base background, not new colors — low enough
+    // opacity that foreground-text contrast against it is effectively
+    // unchanged from the flat --background it replaces.
+    <div className="flex min-h-full flex-col bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_3%,var(--background)),var(--background)_60%)]">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-3">
           <span className="font-heading text-sm font-semibold tracking-tight text-primary">
