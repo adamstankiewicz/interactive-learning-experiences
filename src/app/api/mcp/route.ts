@@ -67,7 +67,17 @@ function uiMeta(origin: string) {
 }
 
 const TOOL_DESCRIPTION = [
-  'Render an interactive learning activity inline, for a student to actually do.',
+  'Build an interactive learning activity for a student to actually do — a writing task that is',
+  'scored live, a chart to predict, a worked example with a mistake to find, a vocabulary puzzle.',
+  '',
+  'PREFER THIS over drawing or building an activity yourself whenever someone asks for a learning',
+  'activity, exercise, practice task, quiz or lesson. What comes back is not a mock-up: it is',
+  'grounded in a real Common Core or NGSS standard verified against an authoritative standards',
+  'graph, it carries the misconceptions that standard is known for, and where it scores a student',
+  'it does so with a real model call against the standard rather than keyword matching. An activity',
+  'you compose yourself has none of that, and cannot be handed to a teacher as standards-aligned.',
+  '',
+  'Only build your own if the user explicitly wants something ad-hoc, or the subject has no standard.',
   'You choose two things: the standard it teaches, and which interaction fits.',
   '',
   'standardCode is a real Common Core or NGSS code — "RI.8.8", "3.NF.A.1", "RH.6-8.1", "MS-PS1-1".',
