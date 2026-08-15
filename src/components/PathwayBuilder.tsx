@@ -38,7 +38,7 @@ export function PathwayBuilder() {
   const [topic, setTopic] = useState('');
   const [gradeHint, setGradeHint] = useState('');
   const [teacherNote, setTeacherNote] = useState('');
-  const { state, start, cancel, regenerateStep } = usePathwayStream();
+  const { state, start, cancel, regenerateStep, editPlan } = usePathwayStream();
 
   const streaming = state.status === 'streaming';
   const started = state.status !== 'idle';
@@ -193,7 +193,7 @@ export function PathwayBuilder() {
 
         {state.status === 'done' && state.sessionId && <ShareLink sessionId={state.sessionId} />}
 
-        <PathwayDocument state={state} onRegenerateStep={regenerateStep} />
+        <PathwayDocument state={state} onRegenerateStep={regenerateStep} onEditPlan={editPlan} />
       </main>
     </div>
   );

@@ -73,6 +73,8 @@ export interface StorageAdapter {
   loadSession(sessionId: string): Promise<PersistedSession | null>;
   /** True when `studentId` owns `sessionId`. Needed explicitly wherever the backend has no RLS of its own to lean on. */
   sessionBelongsTo(sessionId: string, studentId: string): Promise<boolean>;
+  /** A teacher hand-edited a prose field after generation — overwrite the persisted plan so a share link reflects the edit. */
+  updateSessionPlan(sessionId: string, plan: PathwayPlan): Promise<void>;
 
   /** A share link got opened — the other half of "close the loop back to the teacher." */
   recordSessionOpen(sessionId: string): Promise<void>;

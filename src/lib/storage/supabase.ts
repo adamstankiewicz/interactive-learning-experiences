@@ -106,6 +106,12 @@ export const supabaseStorageAdapter: StorageAdapter = {
     return Boolean(data) && data?.student_id === studentId;
   },
 
+  async updateSessionPlan(sessionId, plan) {
+    if (!supabaseConfigured()) return;
+    const { error } = await supabaseAdmin().from('pathway_sessions').update({ plan }).eq('id', sessionId);
+    if (error) console.error('[storage] updateSessionPlan failed', error);
+  },
+
   async recordSessionOpen(sessionId) {
     if (!supabaseConfigured()) return;
     const { error } = await supabaseAdmin().rpc('increment_pathway_session_open_count', {

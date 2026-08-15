@@ -76,7 +76,9 @@ type Action =
   | { kind: 'event'; event: PathwayEvent; at: number }
   | { kind: 'regenerate-start'; stepIndex: number }
   | { kind: 'regenerate-done'; stepIndex: number; widget: WidgetSpec; note: string | null }
-  | { kind: 'regenerate-error'; stepIndex: number; message: string };
+  | { kind: 'regenerate-error'; stepIndex: number; message: string }
+  /** A hand-edit to a prose field — only valid once `plan` is the full, validated thing. */
+  | { kind: 'edit-plan'; plan: PathwayPlan };
 
 function withoutKey<T>(record: Record<number, T>, key: number): Record<number, T> {
   const next = { ...record };
@@ -127,6 +129,9 @@ function reducer(state: PathwayState, action: Action): PathwayState {
       regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: false },
       stepErrors: { ...state.stepErrors, [action.stepIndex]: action.message },
     };
+  }
+  if (action.kind === 'edit-plan') {
+    return { ...state, plan: action.plan };
   }
 
   const event = action.event;
@@ -294,5 +299,32 @@ export function usePathwayStream() {
     }
   }, []);
 
-  return { state, start, cancel, regenerateStep };
+  const editPlan = useCallback((plan: PathwayPlan) => {
+    dispatch({ kind: 'edit-plan', plan });
+  }, []);
+
+  // Debounced autosave: a share link is only worth handing out if it shows
+  // what the teacher actually approved, not the pipeline's first draft. Waits
+  // for typing to pause rather than saving on every keystroke, and only once
+  // there is a persisted session to overwrite — editing before that just
+  // updates local state, saved for free once `persistSession` eventually runs.
+  useEffect(() => {
+    if (!state.sessionId || !state.plan) return;
+    const plan = state.plan as PathwayPlan;
+    const sessionId = state.sessionId;
+
+    const id = setTimeout(() => {
+      void fetch(`/api/pathway/session/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      }).catch(() => {
+        // Best-effort — the teacher's local view already has the edit.
+      });
+    }, 800);
+
+    return () => clearTimeout(id);
+  }, [state.plan, state.sessionId]);
+
+  return { state, start, cancel, regenerateStep, editPlan };
 }

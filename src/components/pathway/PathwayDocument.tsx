@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, RotateCcw, Sparkles } from 'lucide-react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Textarea } from '@/components/ui/textarea';
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { plainMath } from '@/lib/learning-commons/format';
 import type { Anchor, DeepPartial } from '@/lib/pathway/events';
@@ -14,6 +16,7 @@ import type { PathwayState } from '@/lib/pathway/use-pathway-stream';
 import { cn } from '@/lib/utils';
 
 type RegenerateStep = (anchor: Anchor, plan: PathwayPlan, stepIndex: number) => Promise<void>;
+type EditPlan = (plan: PathwayPlan) => void;
 
 const PURPOSE_LABEL: Record<string, string> = {
   activate: 'Activate',
@@ -35,21 +38,59 @@ type PartialStep = DeepPartial<PathwayPlan>['steps'] extends (infer S)[] | undef
 export function PathwayDocument({
   state,
   onRegenerateStep,
+  onEditPlan,
 }: {
   state: PathwayState;
   onRegenerateStep?: RegenerateStep;
+  onEditPlan?: EditPlan;
 }) {
   const { anchor, plan } = state;
   if (!anchor) return null;
 
-  // Regeneration replays a step through the same widget-generation call the
-  // pipeline made the first time — only meaningful once the plan is the real
-  // validated thing, not the partial shape it streams in as.
+  // Both only make sense once `plan` is the real validated thing, not the
+  // partial shape it streams in as — regeneration replays a step through the
+  // same widget-generation call the pipeline made the first time, and an
+  // edit rewrites a field on a plan that still has every other field intact.
   const regenerateStep = state.status === 'done' ? onRegenerateStep : undefined;
+  const editPlan = state.status === 'done' ? onEditPlan : undefined;
 
   const rejectedCodes = Object.entries(state.verdicts)
     .filter(([, resolved]) => !resolved)
     .map(([code]) => code);
+
+  // Every edit callback closes over the *current* full plan and writes back
+  // a whole new one — `editPlan` (like `regenerateStep`) is only ever handed
+  // a complete `PathwayPlan`, never a partial one, so this cast is safe
+  // exactly where `editPlan` itself is truthy.
+  const editOutcome = editPlan
+    ? (index: number, field: 'statement' | 'evidence', text: string) => {
+        const current = plan as PathwayPlan;
+        editPlan({
+          ...current,
+          outcomes: current.outcomes.map((o, i) => (i === index ? { ...o, [field]: text } : o)),
+        });
+      }
+    : undefined;
+
+  const editStepField = editPlan
+    ? (index: number, field: 'title' | 'description', text: string) => {
+        const current = plan as PathwayPlan;
+        editPlan({
+          ...current,
+          steps: current.steps.map((s, i) => (i === index ? { ...s, [field]: text } : s)),
+        });
+      }
+    : undefined;
+
+  const editMisconception = editPlan
+    ? (index: number, text: string) => {
+        const current = plan as PathwayPlan;
+        editPlan({
+          ...current,
+          misconceptions: current.misconceptions.map((m, i) => (i === index ? text : m)),
+        });
+      }
+    : undefined;
 
   return (
     <article className="mt-8 space-y-10">
@@ -58,6 +99,9 @@ export function PathwayDocument({
         plan={plan}
         rejectedCodes={rejectedCodes}
         topic={state.topic}
+        onEditBigIdea={
+          editPlan ? (text) => editPlan({ ...(plan as PathwayPlan), bigIdea: text }) : undefined
+        }
       />
 
       {/* Backward design: objectives before activities. A teacher decides
@@ -77,11 +121,30 @@ export function PathwayDocument({
               <li key={index}>
                 <Card size="sm">
                   <CardContent>
-                    <p className="text-sm font-medium">{outcome?.statement}</p>
-                    {outcome?.evidence && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        You&rsquo;ll know they have it when: {outcome.evidence}
-                      </p>
+                    {editOutcome ? (
+                      <EditableText
+                        value={outcome?.statement ?? ''}
+                        onSave={(text) => editOutcome(index, 'statement', text)}
+                        className="text-sm font-medium"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium">{outcome?.statement}</p>
+                    )}
+                    {editOutcome ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        You&rsquo;ll know they have it when:{' '}
+                        <EditableText
+                          value={outcome?.evidence ?? ''}
+                          onSave={(text) => editOutcome(index, 'evidence', text)}
+                          as="span"
+                        />
+                      </div>
+                    ) : (
+                      outcome?.evidence && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          You&rsquo;ll know they have it when: {outcome.evidence}
+                        </p>
+                      )
                     )}
                   </CardContent>
                 </Card>
@@ -103,6 +166,9 @@ export function PathwayDocument({
                 onRegenerate={
                   regenerateStep ? () => regenerateStep(anchor, plan as PathwayPlan, index) : undefined
                 }
+                onEditField={
+                  editStepField ? (field, text) => editStepField(index, field, text) : undefined
+                }
               />
             ))}
           </ol>
@@ -115,7 +181,16 @@ export function PathwayDocument({
             {plan?.misconceptions?.map((misconception, index) => (
               <li key={index} className="flex gap-2.5 text-sm">
                 <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-warning" />
-                {misconception}
+                {editMisconception ? (
+                  <EditableText
+                    value={misconception ?? ''}
+                    onSave={(text) => editMisconception(index, text)}
+                    as="span"
+                    className="flex-1"
+                  />
+                ) : (
+                  misconception
+                )}
               </li>
             ))}
           </ul>
@@ -167,11 +242,13 @@ function DocumentHeader({
   plan,
   rejectedCodes,
   topic,
+  onEditBigIdea,
 }: {
   anchor: Anchor;
   plan: DeepPartial<PathwayPlan> | null;
   rejectedCodes: string[];
   topic: string;
+  onEditBigIdea?: (text: string) => void;
 }) {
   const { standard } = anchor;
 
@@ -194,8 +271,17 @@ function DocumentHeader({
 
       <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight">{topic}</h2>
 
-      {plan?.bigIdea && (
-        <p className="mt-2 text-base leading-relaxed text-muted-foreground">{plan.bigIdea}</p>
+      {onEditBigIdea ? (
+        <EditableText
+          value={plan?.bigIdea ?? ''}
+          onSave={onEditBigIdea}
+          className="mt-2 text-base leading-relaxed text-muted-foreground"
+          multiline
+        />
+      ) : (
+        plan?.bigIdea && (
+          <p className="mt-2 text-base leading-relaxed text-muted-foreground">{plan.bigIdea}</p>
+        )
       )}
 
       {/* The provenance is the product's whole claim, so it stays reachable —
@@ -243,11 +329,13 @@ function StepCard({
   index,
   state,
   onRegenerate,
+  onEditField,
 }: {
   step: PartialStep;
   index: number;
   state: PathwayState;
   onRegenerate?: () => void;
+  onEditField?: (field: 'title' | 'description', text: string) => void;
 }) {
   const purpose = step?.purpose;
   const widget = state.stepWidgets[index];
@@ -268,9 +356,26 @@ function StepCard({
           </span>
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{step?.title}</p>
-          {step?.description && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p>
+          {onEditField ? (
+            <EditableText
+              value={step?.title ?? ''}
+              onSave={(text) => onEditField('title', text)}
+              className="text-sm font-medium"
+            />
+          ) : (
+            <p className="text-sm font-medium">{step?.title}</p>
+          )}
+          {onEditField ? (
+            <EditableText
+              value={step?.description ?? ''}
+              onSave={(text) => onEditField('description', text)}
+              className="mt-0.5 text-sm text-muted-foreground"
+              multiline
+            />
+          ) : (
+            step?.description && (
+              <p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p>
+            )
           )}
           {regenerateError && <p className="mt-1 text-xs text-destructive">{regenerateError}</p>}
         </div>
@@ -331,5 +436,82 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+/**
+ * Click a prose field, get a textarea in its place; blur or Enter commits,
+ * Escape reverts. No rich-text formatting, no AI toolbar — just the ability
+ * to hand-fix a word choice without regenerating the whole step around it.
+ * `onSave` only fires when the trimmed text actually changed.
+ */
+function EditableText({
+  value,
+  onSave,
+  as = 'p',
+  className,
+  multiline = false,
+}: {
+  value: string;
+  onSave: (text: string) => void;
+  as?: 'p' | 'span';
+  className?: string;
+  multiline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    ref.current?.focus();
+    ref.current?.select();
+  }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    else setDraft(value);
+  }
+
+  if (editing) {
+    return (
+      <Textarea
+        ref={ref}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setDraft(value);
+            setEditing(false);
+          } else if (event.key === 'Enter' && !multiline && !event.shiftKey) {
+            event.preventDefault();
+            commit();
+          }
+        }}
+        rows={multiline ? 3 : 1}
+        className={cn('min-h-0 resize-none py-1', className)}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(value);
+        setEditing(true);
+      }}
+      className={cn(
+        'cursor-text rounded text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50',
+        as === 'p' && 'block w-full',
+        className,
+      )}
+    >
+      {value || <span className="text-muted-foreground/50">Click to add…</span>}
+    </button>
   );
 }

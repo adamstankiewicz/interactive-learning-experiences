@@ -93,6 +93,11 @@ export const memoryStorageAdapter: StorageAdapter = {
     return id;
   },
 
+  async updateSessionPlan(sessionId, plan) {
+    const session = sessions.get(sessionId);
+    if (session) session.plan = plan;
+  },
+
   async recordSessionOpen(sessionId) {
     const session = sessions.get(sessionId);
     if (session) session.openCount += 1;
