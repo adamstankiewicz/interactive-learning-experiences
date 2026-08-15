@@ -63,8 +63,8 @@ function directionOf(from: number, to: number): Direction {
  * segment within the values it connects — flat stays flat, rising never dips —
  * so the line can be curvy without asserting motion that isn't in the data.
  */
-function smoothPath(pts: { x: number; y: number }[]): string {
-  if (pts.length < 2) return '';
+function curveSegments(pts: { x: number; y: number }[]): string[] {
+  if (pts.length < 2) return [];
 
   const n = pts.length;
   const h: number[] = [];
@@ -99,14 +99,40 @@ function smoothPath(pts: { x: number; y: number }[]): string {
     }
   }
 
-  let d = `M ${pts[0]!.x},${pts[0]!.y}`;
+  /*
+   * Emitted one segment at a time rather than as a single path, so each leg can
+   * be coloured on its own. Turning the whole line red said only "no"; colouring
+   * the two stretches that went the wrong way says *where*, which is the part a
+   * student can act on.
+   */
+  const out: string[] = [];
   for (let i = 0; i < n - 1; i++) {
     const third = h[i]! / 3;
-    d += ` C ${pts[i]!.x + third},${pts[i]!.y + m[i]! * third} ${pts[i + 1]!.x - third},${
-      pts[i + 1]!.y - m[i + 1]! * third
-    } ${pts[i + 1]!.x},${pts[i + 1]!.y}`;
+    out.push(
+      `M ${pts[i]!.x},${pts[i]!.y} C ${pts[i]!.x + third},${pts[i]!.y + m[i]! * third} ${
+        pts[i + 1]!.x - third
+      },${pts[i + 1]!.y - m[i + 1]! * third} ${pts[i + 1]!.x},${pts[i + 1]!.y}`,
+    );
   }
-  return d;
+  return out;
+}
+
+/** The shape, said out loud — see the live readout below the chart. */
+const DIRECTION_WORD: Record<Direction, string> = {
+  up: 'rises',
+  flat: 'levels off',
+  down: 'falls',
+};
+
+function describeShape(directions: Direction[]): string {
+  if (directions.every((d) => d === 'flat')) return 'Your line is flat all the way across.';
+
+  // Collapse runs, so four rising segments read as one climb rather than four.
+  const runs: Direction[] = [];
+  for (const d of directions) if (d !== runs[runs.length - 1]) runs.push(d);
+
+  const words = runs.map((d) => DIRECTION_WORD[d]);
+  return `Your line ${words.join(', then ')}.`;
 }
 
 export function DrawTheCurve({ spec, onComplete }: Props) {
@@ -246,7 +272,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
     setRevealed(false);
   }, [points]);
 
-  const line = (vals: number[]) => smoothPath(vals.map((v, i) => ({ x: xOf(i), y: yOf(v) })));
+  const legs = (vals: number[]) => curveSegments(vals.map((v, i) => ({ x: xOf(i), y: yOf(v) })));
   const untouched = values.every((v) => v === START_VALUE);
 
   return (
@@ -330,24 +356,33 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
             </text>
 
             {/* The real curve, only after they have committed to their own. */}
-            {revealed && (
+            {revealed &&
+              legs(actual).map((d, i) => (
+                <path
+                  key={`actual-${i}`}
+                  d={d}
+                  fill="none"
+                  className="stroke-success"
+                  strokeWidth={2.5}
+                  strokeDasharray="7 6"
+                  strokeLinecap="round"
+                />
+              ))}
+
+            {legs(values).map((d, i) => (
               <path
-                d={line(actual)}
+                key={`mine-${i}`}
+                d={d}
                 fill="none"
-                className="stroke-success"
+                className={
+                  revealed && segments[i] && segments[i]!.mine !== segments[i]!.theirs
+                    ? 'stroke-destructive'
+                    : 'stroke-primary'
+                }
                 strokeWidth={2.5}
-                strokeDasharray="7 6"
                 strokeLinecap="round"
               />
-            )}
-
-            <path
-              d={line(values)}
-              fill="none"
-              className={revealed && !allRight ? 'stroke-destructive' : 'stroke-primary'}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
+            ))}
 
             {points.map((point, i) => (
               <g key={point.id}>
@@ -355,9 +390,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
                   cx={xOf(i)}
                   cy={yOf(values[i]!)}
                   r={dragging === i ? 7 : 5}
-                  className={`fill-card ${
-                    revealed && !allRight ? 'stroke-destructive' : 'stroke-primary'
-                  } ${revealed ? '' : 'cursor-grab'} transition-[r]`}
+                  className={`fill-card stroke-primary ${revealed ? '' : 'cursor-grab'} transition-[r]`}
                   strokeWidth={2.5}
                 />
                 {/* The handle is a slider, so arrow keys work and a screen reader
@@ -409,10 +442,22 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
         </div>
       </div>
 
+      {/*
+        Live, but describing rather than judging. A running verdict would let a
+        student wiggle a point until it went green, which is the opposite of
+        predicting — so this says what shape they have drawn, in the words a
+        graph question would use, and stays silent about whether it is right.
+        Naming your own curve is most of the skill being taught anyway.
+      */}
       {!revealed && (
-        <p className="text-xs text-muted-foreground">
-          Drag each point up or down — or tab to one and use the arrow keys.
-        </p>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <p aria-live="polite" className="text-sm font-medium text-foreground">
+            {describeShape(segments.map((s) => s.mine))}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Drag each point, or tab to one and use the arrow keys.
+          </p>
+        </div>
       )}
 
       {revealed && (
@@ -425,13 +470,29 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
           }`}
         >
           {allRight ? (
-            spec.reveal
+            <>
+              <span className="mb-1 flex items-center gap-1.5 font-semibold">
+                <svg viewBox="0 0 20 20" className="size-4 shrink-0" aria-hidden="true">
+                  <circle cx="10" cy="10" r="9" className="fill-success" />
+                  <path
+                    d="M6 10.5l2.5 2.5L14 7.5"
+                    fill="none"
+                    className="stroke-background"
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                That&apos;s the shape
+              </span>
+              {spec.reveal}
+            </>
           ) : (
             <>
               <span className="font-medium">
                 {wrongSegments === 1
-                  ? 'One stretch goes the wrong way.'
-                  : `${wrongSegments} stretches go the wrong way.`}
+                  ? "One stretch goes the wrong way — it's marked in red."
+                  : `${wrongSegments} stretches go the wrong way — they're marked in red.`}
               </span>{' '}
               {spec.hint}
             </>
