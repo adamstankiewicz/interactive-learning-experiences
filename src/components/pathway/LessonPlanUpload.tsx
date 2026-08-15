@@ -11,13 +11,22 @@ export type ExtractedTopic = {
   topic: string;
   gradeLevel: string;
   description: string;
+  /** What the plan says students struggle with here — '' when it doesn't say. */
+  teacherNote: string;
+};
+
+/** Everything a picked chip hands the builder, including the plan behind it. */
+export type LessonPlanPick = ExtractedTopic & {
+  filename: string;
+  /** The plan's text, to travel with the build as context. */
+  excerpt: string;
 };
 
 type Status =
   | { kind: 'idle' }
   | { kind: 'uploading'; filename: string }
   | { kind: 'error'; message: string }
-  | { kind: 'done'; filename: string; topics: ExtractedTopic[] };
+  | { kind: 'done'; filename: string; topics: ExtractedTopic[]; excerpt: string };
 
 const ACCEPTED = ['.txt', '.pdf'];
 
@@ -32,13 +41,21 @@ function hasAcceptedExtension(filename: string): boolean {
  * builder already has. Picking a chip only fills the fields — same restraint
  * as the example buttons — so the teacher still reviews/edits before building
  * rather than an upload silently kicking off a build on their behalf.
+ *
+ * A pick also carries the plan's text back to the builder, which sends it with
+ * the build so the pathway is shaped by how the teacher actually teaches this
+ * topic and not just by its name. Hence `onClear`: dropping the upload has to
+ * drop that context too, or a later build quietly keeps citing a document the
+ * teacher believes they removed.
  */
 export function LessonPlanUpload({
   disabled,
-  onPickTopic,
+  onPick,
+  onClear,
 }: {
   disabled?: boolean;
-  onPickTopic: (topic: string, gradeLevel: string) => void;
+  onPick: (pick: LessonPlanPick) => void;
+  onClear: () => void;
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,6 +68,9 @@ export function LessonPlanUpload({
       return;
     }
 
+    // The previous plan stops being context the moment a different file is
+    // dropped in, even though nothing has been picked from the new one yet.
+    onClear();
     setStatus({ kind: 'uploading', filename: file.name });
 
     try {
@@ -58,7 +78,7 @@ export function LessonPlanUpload({
       formData.append('file', file);
       const response = await fetch('/api/lesson-plan', { method: 'POST', body: formData });
       const body = (await response.json().catch(() => null)) as
-        | { filename: string; topics: ExtractedTopic[] }
+        | { filename: string; topics: ExtractedTopic[]; excerpt: string }
         | { error: string }
         | null;
 
@@ -66,19 +86,25 @@ export function LessonPlanUpload({
         throw new Error(body && 'error' in body ? body.error : 'Upload failed.');
       }
 
-      setStatus({ kind: 'done', filename: body.filename, topics: body.topics });
+      setStatus({
+        kind: 'done',
+        filename: body.filename,
+        topics: body.topics,
+        excerpt: body.excerpt,
+      });
     } catch (error) {
       setStatus({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Could not process that file.',
       });
     }
-  }, []);
+  }, [onClear]);
 
   const reset = useCallback(() => {
+    onClear();
     setStatus({ kind: 'idle' });
     if (inputRef.current) inputRef.current.value = '';
-  }, []);
+  }, [onClear]);
 
   if (status.kind === 'done') {
     return (
@@ -104,7 +130,9 @@ export function LessonPlanUpload({
                 key={extracted.topic}
                 type="button"
                 disabled={disabled}
-                onClick={() => onPickTopic(extracted.topic, extracted.gradeLevel)}
+                onClick={() =>
+                  onPick({ ...extracted, filename: status.filename, excerpt: status.excerpt })
+                }
                 title={extracted.description}
                 className="group flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:pointer-events-none disabled:opacity-50"
               >

@@ -1,9 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { ActivityTrail } from "@/components/pathway/ActivityTrail";
-import { LessonPlanUpload } from "@/components/pathway/LessonPlanUpload";
+import {
+  LessonPlanUpload,
+  type LessonPlanPick,
+} from "@/components/pathway/LessonPlanUpload";
 import { PathwayDocument } from "@/components/pathway/PathwayDocument";
 import { ShareLink } from "@/components/pathway/ShareLink";
 import { AssignToStudents } from "@/components/roster/AssignToStudents";
@@ -62,6 +65,18 @@ export function PathwayBuilder() {
   const [topic, setTopic] = useState("");
   const [gradeHint, setGradeHint] = useState("");
   const [teacherNote, setTeacherNote] = useState("");
+  /** The uploaded plan behind the current topic, sent along when building. */
+  const [lessonPlan, setLessonPlan] = useState<{
+    filename: string;
+    excerpt: string;
+  } | null>(null);
+  /**
+   * Whether the note currently in the box was filled from a lesson plan rather
+   * than typed. Picking a different topic should replace a note that came from
+   * the previous chip — it describes the wrong topic now — but must never
+   * overwrite a sentence the teacher wrote themselves.
+   */
+  const noteFromLessonPlan = useRef(false);
   const { state, start, cancel, regenerateStep, editPlan } = usePathwayStream();
 
   const streaming = state.status === "streaming";
@@ -69,12 +84,25 @@ export function PathwayBuilder() {
 
   function runSubmit() {
     if (!topic.trim() || streaming) return;
-    void start(topic, gradeHint, teacherNote.trim() || undefined);
+    void start(
+      topic,
+      gradeHint,
+      teacherNote.trim() || undefined,
+      lessonPlan?.excerpt,
+    );
   }
 
-  function pickTopic(pickedTopic: string, gradeLevel: string) {
-    setTopic(pickedTopic);
-    setGradeHint(normalizeGrade(gradeLevel));
+  function pickFromLessonPlan(pick: LessonPlanPick) {
+    setTopic(pick.topic);
+    setGradeHint(normalizeGrade(pick.gradeLevel));
+    setLessonPlan({ filename: pick.filename, excerpt: pick.excerpt });
+
+    if (!teacherNote.trim() || noteFromLessonPlan.current) {
+      // Assigns even when the plan said nothing about this topic: clearing a
+      // stale note beats carrying the previous topic's difficulty forward.
+      setTeacherNote(pick.teacherNote);
+      noteFromLessonPlan.current = Boolean(pick.teacherNote);
+    }
   }
 
   function submit(event: React.FormEvent) {
@@ -189,7 +217,10 @@ export function PathwayBuilder() {
               <Textarea
                 id={teacherNoteId}
                 value={teacherNote}
-                onChange={(event) => setTeacherNote(event.target.value)}
+                onChange={(event) => {
+                  setTeacherNote(event.target.value);
+                  noteFromLessonPlan.current = false;
+                }}
                 placeholder="e.g. they mix up numerator and denominator when the fraction is improper"
                 rows={1}
                 className="mt-1.5 min-h-10 resize-none py-2 text-sm"
@@ -198,7 +229,22 @@ export function PathwayBuilder() {
           )}
 
           {!started && (
-            <LessonPlanUpload disabled={streaming} onPickTopic={pickTopic} />
+            <>
+              <LessonPlanUpload
+                disabled={streaming}
+                onPick={pickFromLessonPlan}
+                onClear={() => setLessonPlan(null)}
+              />
+              {lessonPlan && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Building with{" "}
+                  <span className="font-medium text-foreground">
+                    {lessonPlan.filename}
+                  </span>{" "}
+                  as context — the pathway follows how your plan teaches this.
+                </p>
+              )}
+            </>
           )}
 
           {!started && (
@@ -216,6 +262,9 @@ export function PathwayBuilder() {
                     onClick={() => {
                       setTopic(example.topic);
                       setGradeHint(example.grade);
+                      // An example has nothing to do with the uploaded plan,
+                      // so building from one must not cite it.
+                      setLessonPlan(null);
                     }}
                     className="rounded-full font-normal text-muted-foreground"
                   >
