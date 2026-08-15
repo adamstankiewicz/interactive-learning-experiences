@@ -90,9 +90,20 @@ in Claude Desktop, `resources/read` has never once been called.
 python3 -m http.server 3200 --directory mcp   # then open /harness.html
 ```
 
-## Not done yet
+## How a widget gets built
 
-- The spec is hardcoded. Wiring the real pathway generator in is the next step.
+The server is a thin adapter. `show_widget` takes a standard code and a widget
+kind, posts them to `/api/widget` in the app, and hands back whatever comes out.
+
+That endpoint exists because `/api/pathway` is the wrong shape for a
+conversation: five model calls and ~30s to author a whole lesson, when the
+caller already knows which standard and which interaction it wants. `/api/widget`
+does the one step that is left — configure the widget — in a single call.
+
+The consequence worth knowing: **a widget added to the app shows up in chat with
+no change on this side.** There are no per-widget tools and no fixtures here.
+
+## Not done yet
 - The shell logs every message the host sends and sniffs a spec out of it,
   because we have not yet seen Claude's actual envelope. That is the point of
   the spike — check the console once it renders.
