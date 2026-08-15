@@ -9,6 +9,7 @@
 import '@/lib/widgets/definitions/fraction-area-model';
 import '@/lib/widgets/definitions/swiper-flashcard';
 import '@/lib/widgets/definitions/draft-meter';
+import '@/lib/widgets/definitions/defend-claim';
 import '@/lib/widgets/definitions/drag-sort';
 import '@/lib/widgets/definitions/drag-categorize';
 import '@/lib/widgets/definitions/crossword';

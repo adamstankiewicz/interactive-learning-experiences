@@ -152,6 +152,103 @@ export const draftMeterSpec = z.object({
 
 export type DraftMeterSpec = z.infer<typeof draftMeterSpec>;
 
+/**
+ * Defend a Claim: a contestable historical claim, two sources, and a defense
+ * the student revises against feedback they asked for.
+ *
+ * The near neighbour is Draft Meter, and the difference between them is the
+ * whole point of having both. Draft Meter scores continuously and silently —
+ * the line moves while you type, and you never ask it anything. This one never
+ * scores unprompted: the student writes, decides they are ready, and requests a
+ * reading. That request is the pedagogy. History argument at this level is
+ * about holding a position under objection, and an objection you did not invite
+ * is an interruption; one you asked for is a rebuttal you have to answer.
+ *
+ * Hence the two things this spec carries that Draft Meter's does not: a
+ * `stance` the student commits to before writing (so the feedback can catch a
+ * paragraph arguing against the box its author ticked), and `sources` that make
+ * "evidence" mean a specific document rather than anything true the student
+ * happens to know.
+ */
+export const defendClaimSpec = z.object({
+  kind: z.literal('defend-claim'),
+  learningComponentId: z.string().nullable(),
+  era: z
+    .string()
+    .describe(
+      'The period or episode this claim sits in, 1-3 words, shown as a small label — e.g. "Reconstruction", "The New Deal", "Partition of India".',
+    ),
+  claim: z
+    .string()
+    .describe(
+      [
+        'The claim the student agrees or disagrees with. One sentence, and it must be genuinely',
+        'contestable by a well-informed person — an interpretive judgement about cause, significance',
+        'or responsibility, never a fact with a settled answer. A claim a student can look up is not',
+        'a claim they can defend. Write it as an assertion, not a question.',
+      ].join(' '),
+    ),
+  context: z
+    .string()
+    .describe(
+      'One sentence of neutral, uncontested factual grounding — dates, who did what — so a student who is hazy on the period can still engage the argument. State facts only; take no side.',
+    ),
+  sources: z
+    .array(
+      z.object({
+        attribution: z
+          .string()
+          .describe('Short attribution, e.g. "Frederick Douglass, speech, 1875" or "Northern newspaper editorial, 1874".'),
+        text: z
+          .string()
+          .describe('The excerpt itself, 25-60 words, in period-appropriate voice and readable by a 7th grader.'),
+      }),
+    )
+    .describe(
+      [
+        'Give exactly 2 excerpts that pull in different directions, so citing one is a choice the',
+        'student has to justify rather than the only move available. Together they must make both',
+        'sides of the claim defensible — if both support the same side, the disagree option is a trap.',
+      ].join(' '),
+    ),
+  placeholder: z.string().describe('Textarea placeholder. Short and inviting, under 60 characters.'),
+  /**
+   * The pre-submission checklist, and the model's per-criterion verdict, are
+   * the same three keys by construction.
+   *
+   * This started as a free-text `string[]` the model wrote, alongside a
+   * separate booleans object — which is the exact trap `draft-meter/schema.ts`
+   * documents for score/band/label: two independently authored things that
+   * describe the same judgement will eventually disagree, and there is no
+   * sane way to reconcile "a reason that supports it" with a fourth boolean at
+   * render time. Fixing the keys means the ticks cannot drift from the list,
+   * while the wording still gets to name *this* claim's sources.
+   */
+  checklist: z
+    .object({
+      position: z.string().describe('e.g. "A clear position on the claim" — under 45 characters.'),
+      reasoning: z.string().describe('e.g. "A reason that supports it" — under 45 characters.'),
+      evidence: z
+        .string()
+        .describe('Names the supplied sources, e.g. "A quote from Douglass or the editorial" — under 45 characters.'),
+    })
+    .describe('Shown before submitting, and ticked off one-to-one by the feedback call.'),
+  standardCode: z.string().describe('The anchor standard code, copied verbatim.'),
+  standardDescription: z.string().describe('The anchor standard wording, copied verbatim.'),
+  standardForStudents: z
+    .string()
+    .describe(
+      'The standard restated in one or two sentences a 13-year-old understands, addressed to them ("You take a side, then..."). No jargon, no standard code, no quoting the official wording.',
+    ),
+  criteria: z
+    .array(z.string())
+    .describe(
+      'Give 2-4 short phrases naming what a strong defense of this particular claim contains. These ground the feedback call and are never shown to the student.',
+    ),
+});
+
+export type DefendClaimSpec = z.infer<typeof defendClaimSpec>;
+
 export const dragSortSpec = z.object({
   kind: z.literal('drag-sort'),
   learningComponentId: z.string().nullable(),
@@ -497,6 +594,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
   draftMeterSpec,
+  defendClaimSpec,
   dragSortSpec,
   dragCategorizeSpec,
   markdownCardSpec,
@@ -522,6 +620,7 @@ export const widgetKind = z.enum([
   'fraction-area-model',
   'swiper-flashcard',
   'draft-meter',
+  'defend-claim',
   'drag-sort',
   'drag-categorize',
   'crossword',
@@ -562,6 +661,12 @@ export const pathwayStep = z.object({
       'standards about writing an argument (W, WHST) or citing textual evidence (RL/RI/RH/RST',
       'strands 1 and 8) — it is meaningless for any other standard. It is also the heaviest',
       'interaction: use it for at most one step in a pathway, normally "practice" or "check".',
+      '"defend-claim" gives the student a contestable historical claim and two conflicting primary',
+      'sources; they pick a side, write a defense, and then ask for feedback and revise it. History',
+      'and social-studies standards only, grade 7 and up — it needs a claim historians actually',
+      'disagree about, which a maths or science standard does not have. Prefer it over "draft-meter"',
+      'when the standard is about historical argument or sourcing; it is the heaviest interaction in',
+      'the set, so use it for at most one step, normally "practice" or "check".',
       '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
       'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
       'lesson taught, not for introducing a concept the student has not met yet.',

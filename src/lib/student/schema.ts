@@ -16,6 +16,14 @@ export const INTERACTION_EVENTS = [
   'part_selected',
   'answer_checked',
   'hint_requested',
+  /**
+   * A student asked to have their work read — distinct from `hint_requested`
+   * on purpose. `component_mastery_rollup` counts hints as a struggle signal,
+   * and requesting feedback is the *intended* move in a revision loop, not
+   * evidence of being stuck. Folding the two together would make every student
+   * who used `defend-claim` as designed look like they needed help.
+   */
+  'feedback_requested',
   'hesitation',
   'widget_completed',
 ] as const;
