@@ -1,4 +1,4 @@
-import { generateText, Output } from 'ai';
+import { generateText, streamText, Output } from 'ai';
 import type { FlexibleSchema, LanguageModel } from 'ai';
 
 import { pathwayModel } from '@/lib/model';
@@ -42,4 +42,36 @@ export async function generateStructured<T>(options: {
   });
 
   return result.output;
+}
+
+/** Local rather than imported from `pathway/events` — this module is domain-agnostic. */
+type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
+/**
+ * The same call, surfaced incrementally. Only worth it for the slowest,
+ * highest-value calls — the plan authoring stage is the one that streams
+ * today — so this stays a separate export rather than the default shape.
+ */
+export async function* streamStructured<T>(options: {
+  schema: FlexibleSchema<T>;
+  system: string;
+  prompt: string;
+  model?: LanguageModel;
+}): AsyncGenerator<DeepPartial<T>, T> {
+  const result = streamText({
+    model: options.model ?? model(),
+    output: Output.object({ schema: options.schema }),
+    system: options.system,
+    prompt: options.prompt,
+  });
+
+  for await (const partial of result.partialOutputStream) {
+    yield partial as DeepPartial<T>;
+  }
+
+  return (await result.output) as T;
 }

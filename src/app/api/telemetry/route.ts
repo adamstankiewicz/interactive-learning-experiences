@@ -1,4 +1,4 @@
-import { supabaseAdmin, supabaseConfigured } from '@/lib/supabase/client';
+import { storageAdapter } from '@/lib/storage';
 import { recomputeProfile } from '@/lib/student/profile';
 import { telemetryBatch } from '@/lib/student/schema';
 
@@ -14,43 +14,36 @@ const MAX_PAYLOAD_BYTES = 4_000;
  * batch closes out a widget, which keeps the interactive path clear of it.
  */
 export async function POST(request: Request) {
-  if (!supabaseConfigured()) {
-    return Response.json({ error: 'Supabase is not configured' }, { status: 503 });
-  }
-
   const parsed = telemetryBatch.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return Response.json({ error: 'Invalid batch', issues: parsed.error.issues }, { status: 400 });
   }
   const { sessionId, studentId, events } = parsed.data;
 
-  const db = supabaseAdmin();
+  const adapter = storageAdapter();
 
-  // The service role bypasses RLS, so ownership is checked explicitly here.
-  const { data: session } = await db
-    .from('pathway_sessions')
-    .select('student_id')
-    .eq('id', sessionId)
-    .maybeSingle();
-
-  if (!session || session.student_id !== studentId) {
+  // A backend without its own RLS (or the in-memory adapter, which has none)
+  // needs ownership checked explicitly here rather than left to the database.
+  const belongsToStudent = await adapter.sessionBelongsTo(sessionId, studentId);
+  if (!belongsToStudent) {
     return Response.json({ error: 'Session not found' }, { status: 404 });
   }
 
-  const rows = events.map((event) => ({
-    session_id: sessionId,
-    student_id: studentId,
-    widget_kind: event.widgetKind,
-    event_type: event.eventType,
-    standard_code: event.standardCode,
-    learning_component_id: event.learningComponentId,
-    elapsed_ms: event.elapsedMs,
-    correct: event.correct,
-    payload: truncate(event.payload),
-  }));
-
-  const { error } = await db.from('interactions').insert(rows);
-  if (error) {
+  try {
+    await adapter.recordInteractions(
+      events.map((event) => ({
+        sessionId,
+        studentId,
+        widgetKind: event.widgetKind,
+        eventType: event.eventType,
+        standardCode: event.standardCode,
+        learningComponentId: event.learningComponentId,
+        elapsedMs: event.elapsedMs,
+        correct: event.correct,
+        payload: truncate(event.payload),
+      })),
+    );
+  } catch (error) {
     console.error('[telemetry] insert failed', error);
     return Response.json({ error: 'Write failed' }, { status: 500 });
   }
@@ -59,7 +52,7 @@ export async function POST(request: Request) {
     await recomputeProfile(studentId);
   }
 
-  return Response.json({ accepted: rows.length }, { status: 202 });
+  return Response.json({ accepted: events.length }, { status: 202 });
 }
 
 function truncate(payload: Record<string, unknown>): Record<string, unknown> {

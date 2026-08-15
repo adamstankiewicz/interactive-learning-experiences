@@ -1,13 +1,18 @@
 {
   "name": "interactive-student-experiences",
   "version": "0.1.0",
-  "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:migrate": "supabase migration up"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.55",
@@ -19,12 +24,14 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@types/pdf-parse": "^1.1.5",
     "ai": "^7.0.65",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",
     "motion": "^13.0.0",
     "next": "16.3.1",
+    "pdf-parse": "1.1.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
@@ -41,6 +48,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "supabase": "^2.114.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

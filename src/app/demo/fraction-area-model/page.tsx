@@ -1,6 +1,10 @@
-import Link from 'next/link';
+'use client';
 
-import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+
+import { Slider } from '@/components/ui/slider';
+import { FractionAreaModel, varyFractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import type { FractionAreaModelSpec } from '@/lib/pathway/schema';
 
 const BAR_SPEC: FractionAreaModelSpec = {
@@ -28,6 +32,9 @@ const CIRCLE_SPEC: FractionAreaModelSpec = {
 };
 
 export default function FractionAreaModelDemo() {
+  const [variation, setVariation] = useState(0);
+  const barSpec = useMemo(() => varyFractionAreaModel(BAR_SPEC, variation), [variation]);
+
   return (
     <main className="mx-auto max-w-xl px-4 py-12">
       <div className="mb-8">
@@ -49,7 +56,24 @@ export default function FractionAreaModelDemo() {
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Bar representation
           </p>
-          <FractionAreaModel spec={BAR_SPEC} />
+
+          <div className="mb-4 flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+            <span className="text-xs font-medium text-muted-foreground">Easier</span>
+            <Slider
+              value={[variation]}
+              onValueChange={(next) => setVariation(Array.isArray(next) ? next[0] : next)}
+              min={0}
+              max={100}
+              step={1}
+              className="flex-1"
+              aria-label="Variation"
+            />
+            <span className="text-xs font-medium text-muted-foreground">Harder</span>
+          </div>
+
+          {/* Keyed on the derived tier so internal state (denominator, selection) resets
+              on every variation change instead of carrying over from the previous spec. */}
+          <FractionAreaModel key={`${barSpec.denominator}-${barSpec.numerator}`} spec={barSpec} />
         </section>
 
         <section>

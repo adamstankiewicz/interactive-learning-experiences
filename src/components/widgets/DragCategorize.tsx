@@ -3,9 +3,12 @@
 import {
   DndContext,
   DragOverlay,
+  KeyboardCode,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  closestCorners,
+  getFirstCollision,
   useDraggable,
   useDroppable,
   useSensor,
@@ -13,8 +16,8 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type KeyboardCoordinateGetter,
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -28,6 +31,98 @@ type Category = DragCategorizeSpec['categories'][number];
 type Placement = Record<string, string | null>; // itemId -> categoryId | null
 
 type Props = { spec: DragCategorizeSpec; onComplete?: (correct: boolean) => void };
+
+const ARROW_CODES: string[] = [KeyboardCode.Up, KeyboardCode.Down, KeyboardCode.Left, KeyboardCode.Right];
+
+/**
+ * `@dnd-kit/sortable`'s `sortableKeyboardCoordinates` never moves anything in
+ * this widget: after finding the nearest droppable in the pressed direction,
+ * it looks up the *dragged chip itself* in the droppable-containers map to
+ * compute a sort-insertion offset — a lookup that only succeeds when the
+ * dragged element is also registered as a droppable, which is what
+ * `useSortable` does for items inside a `SortableContext`. This widget isn't
+ * reordering a list, it's moving a chip between distinct containers (the
+ * bank, N category columns), so chips here are `useDraggable` only, that
+ * lookup is always undefined, and the built-in getter silently bails out
+ * every time — confirmed by watching the chip's transform stay at (0,0,0)
+ * across every arrow press before this fix.
+ *
+ * This getter does the same "closest droppable in the pressed direction" search,
+ * but skips the sort-insertion step and returns the center of that droppable
+ * directly, which is what container-to-container movement actually needs.
+ */
+const zoneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { context }) => {
+  const { active, collisionRect, droppableRects, droppableContainers, over } = context;
+
+  if (!ARROW_CODES.includes(event.code) || !active || !collisionRect) return undefined;
+  event.preventDefault();
+
+  const candidates = droppableContainers.getEnabled().filter((entry) => {
+    if (!entry || entry.disabled) return false;
+    const rect = droppableRects.get(entry.id);
+    if (!rect) return false;
+
+    switch (event.code) {
+      case KeyboardCode.Down:
+        return collisionRect.top < rect.top;
+      case KeyboardCode.Up:
+        return collisionRect.top > rect.top;
+      case KeyboardCode.Left:
+        return collisionRect.left > rect.left;
+      case KeyboardCode.Right:
+        return collisionRect.left < rect.left;
+      default:
+        return false;
+    }
+  });
+
+  const collisions = closestCorners({
+    active,
+    collisionRect,
+    droppableRects,
+    droppableContainers: candidates,
+    pointerCoordinates: null,
+  });
+
+  let closestId = getFirstCollision(collisions, 'id');
+  if (closestId === over?.id && collisions.length > 1) {
+    closestId = collisions[1]?.id ?? closestId;
+  }
+  if (closestId == null) return undefined;
+
+  const targetRect = droppableRects.get(closestId);
+  if (!targetRect) return undefined;
+
+  return {
+    x: targetRect.left + targetRect.width / 2 - collisionRect.width / 2,
+    y: targetRect.top + targetRect.height / 2 - collisionRect.height / 2,
+  };
+};
+
+/**
+ * Derives an easier or harder instance by showing fewer or more items per
+ * category — a pure subset of what the model already grounded, never new
+ * items. Every category keeps at least one item, so no column goes empty.
+ * Level 0-100 maps linearly onto 1..maxPerCategory; the same level always
+ * derives the same spec.
+ *
+ * Known caveat: `hint`/`successMessage` are free text the model wrote for
+ * the *full* item set and may name specific items by label (e.g. "kelp") —
+ * trimming can leave a stale reference on screen. `varyFractionAreaModel`
+ * had the same class of gap for its own success text before it was caught
+ * in testing; fixing this one for real would mean the generator authors
+ * copy that does not depend on which items happen to survive the trim.
+ */
+export function varyDragCategorize(base: DragCategorizeSpec, level: number): DragCategorizeSpec {
+  const byCategory = base.categories.map((cat) => base.items.filter((item) => item.categoryId === cat.id));
+  const maxPerCategory = Math.max(1, ...byCategory.map((items) => items.length));
+  const count = Math.max(1, Math.round((level / 100) * (maxPerCategory - 1)) + 1);
+
+  return {
+    ...base,
+    items: byCategory.flatMap((items) => items.slice(0, Math.min(count, items.length))),
+  };
+}
 
 function buildInitialPlacement(items: Item[]): Placement {
   return Object.fromEntries(items.map((it) => [it.id, null]));
@@ -198,7 +293,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: zoneKeyboardCoordinates }),
   );
 
   const handleDragStart = useCallback(({ active }: DragStartEvent) => {
@@ -313,6 +408,13 @@ export function DragCategorize({ spec, onComplete }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
+
+      {phase === 'idle' && (
+        <p className="text-xs text-muted-foreground">
+          Drag into a category, or press Tab to a chip, Space to pick it up, arrow keys to move
+          between zones, and Space again to drop it.
+        </p>
+      )}
 
       <DndContext
         sensors={sensors}

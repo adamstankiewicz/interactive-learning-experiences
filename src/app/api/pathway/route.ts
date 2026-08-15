@@ -1,7 +1,7 @@
 import { encodeEvent, type Anchor } from '@/lib/pathway/events';
 import { streamPathway } from '@/lib/pathway/generate';
 import type { PathwayPlan } from '@/lib/pathway/schema';
-import { supabaseAdmin, supabaseConfigured } from '@/lib/supabase/client';
+import { storageAdapter } from '@/lib/storage';
 import { loadProfile } from '@/lib/student/profile';
 
 export const maxDuration = 120;
@@ -14,7 +14,7 @@ function errorStream(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  let body: { topic?: unknown; gradeHint?: unknown; studentId?: unknown };
+  let body: { topic?: unknown; gradeHint?: unknown; studentId?: unknown; teacherNote?: unknown };
 
   try {
     body = await request.json();
@@ -28,6 +28,8 @@ export async function POST(request: Request) {
   const gradeHint =
     typeof body.gradeHint === 'string' && body.gradeHint.trim() ? body.gradeHint.trim() : undefined;
   const studentId = typeof body.studentId === 'string' && body.studentId ? body.studentId : null;
+  const teacherNote =
+    typeof body.teacherNote === 'string' && body.teacherNote.trim() ? body.teacherNote.trim() : undefined;
 
   const encoder = new TextEncoder();
 
@@ -45,13 +47,13 @@ export async function POST(request: Request) {
         // persistence needs no second run of the pipeline.
         let anchor: Anchor | null = null;
         let plan: PathwayPlan | null = null;
-        let widget: unknown = null;
+        const stepWidgets: Record<number, unknown> = {};
         const rejected: string[] = [];
 
-        for await (const event of streamPathway(topic, gradeHint, profile)) {
+        for await (const event of streamPathway(topic, gradeHint, profile, teacherNote)) {
           if (event.type === 'anchor') anchor = event.anchor;
           if (event.type === 'plan') plan = event.plan;
-          if (event.type === 'widget') widget = event.widget;
+          if (event.type === 'step-widget') stepWidgets[event.stepIndex] = event.widget;
           if (event.type === 'verdict' && !event.resolved) rejected.push(event.code);
 
           // The session id has to reach the client before `done`, so telemetry
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
             const sessionId = await persistSession(studentId, topic, gradeHint, {
               anchor,
               plan,
-              widget,
+              stepWidgets,
               rejected,
             });
             emit({ type: 'session', sessionId });
@@ -97,33 +99,18 @@ async function persistSession(
   studentId: string,
   topic: string,
   gradeHint: string | undefined,
-  result: { anchor: Anchor; plan: PathwayPlan; widget: unknown; rejected: string[] },
+  result: { anchor: Anchor; plan: PathwayPlan; stepWidgets: Record<number, unknown>; rejected: string[] },
 ): Promise<string | null> {
-  if (!supabaseConfigured()) return null;
-
   try {
-    const db = supabaseAdmin();
-
-    // The id comes from the browser's localStorage and can outlive the row it
-    // referred to. Reinstate it rather than losing the session to a foreign key.
-    await db.from('students').upsert({ id: studentId }, { onConflict: 'id', ignoreDuplicates: true });
-
-    const { data, error } = await db
-      .from('pathway_sessions')
-      .insert({
-        student_id: studentId,
-        topic,
-        grade_hint: gradeHint ?? null,
-        anchor: result.anchor,
-        rejected_codes: result.rejected,
-        plan: result.plan,
-        widget: result.widget,
-      })
-      .select('id')
-      .single();
-
-    if (error) throw error;
-    return data.id;
+    return await storageAdapter().persistSession({
+      studentId,
+      topic,
+      gradeHint: gradeHint ?? null,
+      anchor: result.anchor,
+      plan: result.plan,
+      stepWidgets: result.stepWidgets,
+      rejectedCodes: result.rejected,
+    });
   } catch (error) {
     console.error('[pathway] could not persist session', error);
     return null;

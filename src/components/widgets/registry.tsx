@@ -1,65 +1,65 @@
-'use client';
+"use client";
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Crossword } from '@/components/widgets/Crossword';
-import { DragCategorize } from '@/components/widgets/DragCategorize';
-import { Flashcard } from '@/components/widgets/Flashcard';
-import { DragSort } from '@/components/widgets/DragSort';
-import { DraftMeter } from '@/components/widgets/DraftMeter';
-import { MarkdownCard } from '@/components/widgets/MarkdownCard';
-import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
-import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
-import { NarratedCard } from '@/components/widgets/NarratedCard';
-import { StepReveal } from '@/components/widgets/StepReveal';
-import { TimelineBuilder } from '@/components/widgets/TimelineBuilder';
-import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { widgetSpec } from "@/lib/pathway/schema";
+import "@/lib/widgets/builtins";
+import { getWidgetCatalogEntry } from "@/lib/widgets/types";
 
 /**
- * Spec -> component. This is the extension point: adding a widget type means
- * a schema in `pathway/schema.ts`, a generator in `pathway/generate.ts`, and
- * a case here. The exhaustive switch makes a missing case a type error.
+ * Spec -> component, via the open widget registry (`@/lib/widgets`). Adding a
+ * widget kind no longer means a case here — it means a new file under
+ * `lib/widgets/definitions/` plus one import line in `lib/widgets/builtins.ts`.
+ *
+ * `onComplete` is deliberately payload-free at this boundary — each widget's
+ * internal result shape (swipe results, sort correctness) is that widget's
+ * own business. A caller that walks a student through several widgets in
+ * sequence only ever needs to know "this one is done," never what was in it.
+ * Fraction area model, Draft Meter, and Crossword have no notion of "done"
+ * (an area model is checked repeatedly, a meter just keeps scoring, a
+ * crossword is solved cell by cell with no single completion moment) and so
+ * never call it — their registered components simply don't accept the prop
+ * in a way that does anything.
+ *
+ * `widgetSpec` (the six-kind discriminated union in `schema.ts`) is still the
+ * validation boundary — specs cross a network boundary from a model, so they
+ * are parsed rather than trusted, and a malformed spec degrades to a visible
+ * notice, not a crash. That union stays static rather than registry-derived
+ * for now (see `lib/widgets/types.ts`'s top comment for why) — a third party
+ * adding a widget still needs one addition to `schema.ts`'s union to be
+ * generateable/validatable end to end, even though rendering itself no longer
+ * needs any core-file edit.
  */
-function render(spec: WidgetSpec) {
-  switch (spec.kind) {
-    case 'fraction-area-model':
-      return <FractionAreaModel spec={spec} />;
-    case 'swiper-flashcard':
-      return <SwiperFlashcard spec={spec} />;
-    case 'draft-meter':
-      return <DraftMeter spec={spec} />;
-    case 'drag-sort':
-      return <DragSort spec={spec} />;
-    case 'drag-categorize':
-      return <DragCategorize spec={spec} />;
-    case 'markdown-card':
-      return <MarkdownCard spec={spec} />;
-    case 'flashcard':
-      return <Flashcard spec={spec} />;
-    case 'step-reveal':
-      return <StepReveal spec={spec} />;
-    case 'narrated-card':
-      return <NarratedCard spec={spec} />;
-    case 'timeline-builder':
-      return <TimelineBuilder spec={spec} />;
-    case 'crossword':
-      return <Crossword spec={spec} />;
-  }
-}
-
-/**
- * Specs cross a network boundary from a model, so they are parsed rather than
- * trusted — a malformed spec degrades to a visible notice, not a crash.
- */
-export function WidgetRenderer({ spec }: { spec: unknown }) {
+export function WidgetRenderer({
+  spec,
+  onComplete,
+}: {
+  spec: unknown;
+  onComplete?: () => void;
+}) {
   const parsed = widgetSpec.safeParse(spec);
 
   if (!parsed.success) {
     return (
       <Alert variant="warning">
-        <AlertDescription>This widget spec did not match any registered schema.</AlertDescription>
+        <AlertDescription>
+          This widget spec did not match any registered schema.
+        </AlertDescription>
       </Alert>
     );
   }
 
-  return render(parsed.data);
+  const definition = getWidgetCatalogEntry(parsed.data.kind);
+  if (!definition) {
+    return (
+      <Alert variant="warning">
+        <AlertDescription>
+          No renderer is registered for widget kind &ldquo;{parsed.data.kind}
+          &rdquo;.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  const Component = definition.component;
+  return <Component spec={parsed.data} onComplete={onComplete} />;
 }

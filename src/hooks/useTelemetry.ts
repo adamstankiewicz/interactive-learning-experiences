@@ -22,8 +22,17 @@ const MAX_BATCH = 50;
  */
 export function useTelemetry(sessionId: string | null, studentId: string | null) {
   const queue = useRef<InteractionEvent[]>([]);
-  const mountedAt = useRef(Date.now());
-  const lastEventAt = useRef(Date.now());
+  // The clock is read from an effect, not the render body: `Date.now()` is
+  // impure, and the render body runs (and is expected to be side-effect-free)
+  // more often than the mount it is meant to time from. `track`/`flush` below
+  // fall back to `now` when a call somehow lands before the effect has run.
+  const mountedAt = useRef<number | undefined>(undefined);
+  const lastEventAt = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    mountedAt.current = Date.now();
+    lastEventAt.current = mountedAt.current;
+  }, []);
 
   const flush = useCallback(
     (useBeacon = false) => {
@@ -52,7 +61,9 @@ export function useTelemetry(sessionId: string | null, studentId: string | null)
       const now = Date.now();
       queue.current.push({
         ...event,
-        elapsedMs: event.elapsedMs ?? now - mountedAt.current,
+        // Falls back to 0 elapsed on the vanishingly unlikely event a track()
+        // call beats the mount effect — never negative or NaN, just unmeasured.
+        elapsedMs: event.elapsedMs ?? now - (mountedAt.current ?? now),
       });
       lastEventAt.current = now;
 
@@ -64,7 +75,7 @@ export function useTelemetry(sessionId: string | null, studentId: string | null)
   /** Records a long gap since the previous event — the "stuck" signal. */
   const trackHesitation = useCallback(
     (widgetKind: string, learningComponentId: string | null) => {
-      const idleMs = Date.now() - lastEventAt.current;
+      const idleMs = Date.now() - (lastEventAt.current ?? Date.now());
       if (idleMs < 4_000) return;
 
       track({

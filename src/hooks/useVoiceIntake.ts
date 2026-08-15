@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 /**
  * Web Speech API wrapper.
@@ -37,20 +37,37 @@ function recognitionCtor(): (new () => Recognition) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+// No subscription needed — browser support for this API cannot change during
+// a session — so the "subscribe" callback is a no-op. What matters is the
+// two snapshots differing: server has no `window`, so `getServerSnapshot`
+// always returns false, and React uses that value for the client's own first
+// render too. Only once hydration is committed does the real check run,
+// avoiding a mismatch between server and client HTML on the very first paint.
+const subscribe = () => () => {};
+const getServerSnapshot = () => false;
+
 export function useVoiceIntake(onFinal: (transcript: string) => void) {
-  const [supported, setSupported] = useState(false);
+  const supported = useSyncExternalStore(
+    subscribe,
+    () => Boolean(recognitionCtor()),
+    getServerSnapshot,
+  );
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<Recognition | null>(null);
+  // Kept current via an effect (runs after every render) rather than written
+  // directly in the render body: mutating a ref during render is against the
+  // rules even when, as here, nothing reads it until a later event fires.
   const onFinalRef = useRef(onFinal);
-  onFinalRef.current = onFinal;
+  useEffect(() => {
+    onFinalRef.current = onFinal;
+  });
 
   useEffect(() => {
     const Ctor = recognitionCtor();
     if (!Ctor) return;
-    setSupported(true);
 
     const recognition = new Ctor();
     recognition.lang = 'en-US';

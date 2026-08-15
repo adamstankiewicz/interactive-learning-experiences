@@ -33,13 +33,66 @@ create table if not exists public.pathway_sessions (
   -- rejection rate is a signal about the model, not just debug noise.
   rejected_codes text[] not null default '{}',
   plan           jsonb not null default '{}'::jsonb,
+  -- Deprecated by step_widgets below: a pathway now builds one widget per
+  -- step, not one for the whole run. Left in place, nullable, rather than
+  -- dropped — existing rows keep their data, and dropping a column in a
+  -- shared database is not a call this migration makes for you.
   widget         jsonb,
-  standard_code  text generated always as (anchor -> 'standard' ->> 'statementCode') stored,
+  -- stepIndex -> the widget generated for that step, e.g. {"0": {...}, "2": {...}}.
+  step_widgets   jsonb not null default '{}'::jsonb,
+  -- 'code', not the old 'statementCode' — the StandardsSource abstraction
+  -- renamed the in-memory field (learning-commons.ts et al.), and the JSON
+  -- persisted here follows whatever the JS object's property names are.
+  standard_code  text generated always as (anchor -> 'standard' ->> 'code') stored,
   created_at     timestamptz not null default now()
 );
 
+-- Additive migration for a database created before step_widgets existed.
+-- `create table if not exists` above is a no-op once the table already
+-- exists, so existing installs need this run explicitly in the SQL editor.
+alter table public.pathway_sessions
+  add column if not exists step_widgets jsonb not null default '{}'::jsonb;
+
+-- Migration for an install created before the StandardsSource rename: a
+-- generated column's expression can't be altered in place, so drop and
+-- recreate it. Existing rows still have `anchor->'standard'->>'statementCode'`
+-- in their stored JSON from before the rename — this only fixes newly
+-- inserted rows going forward, it does not backfill old ones.
+alter table public.pathway_sessions drop column if exists standard_code;
+alter table public.pathway_sessions
+  add column standard_code text generated always as (anchor -> 'standard' ->> 'code') stored;
+
 create index if not exists pathway_sessions_student_idx
   on public.pathway_sessions (student_id, created_at desc);
+
+-- Closing the loop back to the teacher: a share link's whole payoff is
+-- knowing anyone actually opened it. Additive for installs from before these
+-- existed, same pattern as step_widgets above.
+alter table public.pathway_sessions add column if not exists open_count integer not null default 0;
+alter table public.pathway_sessions add column if not exists completion_count integer not null default 0;
+
+-- Atomic increments via a function rather than read-then-write from the app,
+-- so two students opening the same link at once don't lose a count to a race.
+create or replace function public.increment_pathway_session_open_count(p_session_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.pathway_sessions set open_count = open_count + 1 where id = p_session_id;
+$$;
+
+create or replace function public.increment_pathway_session_completion_count(p_session_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.pathway_sessions set completion_count = completion_count + 1 where id = p_session_id;
+$$;
+
+grant execute on function public.increment_pathway_session_open_count(uuid) to service_role;
+grant execute on function public.increment_pathway_session_completion_count(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- interactions — APPEND ONLY event stream. Never updated, never deleted.
@@ -140,3 +193,24 @@ create policy profiles_self_read on public.student_profiles
   for select using (
     student_id in (select id from public.students where auth_user_id = auth.uid())
   );
+
+-- ---------------------------------------------------------------------------
+-- Table grants
+--
+-- RLS policies restrict *rows*, but a role needs a base GRANT before RLS
+-- even gets evaluated. Supabase's hosted platform provisions this
+-- automatically as part of creating a project, which is easy to mistake for
+-- "RLS is enough" — it silently isn't on a self-hosted or local CLI Postgres
+-- instance, where these tables (created by this migration, not by the
+-- platform) get no default privileges at all. `service_role` bypasses RLS by
+-- role attribute, not by these grants alone; it still needs them.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to service_role, anon, authenticated;
+
+grant select, insert, update, delete
+  on public.students, public.pathway_sessions, public.interactions, public.student_profiles
+  to service_role;
+
+grant select
+  on public.students, public.pathway_sessions, public.interactions, public.student_profiles
+  to anon, authenticated;
