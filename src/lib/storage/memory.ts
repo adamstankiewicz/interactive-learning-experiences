@@ -93,9 +93,11 @@ export const memoryStorageAdapter: StorageAdapter = {
     return id;
   },
 
-  async updateSessionPlan(sessionId, plan) {
+  async updateSessionPlan(sessionId, studentId, plan) {
     const session = sessions.get(sessionId);
-    if (session) session.plan = plan;
+    if (!session || session.studentId !== studentId) return false;
+    session.plan = plan;
+    return true;
   },
 
   async recordSessionOpen(sessionId) {

@@ -6,6 +6,7 @@
 import '@/lib/widgets/definitions/fraction-area-model.generate';
 import '@/lib/widgets/definitions/swiper-flashcard.generate';
 import '@/lib/widgets/definitions/draft-meter.generate';
+import '@/lib/widgets/definitions/defend-claim.generate';
 import '@/lib/widgets/definitions/drag-sort.generate';
 import '@/lib/widgets/definitions/drag-categorize.generate';
 import '@/lib/widgets/definitions/crossword.generate';
@@ -15,3 +16,4 @@ import '@/lib/widgets/definitions/step-reveal.generate';
 import '@/lib/widgets/definitions/narrated-card.generate';
 import '@/lib/widgets/definitions/timeline-builder.generate';
 import '@/lib/widgets/definitions/find-the-flaw.generate';
+import '@/lib/widgets/definitions/draw-the-curve.generate';

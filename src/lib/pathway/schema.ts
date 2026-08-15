@@ -152,6 +152,103 @@ export const draftMeterSpec = z.object({
 
 export type DraftMeterSpec = z.infer<typeof draftMeterSpec>;
 
+/**
+ * Defend a Claim: a contestable historical claim, two sources, and a defense
+ * the student revises against feedback they asked for.
+ *
+ * The near neighbour is Draft Meter, and the difference between them is the
+ * whole point of having both. Draft Meter scores continuously and silently —
+ * the line moves while you type, and you never ask it anything. This one never
+ * scores unprompted: the student writes, decides they are ready, and requests a
+ * reading. That request is the pedagogy. History argument at this level is
+ * about holding a position under objection, and an objection you did not invite
+ * is an interruption; one you asked for is a rebuttal you have to answer.
+ *
+ * Hence the two things this spec carries that Draft Meter's does not: a
+ * `stance` the student commits to before writing (so the feedback can catch a
+ * paragraph arguing against the box its author ticked), and `sources` that make
+ * "evidence" mean a specific document rather than anything true the student
+ * happens to know.
+ */
+export const defendClaimSpec = z.object({
+  kind: z.literal('defend-claim'),
+  learningComponentId: z.string().nullable(),
+  era: z
+    .string()
+    .describe(
+      'The period or episode this claim sits in, 1-3 words, shown as a small label — e.g. "Reconstruction", "The New Deal", "Partition of India".',
+    ),
+  claim: z
+    .string()
+    .describe(
+      [
+        'The claim the student agrees or disagrees with. One sentence, and it must be genuinely',
+        'contestable by a well-informed person — an interpretive judgement about cause, significance',
+        'or responsibility, never a fact with a settled answer. A claim a student can look up is not',
+        'a claim they can defend. Write it as an assertion, not a question.',
+      ].join(' '),
+    ),
+  context: z
+    .string()
+    .describe(
+      'One sentence of neutral, uncontested factual grounding — dates, who did what — so a student who is hazy on the period can still engage the argument. State facts only; take no side.',
+    ),
+  sources: z
+    .array(
+      z.object({
+        attribution: z
+          .string()
+          .describe('Short attribution, e.g. "Frederick Douglass, speech, 1875" or "Northern newspaper editorial, 1874".'),
+        text: z
+          .string()
+          .describe('The excerpt itself, 25-60 words, in period-appropriate voice and readable by a 7th grader.'),
+      }),
+    )
+    .describe(
+      [
+        'Give exactly 2 excerpts that pull in different directions, so citing one is a choice the',
+        'student has to justify rather than the only move available. Together they must make both',
+        'sides of the claim defensible — if both support the same side, the disagree option is a trap.',
+      ].join(' '),
+    ),
+  placeholder: z.string().describe('Textarea placeholder. Short and inviting, under 60 characters.'),
+  /**
+   * The pre-submission checklist, and the model's per-criterion verdict, are
+   * the same three keys by construction.
+   *
+   * This started as a free-text `string[]` the model wrote, alongside a
+   * separate booleans object — which is the exact trap `draft-meter/schema.ts`
+   * documents for score/band/label: two independently authored things that
+   * describe the same judgement will eventually disagree, and there is no
+   * sane way to reconcile "a reason that supports it" with a fourth boolean at
+   * render time. Fixing the keys means the ticks cannot drift from the list,
+   * while the wording still gets to name *this* claim's sources.
+   */
+  checklist: z
+    .object({
+      position: z.string().describe('e.g. "A clear position on the claim" — under 45 characters.'),
+      reasoning: z.string().describe('e.g. "A reason that supports it" — under 45 characters.'),
+      evidence: z
+        .string()
+        .describe('Names the supplied sources, e.g. "A quote from Douglass or the editorial" — under 45 characters.'),
+    })
+    .describe('Shown before submitting, and ticked off one-to-one by the feedback call.'),
+  standardCode: z.string().describe('The anchor standard code, copied verbatim.'),
+  standardDescription: z.string().describe('The anchor standard wording, copied verbatim.'),
+  standardForStudents: z
+    .string()
+    .describe(
+      'The standard restated in one or two sentences a 13-year-old understands, addressed to them ("You take a side, then..."). No jargon, no standard code, no quoting the official wording.',
+    ),
+  criteria: z
+    .array(z.string())
+    .describe(
+      'Give 2-4 short phrases naming what a strong defense of this particular claim contains. These ground the feedback call and are never shown to the student.',
+    ),
+});
+
+export type DefendClaimSpec = z.infer<typeof defendClaimSpec>;
+
 export const dragSortSpec = z.object({
   kind: z.literal('drag-sort'),
   learningComponentId: z.string().nullable(),
@@ -408,10 +505,96 @@ export const findTheFlawSpec = z.object({
 
 export type FindTheFlawSpec = z.infer<typeof findTheFlawSpec>;
 
+/**
+ * Draw the Curve: shape a line by dragging its points, then see the real one.
+ *
+ * The generalisation that gets this out of maths is dropping exact values. The
+ * x positions are fixed and labelled, the student only sets heights, and the
+ * check is on *shape* — does the line rise where it should rise, peak where it
+ * should peak. For a story's tension curve an exact number is meaningless and
+ * "the peak is at the climax, not the opening" is the entire point; the same
+ * check does honest work for a distance-time graph or a population trend.
+ *
+ * Predict first, then reveal. The student commits a shape before the real
+ * curve is drawn over the top, which is where the learning actually happens —
+ * seeing your own wrong intuition next to the right answer beats being shown
+ * the right answer cold.
+ */
+export const drawTheCurveSpec = z.object({
+  kind: z.literal('draw-the-curve'),
+  learningComponentId: z.string().nullable(),
+  prompt: z
+    .string()
+    .describe(
+      'Instruction shown above the chart, e.g. "Drag each point to show how the tension changes across the story."',
+    ),
+  /**
+   * The situation being graphed.
+   *
+   * Without this the task is unanswerable for anything but a conventional
+   * shape: "show how far Ana is from home during her walk" cannot be predicted
+   * unless the walk is described, and a student who misses the five minutes she
+   * spent in the shop was never told about them. The setup has to carry every
+   * fact the shape depends on, while stopping short of naming the shape.
+   */
+  setup: z
+    .string()
+    .describe(
+      'One to three sentences describing what happens, in enough detail that the shape can be worked out — every event that changes the line must be mentioned. Never describe the line itself ("it rises then flattens"); describe the situation and let the student infer the shape.',
+    ),
+  xAxis: z
+    .object({
+      label: z.string().describe('What the horizontal axis runs over, e.g. "Stage of the story", "Time".'),
+      points: z
+        .array(
+          z.object({
+            id: z.string().describe('Short stable lowercase slug.'),
+            label: z
+              .string()
+              .describe('Short label under this position, 1-3 words, e.g. "Climax", "1850", "10 min".'),
+          }),
+        )
+        .describe('Give 4-7 positions in order, left to right. Short labels — they sit under the axis.'),
+    })
+    .describe('The fixed horizontal positions. The student sets heights, never x.'),
+  yAxis: z
+    .object({
+      label: z.string().describe('What the vertical axis measures, e.g. "Tension", "Distance from home".'),
+      lowLabel: z.string().describe('Two or three words for the bottom of the scale, e.g. "calm", "close".'),
+      highLabel: z.string().describe('Two or three words for the top, e.g. "intense", "far away".'),
+    })
+    .describe('The vertical scale, described in words rather than numbers — no units are ever shown.'),
+  /**
+   * The real curve, revealed after the student commits. Its *shape* is also
+   * what the answer is checked against: segment by segment, does the student's
+   * line go the same direction? Absolute heights are never compared, so a
+   * student who draws the right shape too low still gets it right.
+   */
+  actual: z
+    .array(
+      z.object({
+        pointId: z.string().describe('Must match one of the xAxis point ids.'),
+        value: z.number().describe('0-100, where 0 is the bottom of the chart and 100 the top.'),
+      }),
+    )
+    .describe('One entry per x position, in the same order. This is the correct curve.'),
+  reveal: z
+    .string()
+    .describe(
+      'Shown with the real curve once the student commits: what the true shape is and why it goes that way. Two or three sentences.',
+    ),
+  hint: z
+    .string()
+    .describe('Shown after a wrong shape. Points at what to reconsider without describing the curve.'),
+});
+
+export type DrawTheCurveSpec = z.infer<typeof drawTheCurveSpec>;
+
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
   swiperFlashcardSpec,
   draftMeterSpec,
+  defendClaimSpec,
   dragSortSpec,
   dragCategorizeSpec,
   markdownCardSpec,
@@ -421,6 +604,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   timelineBuilderSpec,
   crosswordSpec,
   findTheFlawSpec,
+  drawTheCurveSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
 
@@ -436,6 +620,7 @@ export const widgetKind = z.enum([
   'fraction-area-model',
   'swiper-flashcard',
   'draft-meter',
+  'defend-claim',
   'drag-sort',
   'drag-categorize',
   'crossword',
@@ -445,6 +630,7 @@ export const widgetKind = z.enum([
   'narrated-card',
   'timeline-builder',
   'find-the-flaw',
+  'draw-the-curve',
 ]);
 export type WidgetKind = z.infer<typeof widgetKind>;
 
@@ -475,9 +661,21 @@ export const pathwayStep = z.object({
       'standards about writing an argument (W, WHST) or citing textual evidence (RL/RI/RH/RST',
       'strands 1 and 8) — it is meaningless for any other standard. It is also the heaviest',
       'interaction: use it for at most one step in a pathway, normally "practice" or "check".',
+      '"defend-claim" gives the student a contestable historical claim and two conflicting primary',
+      'sources; they pick a side, write a defense, and then ask for feedback and revise it. History',
+      'and social-studies standards only, grade 7 and up — it needs a claim historians actually',
+      'disagree about, which a maths or science standard does not have. Prefer it over "draft-meter"',
+      'when the standard is about historical argument or sourcing; it is the heaviest interaction in',
+      'the set, so use it for at most one step, normally "practice" or "check".',
       '"crossword" is a vocabulary puzzle built from the standard\'s own terms — every standard has',
       'vocabulary, so this fits any subject. Best for a "check" step that consolidates the words the',
       'lesson taught, not for introducing a concept the student has not met yet.',
+      '"draw-the-curve" gives labelled positions along an axis and lets the student drag each point\'s',
+      'height to predict a shape, then draws the real curve over their guess. Checked on shape, not',
+      'numbers, so it is not only for maths: tension across a story, distance over time, population',
+      'across decades, a trend across eras. Use it when the standard is about how something changes,',
+      'and prefer "practice" or "check" — the reveal is the payoff and it lands hardest once the',
+      'student has a real prediction to be wrong about.',
       '"find-the-flaw" shows a worked example containing one deliberate mistake — a solution, an',
       'experiment, an argument, a historical explanation — and asks the student to find the step',
       'where it goes wrong and say why. It is the only interaction that asks a student to judge',

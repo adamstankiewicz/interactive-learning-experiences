@@ -19,21 +19,12 @@ import { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { TimelineBuilderSpec } from '@/lib/pathway/schema';
+import { seededShuffle } from '@/lib/widgets/shuffle';
 
 type Event = TimelineBuilderSpec['events'][number];
 type Zone = TimelineBuilderSpec['zones'][number];
 type Placement = Record<string, string | null>;
 type Feedback = Record<string, 'correct' | 'wrong' | null>;
-
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const seed = copy.slice(0, i + 1).reduce((acc, it) => acc + JSON.stringify(it).charCodeAt(0), 0);
-    const j = seed % (i + 1);
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
-}
 
 // ── Draggable event chip ──────────────────────────────────────────────────────
 
@@ -119,7 +110,7 @@ function TimelineZone({
   isLast: boolean;
   isKeyboardTarget: boolean;
   onKeyboardDrop: (zoneId: string) => void;
-  dropTargetRef?: React.RefObject<HTMLDivElement | null>;
+  dropTargetRef?: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({ id: zone.id });
@@ -145,7 +136,7 @@ function TimelineZone({
       <div
         ref={(el) => {
           setNodeRef(el);
-          if (dropTargetRef) (dropTargetRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+          dropTargetRef?.(el);
         }}
         role={isKeyboardTarget ? 'button' : undefined}
         tabIndex={isKeyboardTarget ? 0 : undefined}
@@ -176,7 +167,7 @@ function TimelineZone({
 // ── Widget ────────────────────────────────────────────────────────────────────
 
 export function TimelineBuilder({ spec, onComplete }: { spec: TimelineBuilderSpec; onComplete?: (correct: boolean) => void }) {
-  const [shuffledEvents] = useState(() => shuffle(spec.events));
+  const [shuffledEvents] = useState(() => seededShuffle(spec.events, (e) => e.id));
   const [placement, setPlacement] = useState<Placement>(() =>
     Object.fromEntries(spec.events.map((e) => [e.id, null])),
   );
@@ -196,6 +187,10 @@ export function TimelineBuilder({ spec, onComplete }: { spec: TimelineBuilderSpe
 
   const announce = useCallback((msg: string) => {
     if (announcerRef.current) announcerRef.current.textContent = msg;
+  }, []);
+
+  const setFirstZoneRef = useCallback((el: HTMLDivElement | null) => {
+    firstZoneRef.current = el;
   }, []);
 
 const sensors = useSensors(useSensor(PointerSensor));
@@ -325,7 +320,7 @@ const sensors = useSensors(useSensor(PointerSensor));
 
       {isKeyboardMode && (
         <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary font-medium" aria-hidden="true">
-          "{spec.events.find((e) => e.id === selectedEventId)?.label}" selected — click a zone below to place it, or press Escape to cancel.
+          &ldquo;{spec.events.find((e) => e.id === selectedEventId)?.label}&rdquo; selected — click a zone below to place it, or press Escape to cancel.
         </p>
       )}
 
@@ -405,7 +400,7 @@ const sensors = useSensors(useSensor(PointerSensor));
                 isLast={i === spec.zones.length - 1}
                 isKeyboardTarget={isKeyboardMode}
                 onKeyboardDrop={handleKeyboardDrop}
-                dropTargetRef={i === 0 ? firstZoneRef : undefined}
+                dropTargetRef={i === 0 ? setFirstZoneRef : undefined}
               >
                 {zoneEvents.map((event) => (
                   <DraggableEvent

@@ -7,8 +7,6 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
-  closestCorners,
-  getFirstCollision,
   useDraggable,
   useDroppable,
   useSensor,
@@ -25,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import type { DragCategorizeSpec } from '@/lib/pathway/schema';
+import { seededShuffle } from '@/lib/widgets/shuffle';
 
 type Item = DragCategorizeSpec['items'][number];
 type Category = DragCategorizeSpec['categories'][number];
@@ -50,44 +49,95 @@ const ARROW_CODES: string[] = [KeyboardCode.Up, KeyboardCode.Down, KeyboardCode.
  * This getter does the same "closest droppable in the pressed direction" search,
  * but skips the sort-insertion step and returns the center of that droppable
  * directly, which is what container-to-container movement actually needs.
+ *
+ * Direction and distance are both judged by rect *center*, not edges, and
+ * candidates are ranked by straight center-to-center distance rather than
+ * handed to dnd-kit's `closestCorners`. Three things go wrong with edges +
+ * `closestCorners` here, because the dragged chip is much smaller than the
+ * zones it moves between, and the bank is a single row spanning every
+ * category's columns:
+ *  - Edge comparisons (e.g. Left: `collisionRect.left > rect.left`) are
+ *    true for *any* zone sharing the chip's column, not just ones actually
+ *    further left, because the chip's own edge sits inset from its zone's
+ *    edge. A same-column zone one row down would then spuriously pass the
+ *    "left" filter — which is what made Left silently jump down a row
+ *    instead of sideways. Centers don't have this asymmetry: zones that
+ *    share a column/row also share a center on that axis, so the
+ *    inequality ties and correctly excludes them.
+ *  - `closestCorners` sums 4 corner-to-corner distances, which — again
+ *    because the chip is so much smaller than a zone — can favor a
+ *    diagonal zone over the directly-adjacent one. Once candidates are
+ *    already direction-filtered, plain nearest-center distance is both
+ *    simpler and matches what "closest in this direction" actually means.
+ *  - Center comparison alone still isn't enough for Left/Right out of a
+ *    category: the bank spans every column, so its horizontal center sits
+ *    between two category columns and reads as "to the right" from the
+ *    left column (or "to the left" from the right one) — and since it's
+ *    only a short vertical hop away, it can out-distance the real
+ *    same-row neighbor. Requiring the candidate to actually overlap the
+ *    chip on the perpendicular axis (vertically, for Left/Right;
+ *    horizontally, for Up/Down) rules out a zone that isn't really in that
+ *    row/column at all.
  */
 const zoneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { context }) => {
-  const { active, collisionRect, droppableRects, droppableContainers, over } = context;
+  const { active, collisionRect, droppableRects, droppableContainers } = context;
 
   if (!ARROW_CODES.includes(event.code) || !active || !collisionRect) return undefined;
   event.preventDefault();
 
-  const candidates = droppableContainers.getEnabled().filter((entry) => {
-    if (!entry || entry.disabled) return false;
+  const isHorizontal = event.code === KeyboardCode.Left || event.code === KeyboardCode.Right;
+  const activeCenterX = collisionRect.left + collisionRect.width / 2;
+  const activeCenterY = collisionRect.top + collisionRect.height / 2;
+
+  let closestId: string | number | null = null;
+  let closestDistance = Infinity;
+
+  for (const entry of droppableContainers.getEnabled()) {
+    if (!entry || entry.disabled) continue;
     const rect = droppableRects.get(entry.id);
-    if (!rect) return false;
+    if (!rect) continue;
 
-    switch (event.code) {
-      case KeyboardCode.Down:
-        return collisionRect.top < rect.top;
-      case KeyboardCode.Up:
-        return collisionRect.top > rect.top;
-      case KeyboardCode.Left:
-        return collisionRect.left > rect.left;
-      case KeyboardCode.Right:
-        return collisionRect.left < rect.left;
-      default:
-        return false;
+    // The zone the chip is already sitting in fully encloses collisionRect
+    // (the chip isn't centered in it yet before the first move, e.g. its
+    // natural flex-wrap position in the bank) — exclude it so it can never
+    // win as a "move in this direction" target for itself.
+    const encloses =
+      rect.left <= collisionRect.left &&
+      rect.top <= collisionRect.top &&
+      rect.right >= collisionRect.right &&
+      rect.bottom >= collisionRect.bottom;
+    if (encloses) continue;
+
+    // Perpendicular-axis overlap: a candidate has to actually share the
+    // chip's row (for Left/Right) or column (for Up/Down) to count, not
+    // just have a center that happens to fall on the right side.
+    const overlapsPerpendicular = isHorizontal
+      ? rect.top < collisionRect.bottom && rect.bottom > collisionRect.top
+      : rect.left < collisionRect.right && rect.right > collisionRect.left;
+    if (!overlapsPerpendicular) continue;
+
+    const rectCenterX = rect.left + rect.width / 2;
+    const rectCenterY = rect.top + rect.height / 2;
+
+    const inDirection =
+      event.code === KeyboardCode.Down
+        ? rectCenterY > activeCenterY
+        : event.code === KeyboardCode.Up
+          ? rectCenterY < activeCenterY
+          : event.code === KeyboardCode.Left
+            ? rectCenterX < activeCenterX
+            : rectCenterX > activeCenterX;
+    if (!inDirection) continue;
+
+    const dx = rectCenterX - activeCenterX;
+    const dy = rectCenterY - activeCenterY;
+    const distance = dx * dx + dy * dy;
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestId = entry.id;
     }
-  });
-
-  const collisions = closestCorners({
-    active,
-    collisionRect,
-    droppableRects,
-    droppableContainers: candidates,
-    pointerCoordinates: null,
-  });
-
-  let closestId = getFirstCollision(collisions, 'id');
-  if (closestId === over?.id && collisions.length > 1) {
-    closestId = collisions[1]?.id ?? closestId;
   }
+
   if (closestId == null) return undefined;
 
   const targetRect = droppableRects.get(closestId);
@@ -128,35 +178,22 @@ function buildInitialPlacement(items: Item[]): Placement {
   return Object.fromEntries(items.map((it) => [it.id, null]));
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const seed = copy.slice(0, i + 1).reduce((acc, it) => acc + JSON.stringify(it).charCodeAt(0), 0);
-    const j = seed % (i + 1);
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
-}
-
 // ── Draggable chip ────────────────────────────────────────────────────────────
 
 function DraggableChip({
   item,
   inZone,
-  phase,
+  feedback,
   isDragging,
   chipRef,
 }: {
   item: Item;
   inZone: boolean;
-  phase: 'idle' | 'correct' | 'wrong';
+  feedback: 'correct' | 'wrong' | null;
   isDragging: boolean;
   chipRef?: (el: HTMLDivElement | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: item.id,
-    disabled: phase !== 'idle',
-  });
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: item.id });
 
   return (
     <div
@@ -168,11 +205,13 @@ function DraggableChip({
       {...attributes}
       {...listeners}
       className={`inline-flex cursor-grab select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        phase !== 'idle'
-          ? 'border-border bg-card text-foreground cursor-default'
-          : inZone
-            ? 'border-primary/40 bg-primary/10 text-foreground hover:border-primary/70'
-            : 'border-border bg-card text-foreground hover:border-muted-foreground/40'
+        feedback === 'correct'
+          ? 'border-success/50 bg-success/10 text-foreground'
+          : feedback === 'wrong'
+            ? 'border-destructive/50 bg-destructive/5 text-foreground'
+            : inZone
+              ? 'border-primary/40 bg-primary/10 text-foreground hover:border-primary/70'
+              : 'border-border bg-card text-foreground hover:border-muted-foreground/40'
       }`}
     >
       {item.label}
@@ -186,8 +225,7 @@ function DropZone({
   id,
   label,
   items,
-  placement,
-  phase,
+  feedback,
   activeId,
   isOver,
   chipRefs,
@@ -196,8 +234,7 @@ function DropZone({
   id: string;
   label?: string;
   items: Item[];
-  placement: Placement;
-  phase: 'idle' | 'correct' | 'wrong';
+  feedback: Record<string, 'correct' | 'wrong' | null>;
   activeId: string | null;
   isOver: boolean;
   chipRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
@@ -209,9 +246,7 @@ function DropZone({
     <div
       ref={setNodeRef}
       className={`flex flex-col gap-2 rounded-lg border-2 p-3 transition-colors ${
-        isOver && phase === 'idle'
-          ? 'border-primary bg-primary/8'
-          : 'border-border'
+        isOver ? 'border-primary bg-primary/8' : 'border-border'
       }`}
       style={{ minHeight: label ? '7rem' : '3.5rem' }}
     >
@@ -222,30 +257,24 @@ function DropZone({
       )}
       <div className="flex flex-wrap gap-2">
         {items.map((item) => {
-          const placed = placement[item.id];
-          const isCorrect = phase !== 'idle' && placed === item.categoryId;
-          const isWrong = phase === 'wrong' && placed !== item.categoryId;
+          const itemFeedback = feedback[item.id] ?? null;
           return (
             <div key={item.id} className="relative">
               <DraggableChip
                 item={item}
                 inZone={id !== 'bank'}
-                phase={phase}
+                feedback={itemFeedback}
                 isDragging={item.id === activeId}
                 chipRef={(el) => { chipRefs.current[item.id] = el; }}
               />
-              {phase !== 'idle' && (
+              {itemFeedback && (
                 <span
                   className={`absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold ${
-                    isCorrect
-                      ? 'bg-success text-white'
-                      : isWrong
-                        ? 'bg-destructive text-white'
-                        : 'bg-muted text-muted-foreground'
+                    itemFeedback === 'correct' ? 'bg-success text-white' : 'bg-destructive text-white'
                   }`}
                   aria-hidden="true"
                 >
-                  {isCorrect ? '✓' : isWrong ? '✗' : ''}
+                  {itemFeedback === 'correct' ? '✓' : '✗'}
                 </span>
               )}
             </div>
@@ -263,11 +292,15 @@ export function DragCategorize({ spec, onComplete }: Props) {
   const [placement, setPlacement] = useState<Placement>(() =>
     buildInitialPlacement(spec.items),
   );
-  const [phase, setPhase] = useState<'idle' | 'correct' | 'wrong'>('idle');
+  const [feedback, setFeedback] = useState<Record<string, 'correct' | 'wrong' | null>>(() =>
+    Object.fromEntries(spec.items.map((it) => [it.id, null])),
+  );
+  const [correct, setCorrect] = useState(false);
   const [attempts, setAttempts] = useState(0);
-  const [shuffledItems] = useState(() => shuffle(spec.items));
+  const [shuffledItems] = useState(() => seededShuffle(spec.items, (it) => it.id));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
 
   const telemetry = useWidgetTelemetry();
   const shownRef = useRef(false);
@@ -297,7 +330,10 @@ export function DragCategorize({ spec, onComplete }: Props) {
   );
 
   const handleDragStart = useCallback(({ active }: DragStartEvent) => {
-    setActiveId(active.id as string);
+    const id = active.id as string;
+    setActiveId(id);
+    setFeedback((prev) => ({ ...prev, [id]: null }));
+    setCorrect(false);
   }, []);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
@@ -305,7 +341,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
   }, []);
 
   const handleDragEnd = useCallback(
-    ({ active, over }: DragEndEvent) => {
+    ({ active, over, activatorEvent }: DragEndEvent) => {
       setActiveId(null);
       setOverId(null);
 
@@ -313,31 +349,39 @@ export function DragCategorize({ spec, onComplete }: Props) {
       const destination = over ? String(over.id) : null;
       const placedInCategory = destination && destination !== 'bank';
 
-      setPlacement((prev) => {
-        const next = { ...prev, [movedId]: placedInCategory ? destination : null };
+      const next = { ...placement, [movedId]: placedInCategory ? destination : null };
+      setPlacement(next);
 
-        // After placing into a category, focus the next unplaced bank item.
-        // Use rAF twice: once to let React re-render the new placement, once more
-        // to let dnd-kit finish returning focus to the dragged element — then
-        // we steal it away to the next chip.
-        if (placedInCategory) {
-          const nextUnplaced = shuffledItems.find(
-            (it) => it.id !== movedId && next[it.id] === null,
-          );
-          if (nextUnplaced) {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                chipRefs.current[nextUnplaced.id]?.focus();
-              });
-            });
-          }
-        }
-
-        return next;
-      });
+      // Keyboard drags only: a pointer user who drops a chip does not expect
+      // focus to jump to another chip, which also scrolls it into view.
+      if (placedInCategory && activatorEvent instanceof KeyboardEvent) {
+        const nextUnplaced = shuffledItems.find(
+          (it) => it.id !== movedId && next[it.id] === null,
+        );
+        setFocusTarget(nextUnplaced?.id ?? null);
+      }
     },
-    [shuffledItems],
+    [placement, shuffledItems],
   );
+
+  // Two frames: one for React to render the new placement, one more for dnd-kit
+  // to finish returning focus to the dragged element before we move it on.
+  useEffect(() => {
+    if (!focusTarget) return;
+
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        chipRefs.current[focusTarget]?.focus();
+        setFocusTarget(null);
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [focusTarget]);
 
   const handleDragCancel = useCallback(() => {
     setActiveId(null);
@@ -345,29 +389,31 @@ export function DragCategorize({ spec, onComplete }: Props) {
   }, []);
 
   const handleSubmit = useCallback(() => {
-    const misplaced = spec.items.filter((it) => placement[it.id] !== it.categoryId);
-    const correct = misplaced.length === 0;
+    const newFeedback: Record<string, 'correct' | 'wrong' | null> = Object.fromEntries(
+      spec.items.map((it) => [it.id, placement[it.id] === it.categoryId ? 'correct' : 'wrong']),
+    );
+    const allCorrect = spec.items.every((it) => placement[it.id] === it.categoryId);
+    setFeedback(newFeedback);
+    setCorrect(allCorrect);
     setAttempts((a) => a + 1);
-    setPhase(correct ? 'correct' : 'wrong');
 
     telemetry.track({
       eventType: 'answer_checked',
       widgetKind: spec.kind,
       learningComponentId: spec.learningComponentId,
       standardCode: telemetry.standardCode,
-      correct,
+      correct: allCorrect,
       payload: {
         attempt: attempts + 1,
-        misplaced: misplaced.length,
-        // Which column a wrong item was dropped into is the diagnosis, so the
-        // confusion is recorded as a pair rather than as a count.
-        confusions: misplaced.map((it) => `${it.categoryId}->${placement[it.id] ?? 'unplaced'}`),
-        // The profile confirms a misconception only from a wrong answer carrying it.
-        ...(correct ? {} : { misconception: spec.hint }),
+        misplaced: spec.items.filter((it) => placement[it.id] !== it.categoryId).length,
+        confusions: spec.items
+          .filter((it) => placement[it.id] !== it.categoryId)
+          .map((it) => `${it.categoryId}->${placement[it.id] ?? 'unplaced'}`),
+        ...(!allCorrect ? { misconception: spec.hint } : {}),
       },
     });
 
-    if (!correct) return;
+    if (!allCorrect) return;
     onComplete?.(true);
 
     if (completedRef.current) return;
@@ -384,13 +430,9 @@ export function DragCategorize({ spec, onComplete }: Props) {
     telemetry.flush();
   }, [placement, spec, onComplete, attempts, telemetry]);
 
-  const handleTryAgain = useCallback(() => {
-    setPlacement(buildInitialPlacement(spec.items));
-    setPhase('idle');
-  }, [spec.items]);
-
   const allPlaced = Object.values(placement).every((v) => v !== null);
   const placedCount = Object.values(placement).filter((v) => v !== null).length;
+  const hasWrongFeedback = spec.items.some((it) => feedback[it.id] === 'wrong');
 
   const bankItems = shuffledItems.filter((it) => placement[it.id] === null);
   const itemsInCategory = (catId: string) =>
@@ -409,7 +451,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
     <div className="flex flex-col gap-4">
       <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
 
-      {phase === 'idle' && (
+      {!correct && (
         <p className="text-xs text-muted-foreground">
           Drag into a category, or press Tab to a chip, Space to pick it up, arrow keys to move
           between zones, and Space again to drop it.
@@ -417,6 +459,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
       )}
 
       <DndContext
+        id="drag-categorize"
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
@@ -462,13 +505,12 @@ export function DragCategorize({ spec, onComplete }: Props) {
         <DropZone
           id="bank"
           items={bankItems}
-          placement={placement}
-          phase={phase}
+          feedback={feedback}
           activeId={activeId}
           isOver={overId === 'bank'}
           chipRefs={chipRefs}
         >
-          {bankItems.length === 0 && phase === 'idle' && (
+          {bankItems.length === 0 && !correct && (
             <p className="text-xs text-muted-foreground">
               All items placed — check your work below.
             </p>
@@ -483,8 +525,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
               id={cat.id}
               label={cat.label}
               items={itemsInCategory(cat.id)}
-              placement={placement}
-              phase={phase}
+              feedback={feedback}
               activeId={activeId}
               isOver={overId === cat.id}
               chipRefs={chipRefs}
@@ -501,29 +542,7 @@ export function DragCategorize({ spec, onComplete }: Props) {
         </DragOverlay>
       </DndContext>
 
-      {phase === 'idle' && (
-        <Button size="lg" className="w-full" disabled={!allPlaced} onClick={handleSubmit}>
-          {allPlaced
-            ? 'Check answers'
-            : `Place all items to check (${placedCount}/${spec.items.length})`}
-        </Button>
-      )}
-
-      {phase === 'wrong' && (
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="flex flex-col gap-3 py-4">
-            <p className="text-sm font-semibold text-destructive">
-              {attempts === 1 ? 'Not quite.' : 'Keep trying!'}
-            </p>
-            <p className="text-sm text-foreground">{spec.hint}</p>
-            <Button size="lg" variant="outline" className="w-full" onClick={handleTryAgain}>
-              Try again
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {phase === 'correct' && (
+      {correct ? (
         <Card className="border-success/30 bg-success/10">
           <CardContent className="flex flex-col gap-3 py-4">
             <p className="text-sm font-semibold text-success">
@@ -535,6 +554,17 @@ export function DragCategorize({ spec, onComplete }: Props) {
             </Button>
           </CardContent>
         </Card>
+      ) : (
+        <>
+          {hasWrongFeedback && (
+            <p className="text-sm text-muted-foreground">{spec.hint}</p>
+          )}
+          <Button size="lg" className="w-full" disabled={!allPlaced} onClick={handleSubmit}>
+            {allPlaced
+              ? 'Check answers'
+              : `Place all items to check (${placedCount}/${spec.items.length})`}
+          </Button>
+        </>
       )}
     </div>
   );

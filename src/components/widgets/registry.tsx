@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { widgetSpec } from "@/lib/pathway/schema";
 import "@/lib/widgets/builtins";
@@ -36,7 +38,10 @@ export function WidgetRenderer({
   spec: unknown;
   onComplete?: () => void;
 }) {
-  const parsed = widgetSpec.safeParse(spec);
+  // safeParse rebuilds the object graph, so an unmemoized call here hands every
+  // widget a new `spec` identity per render — which silently re-armed
+  // DraftMeter's debounce and defeated Crossword's layout memo.
+  const parsed = useMemo(() => widgetSpec.safeParse(spec), [spec]);
 
   if (!parsed.success) {
     return (

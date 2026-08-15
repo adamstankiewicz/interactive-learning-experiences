@@ -107,10 +107,25 @@ export const supabaseStorageAdapter: StorageAdapter = {
     return Boolean(data);
   },
 
-  async updateSessionPlan(sessionId, plan) {
-    if (!supabaseConfigured()) return;
-    const { error } = await supabaseAdmin().from('pathway_sessions').update({ plan }).eq('id', sessionId);
-    if (error) console.error('[storage] updateSessionPlan failed', error);
+  async updateSessionPlan(sessionId, studentId, plan) {
+    if (!supabaseConfigured()) return false;
+
+    const { data, error } = await supabaseAdmin()
+      .from('pathway_sessions')
+      .update({ plan })
+      .eq('id', sessionId)
+      .eq('student_id', studentId)
+      .select('id');
+
+    // Thrown rather than logged: swallowing it made the route's 502 branch
+    // unreachable, so a failed write reported success to the teacher. A
+    // malformed uuid (22P02) is the exception — that is a caller sending a
+    // junk id, which matches no row rather than failing the server.
+    if (error) {
+      if (error.code === '22P02') return false;
+      throw new Error(error.message);
+    }
+    return (data?.length ?? 0) > 0;
   },
 
   async recordSessionOpen(sessionId) {

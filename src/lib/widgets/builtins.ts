@@ -9,6 +9,7 @@
 import '@/lib/widgets/definitions/fraction-area-model';
 import '@/lib/widgets/definitions/swiper-flashcard';
 import '@/lib/widgets/definitions/draft-meter';
+import '@/lib/widgets/definitions/defend-claim';
 import '@/lib/widgets/definitions/drag-sort';
 import '@/lib/widgets/definitions/drag-categorize';
 import '@/lib/widgets/definitions/crossword';
@@ -18,3 +19,4 @@ import '@/lib/widgets/definitions/step-reveal';
 import '@/lib/widgets/definitions/narrated-card';
 import '@/lib/widgets/definitions/timeline-builder';
 import '@/lib/widgets/definitions/find-the-flaw';
+import '@/lib/widgets/definitions/draw-the-curve';

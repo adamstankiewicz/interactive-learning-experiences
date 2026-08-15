@@ -25,11 +25,25 @@ const WIDGETS = [
     tags: ['writing', 'argument', 'live scoring'],
   },
   {
+    slug: 'draw-the-curve',
+    name: 'Draw the Curve',
+    description:
+      'Shape a line by dragging its points to predict how something changes, then see the real curve drawn over your guess. Checked on shape rather than numbers, so a story arc works the same way a motion graph does.',
+    tags: ['predict-then-reveal', 'any subject', 'chart'],
+  },
+  {
     slug: 'find-the-flaw',
     name: 'Find the Flaw',
     description:
       'A worked example with one deliberate mistake — a solution, an experiment, an argument, an explanation. The student finds the step where it goes wrong, then diagnoses why. Checked locally, so there is no wait.',
     tags: ['error analysis', 'any subject', 'metacognition'],
+  },
+  {
+    slug: 'defend-claim',
+    name: 'Defend a Claim',
+    description:
+      'Take a side on a contestable historical claim, defend it from two conflicting sources, then request feedback and revise. Every reading answers with a counterargument. Typed or dictated. History, grade 7+.',
+    tags: ['history', 'argument', 'voice', 'revision'],
   },
   {
     slug: 'timeline-builder',

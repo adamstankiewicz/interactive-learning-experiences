@@ -33,6 +33,12 @@ export type PathwayState = {
   stepWidgets: Record<number, WidgetSpec>;
   /** Why a step's widget is a substitution, keyed the same way. */
   stepWidgetNotes: Record<number, string>;
+  /**
+   * Bumped each time a step's widget is replaced. Regeneration keeps the same
+   * widget kind, so without this the renderer reconciles instead of
+   * remounting and the new spec inherits the old one's interaction state.
+   */
+  stepWidgetSeq: Record<number, number>;
   /** True while a single step's widget is being redone in place. */
   regeneratingSteps: Record<number, boolean>;
   /** A regenerate call that failed, keyed by step index — cleared on retry. */
@@ -63,6 +69,7 @@ const initialState: PathwayState = {
   plan: null,
   stepWidgets: {},
   stepWidgetNotes: {},
+  stepWidgetSeq: {},
   regeneratingSteps: {},
   stepErrors: {},
   sessionId: null,
@@ -122,6 +129,10 @@ function reducer(state: PathwayState, action: Action): PathwayState {
       stepWidgetNotes: action.note
         ? { ...state.stepWidgetNotes, [action.stepIndex]: action.note }
         : withoutKey(state.stepWidgetNotes, action.stepIndex),
+      stepWidgetSeq: {
+        ...state.stepWidgetSeq,
+        [action.stepIndex]: (state.stepWidgetSeq[action.stepIndex] ?? 0) + 1,
+      },
       regeneratingSteps: { ...state.regeneratingSteps, [action.stepIndex]: false },
       stepErrors: withoutKey(state.stepErrors, action.stepIndex),
     };
@@ -315,12 +326,16 @@ export function usePathwayStream() {
     if (!state.sessionId || !state.plan) return;
     const plan = state.plan as PathwayPlan;
     const sessionId = state.sessionId;
+    // The server checks this against the session's owner; a session only
+    // exists because `start` minted an id first, so it is set by now.
+    const studentId = studentIdRef.current;
+    if (!studentId) return;
 
     const id = setTimeout(() => {
       void fetch(`/api/pathway/session/${sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, studentId }),
       }).catch(() => {
         // Best-effort — the teacher's local view already has the edit.
       });

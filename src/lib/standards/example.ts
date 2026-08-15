@@ -92,6 +92,29 @@ const STANDARDS: Record<string, ExampleStandard> = {
     before: [],
     after: [],
   },
+  'HIST.8.US.RECONSTRUCTION': {
+    sourceId: SOURCE_ID,
+    sourceLabel: SOURCE_LABEL,
+    verified: true,
+    code: 'HIST.8.US.RECONSTRUCTION',
+    id: 'ex-hist-8-us-reconstruction',
+    description:
+      'Evaluate competing explanations for the end of Reconstruction, using primary sources to support a position.',
+    jurisdiction: 'Example',
+    gradeLevels: ['8'],
+    subject: 'Social Studies',
+    // The `history` tag is what makes `defend-claim` eligible; the grade floor
+    // in its coverageRule does the rest. Tagged here rather than derived from
+    // the code, since this source's notation is its own — which is the point
+    // of tags living on the ref instead of in a shared regex.
+    tags: ['history'],
+    components: [
+      { id: 'ex-comp-hist-claim', description: 'States a defensible position on a contested historical question' },
+      { id: 'ex-comp-hist-source', description: 'Cites a primary source to support a historical claim' },
+    ],
+    before: [],
+    after: [],
+  },
   'ELA.8.W.ARGUMENT': {
     sourceId: SOURCE_ID,
     sourceLabel: SOURCE_LABEL,
@@ -119,7 +142,8 @@ export const exampleSource: StandardsSource = {
 
   proposalPromptFragment: [
     'Propose codes in this notation only: "MATH.4.NF.EQUIV", "SCI.5.PS.FORCES", "ELA.5.RI.EVIDENCE",',
-    '"ELA.8.W.ARGUMENT" — subject prefix, grade, strand, short topic slug, all upper case, dot-separated.',
+    '"ELA.8.W.ARGUMENT", "HIST.8.US.RECONSTRUCTION" — subject prefix, grade, strand, short topic slug,',
+    'all upper case, dot-separated.',
   ].join(' '),
 
   async verify(code) {

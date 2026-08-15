@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
@@ -79,7 +79,9 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
    * dependencies would re-run the fetch on unrelated re-renders.
    */
   const telemetryRef = useRef(telemetry);
-  telemetryRef.current = telemetry;
+  useEffect(() => {
+    telemetryRef.current = telemetry;
+  });
 
   const shownRef = useRef(false);
   const completedRef = useRef(false);
@@ -136,6 +138,51 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
     setResult(null);
   }
 
+  /**
+   * The meter re-scores on every pause in typing, so recording each response
+   * would bury the profile in one student's keystrokes. Only a band change is
+   * reported, and only the finish line is scored: a draft still being written
+   * is not a wrong answer, so intermediate events carry a null verdict and stay
+   * out of mastery.
+   */
+  const recordScore = useCallback(
+    (scored: ScoreResult) => {
+      const t = telemetryRef.current;
+
+      if (scored.band !== lastBandRef.current) {
+        lastBandRef.current = scored.band;
+        t.track({
+          eventType: 'answer_checked',
+          widgetKind: spec.kind,
+          learningComponentId: spec.learningComponentId,
+          standardCode: t.standardCode,
+          correct: null,
+          // Which checks are missing, by id — the ids differ per standard now, so
+          // this reads as "what this student still owes *this* task".
+          payload: {
+            score: scored.score,
+            band: scored.band,
+            missing: scored.checks.filter((c) => !c.met).map((c) => c.id),
+          },
+        });
+      }
+
+      if (!scored.criteriaMet || completedRef.current) return;
+      completedRef.current = true;
+
+      t.track({
+        eventType: 'widget_completed',
+        widgetKind: spec.kind,
+        learningComponentId: spec.learningComponentId,
+        standardCode: t.standardCode,
+        correct: true,
+        payload: { score: scored.score, band: scored.band },
+      });
+      t.flush();
+    },
+    [spec.kind, spec.learningComponentId],
+  );
+
   useEffect(() => {
     const draft = text.trim();
     if (!draft) return;
@@ -181,49 +228,7 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [text, spec]);
-
-  /**
-   * The meter re-scores on every pause in typing, so recording each response
-   * would bury the profile in one student's keystrokes. Only a band change is
-   * reported, and only the finish line is scored: a draft still being written
-   * is not a wrong answer, so intermediate events carry a null verdict and stay
-   * out of mastery.
-   */
-  function recordScore(scored: ScoreResult) {
-    const t = telemetryRef.current;
-
-    if (scored.band !== lastBandRef.current) {
-      lastBandRef.current = scored.band;
-      t.track({
-        eventType: 'answer_checked',
-        widgetKind: spec.kind,
-        learningComponentId: spec.learningComponentId,
-        standardCode: t.standardCode,
-        correct: null,
-        // Which checks are missing, by id — the ids differ per standard now, so
-        // this reads as "what this student still owes *this* task".
-        payload: {
-          score: scored.score,
-          band: scored.band,
-          missing: scored.checks.filter((c) => !c.met).map((c) => c.id),
-        },
-      });
-    }
-
-    if (!scored.criteriaMet || completedRef.current) return;
-    completedRef.current = true;
-
-    t.track({
-      eventType: 'widget_completed',
-      widgetKind: spec.kind,
-      learningComponentId: spec.learningComponentId,
-      standardCode: t.standardCode,
-      correct: true,
-      payload: { score: scored.score, band: scored.band },
-    });
-    t.flush();
-  }
+  }, [text, spec, recordScore]);
 
   const fill = phase === 'idle' ? IDLE_FILL : Math.max(result?.score ?? 0, IDLE_FILL);
   const label = phase === 'scored' && result ? result.label : PHASE_LABEL[phase as keyof typeof PHASE_LABEL];

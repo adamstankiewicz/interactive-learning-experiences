@@ -46,7 +46,23 @@ function recognitionCtor(): (new () => Recognition) | null {
 const subscribe = () => () => {};
 const getServerSnapshot = () => false;
 
-export function useVoiceIntake(onFinal: (transcript: string) => void) {
+/**
+ * `continuous` is the difference between capturing an answer and capturing a
+ * paragraph. The learn page asks for a topic — one utterance, then the
+ * recognizer should stop on its own — so it stays the default. A widget where
+ * the student dictates several sentences of argument needs the recognizer to
+ * survive the pauses between them; without it they tap the mic once per
+ * sentence, which is enough friction to make them stop using it.
+ *
+ * Chrome still ends a continuous session after a long enough silence. That is
+ * left as-is rather than auto-restarted from `onend`: a restart loop that fires
+ * on an error path holds the microphone open indefinitely, and "tap to start
+ * again" is a cheaper failure than that.
+ */
+export function useVoiceIntake(
+  onFinal: (transcript: string) => void,
+  { continuous = false }: { continuous?: boolean } = {},
+) {
   const supported = useSyncExternalStore(
     subscribe,
     () => Boolean(recognitionCtor()),
@@ -71,20 +87,33 @@ export function useVoiceIntake(onFinal: (transcript: string) => void) {
 
     const recognition = new Ctor();
     recognition.lang = 'en-US';
-    recognition.continuous = false;
+    recognition.continuous = continuous;
     recognition.interimResults = true;
 
+    /**
+     * One event can carry several results, and in continuous mode more than one
+     * of them can be final at once. An earlier version returned from the loop on
+     * the first final result, which silently dropped the rest — invisible when
+     * `continuous` is false and there is only ever one, a lost clause per pause
+     * when it is true. Finals are accumulated instead, and the interim is only
+     * published when there is no final in the batch to supersede it.
+     */
     recognition.onresult = (event) => {
+      let finals = '';
       let draft = '';
+
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
-        if (result.isFinal) {
-          onFinalRef.current(result[0].transcript.trim());
-          setInterim('');
-          return;
-        }
-        draft += result[0].transcript;
+        if (result.isFinal) finals += result[0].transcript;
+        else draft += result[0].transcript;
       }
+
+      if (finals.trim()) {
+        onFinalRef.current(finals.trim());
+        setInterim('');
+        return;
+      }
+
       setInterim(draft);
     };
 
@@ -106,7 +135,7 @@ export function useVoiceIntake(onFinal: (transcript: string) => void) {
       recognition.onend = null;
       recognition.abort();
     };
-  }, []);
+  }, [continuous]);
 
   const start = useCallback(() => {
     setError(null);

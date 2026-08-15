@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, useEffect } from 'react';
+import { useId, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -38,33 +38,31 @@ function gradeLabel(grade: string): string {
 export function PathwayBuilder() {
   const teacherNoteId = useId();
   const searchParams = useSearchParams();
-  const [topic, setTopic] = useState('');
-  const [gradeHint, setGradeHint] = useState('');
+  // Seeded during render rather than synced in an effect: setting state from
+  // an effect cascades an extra render, and the effect version also depended
+  // on the values it set, which is what queued a second generation.
+  const [topic, setTopic] = useState(() => searchParams.get('topic') ?? '');
+  const [gradeHint, setGradeHint] = useState(() => searchParams.get('grade') ?? '');
   const [teacherNote, setTeacherNote] = useState('');
   const { state, start, cancel, regenerateStep, editPlan } = usePathwayStream();
 
   const streaming = state.status === 'streaming';
   const started = state.status !== 'idle';
 
-  // Pre-fill form from URL parameters
+  // Latched so a re-render cannot queue a second run: both reach the server,
+  // and only the first is aborted, and only client-side.
+  const autoSubmitted = useRef(false);
+
+  // A topic and grade in the URL mean the teacher already chose from /upload.
   useEffect(() => {
+    if (autoSubmitted.current) return;
     const topicParam = searchParams.get('topic');
     const gradeParam = searchParams.get('grade');
+    if (!topicParam || !gradeParam) return;
 
-    if (topicParam && !topic) {
-      setTopic(topicParam);
-    }
-    if (gradeParam && !gradeHint) {
-      setGradeHint(gradeParam);
-    }
-
-    // Auto-submit if both params present and not already started
-    if (topicParam && gradeParam && !started && !streaming) {
-      setTimeout(() => {
-        start(topicParam, gradeParam, undefined);
-      }, 100);
-    }
-  }, [searchParams, topic, gradeHint, started, streaming, start]);
+    autoSubmitted.current = true;
+    void start(topicParam, gradeParam, undefined);
+  }, [searchParams, start]);
 
   function runSubmit() {
     if (!topic.trim() || streaming) return;
@@ -137,10 +135,10 @@ export function PathwayBuilder() {
               value={gradeHint || ANY_GRADE}
               onValueChange={(value) => setGradeHint(!value || value === ANY_GRADE ? '' : value)}
             >
-              <SelectTrigger className="h-11 w-full text-base sm:w-40" aria-label="Grade level">
+              <SelectTrigger className={`h-11! w-full sm:w-40 text-sm bg-transparent dark:bg-transparent dark:hover:bg-transparent border-input/50 ${!gradeHint ? 'text-muted-foreground' : ''}`} aria-label="Grade level">
                 <SelectValue>{(value: string | null) => gradeLabel(value ?? ANY_GRADE)}</SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="p-1.5">
                 <SelectItem value={ANY_GRADE}>{gradeLabel(ANY_GRADE)}</SelectItem>
                 {GRADE_OPTIONS.map((grade) => (
                   <SelectItem key={grade} value={grade}>

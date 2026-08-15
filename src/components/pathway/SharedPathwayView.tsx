@@ -30,7 +30,7 @@ export function SharedPathwayView({ session }: { session: WalkthroughSession }) 
   }, [studentId]);
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
+    <div className="light-surface min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
         <p className="text-center text-lg font-black text-balance">{session.topic}</p>
 
