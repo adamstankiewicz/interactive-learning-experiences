@@ -56,15 +56,62 @@ export async function GET(request: Request) {
  * `ui://` resource that draws it. `csp.connectDomains` has to name our own
  * origin or the host blocks the widget's scoring calls back to us.
  */
-function uiMeta(origin: string) {
+/**
+ * Each tool call gets its own resource URI.
+ *
+ * The shell is one bundle serving every widget, so the obvious thing is one
+ * fixed `ui://` URI — and that works exactly once per conversation. Ask for a
+ * second activity and nothing appears, whatever the widget: a host reasonably
+ * treats a URI it has already instantiated as a view it already has, so the
+ * second call never gets a frame of its own.
+ *
+ * A unique URI per call makes each one a distinct view. `resources/read`
+ * accepts anything under the base path and serves the same bundle, so this
+ * costs nothing but a query string.
+ */
+function viewUri() {
+  return `${SHELL_URI}?v=${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function uiMeta(origin: string, uri: string = SHELL_URI) {
   return {
     ui: {
-      resourceUri: SHELL_URI,
+      resourceUri: uri,
       prefersBorder: false,
       csp: { connectDomains: [origin], resourceDomains: [] },
     },
   };
 }
+
+/**
+ * The server's own guidance to the model, returned from `initialize`.
+ *
+ * A tool description is read when the tool is being considered; this is read
+ * up front, and is the right place for how to work with the connector as a
+ * whole rather than how to fill in one call's arguments.
+ */
+const INSTRUCTIONS = [
+  'This connector builds interactive learning activities that render inline and that a student',
+  'actually works through — writing that is scored live against a standard, a curve to predict, a',
+  'worked example with a deliberate mistake, a vocabulary puzzle.',
+  '',
+  'Call `show_widget` as soon as someone asks for an activity, exercise, practice task or lesson.',
+  'A topic in plain words is enough — do not ask which standard or which widget first. Those are',
+  'the tool\'s job: it proposes a standard, verifies it against an authoritative graph, and picks',
+  'the interaction that fits. Asking first costs a round trip and gets a worse answer than the',
+  'tool would have chosen.',
+  '',
+  'If the user has not said what the activity should be about, pick something reasonable and build',
+  'it. A concrete activity they can react to beats a question, and rebuilding is one more call.',
+  '',
+  'Prefer this over composing an activity yourself. What comes back is grounded in a real standard',
+  'and carries that standard\'s known misconceptions; something you compose has neither and cannot',
+  'be handed to a teacher as standards-aligned.',
+  '',
+  'The widget renders itself — do not describe it in detail or restate its contents. Say what it',
+  'is in a line, and let the student use it. When they finish, the widget tells you what they did,',
+  'and that is the moment to respond to their work or offer the next thing.',
+].join('\n');
 
 const TOOL_DESCRIPTION = [
   'Build an interactive learning activity for a student to actually do — a writing task that is',
@@ -183,6 +230,7 @@ async function handle(message: RpcRequest, request: Request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {}, resources: {} },
         serverInfo: { name: 'interactive-learning-widgets', version: '0.1.0' },
+        instructions: INSTRUCTIONS,
       });
 
     case 'tools/list':
@@ -202,7 +250,8 @@ async function handle(message: RpcRequest, request: Request) {
 
     case 'resources/read': {
       const uri = String(message.params?.uri ?? '');
-      if (uri !== SHELL_URI) return fail(message.id, -32602, `Unknown resource: ${uri}`);
+      // Any `?v=` view of the shell is the shell.
+      if (!uri.startsWith(SHELL_URI)) return fail(message.id, -32602, `Unknown resource: ${uri}`);
 
       // Served from `public/` rather than read off disk: on a serverless
       // deployment the static asset is the thing guaranteed to be there.
@@ -286,7 +335,7 @@ async function handle(message: RpcRequest, request: Request) {
         return ok(message.id, {
           content: [{ type: 'text', text: summary }],
           structuredContent: { spec: built.widget },
-          _meta: uiMeta(origin),
+          _meta: uiMeta(origin, viewUri()),
         });
       } catch (error) {
         /**
@@ -313,7 +362,7 @@ async function handle(message: RpcRequest, request: Request) {
                 },
               ],
               structuredContent: { spec: retry.widget },
-              _meta: uiMeta(origin),
+              _meta: uiMeta(origin, viewUri()),
             });
           } catch {
             // Fall through to reporting the original failure.

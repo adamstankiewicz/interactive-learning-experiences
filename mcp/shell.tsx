@@ -200,7 +200,7 @@ function Shell() {
     <div className="p-4 font-sans">
       {/* Widgets report through telemetry, which had no sink in here. Giving it
           one is what lets a finished activity reach the conversation. */}
-      <WidgetTelemetryProvider telemetry={telemetry} standardCode={standardCode}>
+      <WidgetTelemetryProvider telemetry={telemetry} standardCode={standardCode} stepIndex={0}>
         <Component spec={spec} />
       </WidgetTelemetryProvider>
     </div>
