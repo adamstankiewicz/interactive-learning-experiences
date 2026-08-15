@@ -83,8 +83,21 @@ export interface StorageAdapter {
    * student who made them, so participation never masquerades as ownership.
    */
   sessionExists(sessionId: string): Promise<boolean>;
-  /** A teacher hand-edited a prose field after generation — overwrite the persisted plan so a share link reflects the edit. */
-  updateSessionPlan(sessionId: string, plan: PathwayPlan): Promise<void>;
+  /**
+   * A teacher hand-edited a prose field after generation — overwrite the
+   * persisted plan so a share link reflects the edit.
+   *
+   * Ownership, not existence — the opposite of `sessionExists` above, and
+   * deliberately so. That gate is loose because participation must not
+   * require ownership; this one is strict because the session id is
+   * published in every share link, so anyone holding a link could otherwise
+   * rewrite the teacher's pathway for every student who opens it after them.
+   *
+   * Returns false when the session is unknown *or* owned by someone else —
+   * the caller must not distinguish the two, or the endpoint becomes an
+   * oracle for which session ids exist.
+   */
+  updateSessionPlan(sessionId: string, studentId: string, plan: PathwayPlan): Promise<boolean>;
 
   /** A share link got opened — the other half of "close the loop back to the teacher." */
   recordSessionOpen(sessionId: string): Promise<void>;
