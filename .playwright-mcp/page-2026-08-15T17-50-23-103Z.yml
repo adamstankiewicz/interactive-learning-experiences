@@ -1,0 +1,40 @@
+- generic [active] [ref=f18e1]:
+  - generic [ref=f18e2]:
+    - banner [ref=f18e3]:
+      - generic [ref=f18e4]:
+        - generic [ref=f18e5]: Pathways
+        - navigation [ref=f18e6]:
+          - link "Pathway Builder" [ref=f18e7] [cursor=pointer]:
+            - /url: /
+          - link "Pathways" [ref=f18e8] [cursor=pointer]:
+            - /url: /pathways
+          - link "Roster" [ref=f18e9] [cursor=pointer]:
+            - /url: /roster
+        - group "Colour theme" [ref=f18e11]:
+          - button "Light" [pressed] [ref=f18e12]
+          - button "Dark" [ref=f18e13]
+          - button "System" [ref=f18e14]
+    - main [ref=f18e16]:
+      - generic [ref=f18e17]:
+        - heading "Turn a topic into a lesson students can do." [level=1] [ref=f18e18]
+        - paragraph [ref=f18e19]: Name what you’re teaching. We find the standard it maps to in the Learning Commons knowledge graph, then build a pathway from its verified learning components — with interactive activities your students work through.
+      - generic [ref=f18e20]:
+        - textbox "Topic" [ref=f18e21]:
+          - /placeholder: What are you teaching?
+        - generic [ref=f18e22]:
+          - paragraph [ref=f18e23]: ✨ Or start from an example
+          - generic [ref=f18e24]:
+            - button "understanding fractions · Gr 4" [ref=f18e25] [cursor=pointer]:
+              - text: understanding fractions
+              - generic [ref=f18e26]: · Gr 4
+            - button "multiplying by powers of ten · Gr 5" [ref=f18e27] [cursor=pointer]:
+              - text: multiplying by powers of ten
+              - generic [ref=f18e28]: · Gr 5
+            - button "finding the main idea of a text · Gr 5" [ref=f18e29] [cursor=pointer]:
+              - text: finding the main idea of a text
+              - generic [ref=f18e30]: · Gr 5
+        - button "Add detail (optional, but it sharpens the pathway)" [ref=f18e32]:
+          - text: Add detail
+          - generic [ref=f18e34]: (optional, but it sharpens the pathway)
+  - button "Open Next.js Dev Tools" [ref=f18e40] [cursor=pointer]
+  - alert [ref=f18e44]

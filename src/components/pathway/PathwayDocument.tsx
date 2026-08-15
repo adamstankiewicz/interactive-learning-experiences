@@ -1,12 +1,23 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, RotateCcw, Sparkles } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  CircleCheck,
+  Repeat,
+  RotateCcw,
+  Sparkles,
+  Target,
+  type LucideIcon,
+} from 'lucide-react';
+import { motion } from 'motion/react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { plainMath } from '@/lib/learning-commons/format';
@@ -15,15 +26,75 @@ import type { PathwayPlan } from '@/lib/pathway/schema';
 import type { PathwayState } from '@/lib/pathway/use-pathway-stream';
 import { cn } from '@/lib/utils';
 
+import { ShareLink } from './ShareLink';
+
 type RegenerateStep = (anchor: Anchor, plan: PathwayPlan, stepIndex: number) => Promise<void>;
 type EditPlan = (plan: PathwayPlan) => void;
 
-const PURPOSE_LABEL: Record<string, string> = {
-  activate: 'Activate',
-  model: 'Model',
-  practice: 'Practice',
-  check: 'Check',
+/**
+ * Each step purpose gets its own icon and stage color — the same violet/
+ * pink/amber/emerald family `/learn` builds its whole identity from — so the
+ * four kinds read as distinct at a glance and a teacher scanning the list
+ * sees a step's category from its border alone, not just a small label.
+ * Raw Tailwind palette classes rather than the token system, on purpose:
+ * this is the same "local, literal color" approach `/learn` and
+ * `PathwayWalkthrough` already use, deliberately separate from the app's
+ * quieter shadcn token layer.
+ */
+const PURPOSE_META: Record<
+  string,
+  { label: string; Icon: LucideIcon; border: string; tint: string; icon: string }
+> = {
+  activate: {
+    label: 'Activate',
+    Icon: Sparkles,
+    border: 'border-pink-200 dark:border-pink-900',
+    tint: 'bg-pink-100 dark:bg-pink-950/50',
+    icon: 'text-pink-500 dark:text-pink-400',
+  },
+  model: {
+    label: 'Model',
+    Icon: BookOpen,
+    border: 'border-violet-200 dark:border-violet-900',
+    tint: 'bg-violet-100 dark:bg-violet-950/50',
+    icon: 'text-violet-500 dark:text-violet-400',
+  },
+  practice: {
+    label: 'Practice',
+    Icon: Repeat,
+    border: 'border-amber-200 dark:border-amber-900',
+    tint: 'bg-amber-100 dark:bg-amber-950/50',
+    icon: 'text-amber-600 dark:text-amber-400',
+  },
+  check: {
+    label: 'Check',
+    Icon: CircleCheck,
+    border: 'border-emerald-200 dark:border-emerald-900',
+    tint: 'bg-emerald-100 dark:bg-emerald-950/50',
+    icon: 'text-emerald-600 dark:text-emerald-400',
+  },
 };
+
+/**
+ * Waypoint colors for the pathway thread — the vertical line + node running
+ * down "The pathway" section. Separate from `PURPOSE_META`'s `tint`/`icon`
+ * (a low-alpha pill background needs a different color than a solid node
+ * fill), reusing the same four-hue mapping so a step's category reads
+ * identically whether you're scanning the thread or the card itself.
+ */
+const WAYPOINT_META: Record<string, { dot: string; line: string }> = {
+  activate: { dot: 'bg-pink-400', line: 'bg-pink-200 dark:bg-pink-900' },
+  model: { dot: 'bg-violet-400', line: 'bg-violet-200 dark:bg-violet-900' },
+  practice: { dot: 'bg-amber-400', line: 'bg-amber-200 dark:bg-amber-900' },
+  check: { dot: 'bg-emerald-400', line: 'bg-emerald-200 dark:bg-emerald-900' },
+};
+
+/** A preview cycle of the four purposes' border + waypoint colors, for the skeleton — real steps aren't known yet. */
+const STEP_SKELETON_WAYPOINTS = (['activate', 'model', 'practice', 'check'] as const).map((purpose) => ({
+  border: PURPOSE_META[purpose].border,
+  dot: WAYPOINT_META[purpose].dot,
+  line: WAYPOINT_META[purpose].line,
+}));
 
 type PartialStep = DeepPartial<PathwayPlan>['steps'] extends (infer S)[] | undefined ? S : never;
 
@@ -45,6 +116,7 @@ export function PathwayDocument({
   onEditPlan?: EditPlan;
 }) {
   const { anchor, plan } = state;
+  const streaming = state.status === 'streaming';
 
   // Both only make sense once `plan` is the real validated thing, not the
   // partial shape it streams in as — regeneration replays a step through the
@@ -123,8 +195,16 @@ export function PathwayDocument({
     [editStepField],
   );
 
-  // Below the hooks: they must run in the same order on every render.
-  if (!anchor) return null;
+  // Below the hooks: they must run in the same order on every render. A
+  // skeleton fills the gap between "submitted" and "the first real event
+  // arrived" so the document starts assembling the instant a teacher hits
+  // submit, rather than staying blank through the propose/verify/graph
+  // stages. Once the run has ended without ever producing an anchor (an
+  // early error, or a stop before anything landed) there is nothing to keep
+  // showing a promise for.
+  if (!anchor) {
+    return state.status === 'streaming' ? <PathwayDocumentSkeleton /> : null;
+  }
 
   return (
     <article className="mt-8 space-y-10">
@@ -140,8 +220,13 @@ export function PathwayDocument({
 
       {/* Backward design: objectives before activities. A teacher decides
           whether this is the right target for their class from the outcomes,
-          before investing in reading the five-step sequence that serves them. */}
-      {Boolean(plan?.outcomes?.length) && (
+          before investing in reading the five-step sequence that serves them.
+          A skeleton holds this section's place while streaming and before
+          `plan` has landed — without it, `anchor`-derived sections further
+          down (prior knowledge, also touches) would appear first simply
+          because they arrive earlier, undercutting backward design exactly
+          when a teacher is watching it build. */}
+      {plan?.outcomes?.length ? (
         <Section
           title="What students will be able to do"
           note={
@@ -150,64 +235,110 @@ export function PathwayDocument({
               : 'This standard has no published learning components'
           }
         >
-          <ol className="space-y-3">
+          <ol className="space-y-2">
             {plan?.outcomes?.map((outcome, index) => (
-              <li key={index}>
-                <Card size="sm">
-                  <CardContent>
-                    {editOutcome ? (
+              <li
+                key={index}
+                className="flex items-start gap-3 rounded-2xl border-3 border-emerald-200 bg-card px-4 py-3.5 shadow-sm dark:border-emerald-900"
+              >
+                <span
+                  aria-hidden
+                  className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+                >
+                  <Target className="size-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  {editOutcome ? (
+                    <EditableText
+                      value={outcome?.statement ?? ''}
+                      onSave={(text) => editOutcome(index, 'statement', text)}
+                      className="text-sm font-medium"
+                    />
+                  ) : (
+                    <p className="text-sm font-medium">{outcome?.statement}</p>
+                  )}
+                  {editOutcome ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      You&rsquo;ll know they have it when:{' '}
                       <EditableText
-                        value={outcome?.statement ?? ''}
-                        onSave={(text) => editOutcome(index, 'statement', text)}
-                        className="text-sm font-medium"
+                        value={outcome?.evidence ?? ''}
+                        onSave={(text) => editOutcome(index, 'evidence', text)}
+                        as="span"
                       />
-                    ) : (
-                      <p className="text-sm font-medium">{outcome?.statement}</p>
-                    )}
-                    {editOutcome ? (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        You&rsquo;ll know they have it when:{' '}
-                        <EditableText
-                          value={outcome?.evidence ?? ''}
-                          onSave={(text) => editOutcome(index, 'evidence', text)}
-                          as="span"
-                        />
-                      </div>
-                    ) : (
-                      outcome?.evidence && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          You&rsquo;ll know they have it when: {outcome.evidence}
-                        </p>
-                      )
-                    )}
-                  </CardContent>
-                </Card>
+                    </div>
+                  ) : (
+                    outcome?.evidence && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        You&rsquo;ll know they have it when: {outcome.evidence}
+                      </p>
+                    )
+                  )}
+                </div>
               </li>
             ))}
           </ol>
         </Section>
-      )}
-
-      {Boolean(plan?.steps?.length) && (
-        <Section title="The pathway" note="Each step, in order, with its interaction">
-          <ol className="space-y-4">
-            {plan?.steps?.map((step, index) => (
-              <StepCard
-                key={index}
-                step={step}
-                index={index}
-                widget={state.stepWidgets[index]}
-                widgetSeq={state.stepWidgetSeq[index] ?? 0}
-                note={state.stepWidgetNotes[index]}
-                regenerating={Boolean(state.regeneratingSteps[index])}
-                regenerateError={state.stepErrors[index]}
-                onRegenerate={regenerateStep ? handleRegenerateStep : undefined}
-                onEditField={editStepField ? handleEditStepField : undefined}
-              />
+      ) : streaming ? (
+        <Section title="What students will be able to do">
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <OutcomeSkeletonRow key={i} />
             ))}
+          </div>
+        </Section>
+      ) : null}
+
+      {plan?.steps?.length ? (
+        <Section title="The pathway" note="Each step, in order, with its interaction">
+          {/* The one structural device this document earns: steps genuinely
+              are an ordered sequence — a lesson walked in this order, not a
+              set of independent cards — so a connecting thread with a
+              waypoint per step encodes something true, the same way a trail
+              map's line is the point, not decoration. */}
+          <ol className="space-y-0">
+            {plan?.steps?.map((step, index) => {
+              const waypoint = (step?.purpose && WAYPOINT_META[step.purpose]) ?? null;
+              const isLast = index === (plan?.steps?.length ?? 0) - 1;
+              const Icon = (step?.purpose && PURPOSE_META[step.purpose]?.Icon) ?? Sparkles;
+
+              return (
+                <li key={index} className="flex gap-3">
+                  <div className="flex w-8 shrink-0 flex-col items-center" aria-hidden>
+                    <span
+                      className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-full text-white',
+                        waypoint?.dot ?? 'bg-muted-foreground/40',
+                      )}
+                    >
+                      <Icon className="size-3.5" />
+                    </span>
+                    {!isLast && (
+                      <span className={cn('my-1 w-0.5 flex-1 rounded-full', waypoint?.line ?? 'bg-border')} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 pb-4">
+                    <StepCard
+                      step={step}
+                      index={index}
+                      widget={state.stepWidgets[index]}
+                      widgetSeq={state.stepWidgetSeq[index] ?? 0}
+                      note={state.stepWidgetNotes[index]}
+                      regenerating={Boolean(state.regeneratingSteps[index])}
+                      regenerateError={state.stepErrors[index]}
+                      onRegenerate={regenerateStep ? handleRegenerateStep : undefined}
+                      onEditField={editStepField ? handleEditStepField : undefined}
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </Section>
-      )}
+      ) : streaming ? (
+        <Section title="The pathway" note="Each step, in order, with its interaction">
+          <StepWaypointSkeletonList />
+        </Section>
+      ) : null}
 
       {Boolean(plan?.misconceptions?.length) && (
         <Section title="Watch for" note="Specific, diagnosable misconceptions">
@@ -271,6 +402,149 @@ export function PathwayDocument({
   );
 }
 
+/** Baked-in offsets rather than `Math.random()` — a fixed, designed burst shape, not jitter. */
+const CONFETTI = [
+  { emoji: '✨', x: -48, y: -36, rotate: -18, delay: 0 },
+  { emoji: '🎊', x: 42, y: -32, rotate: 14, delay: 0.05 },
+  { emoji: '⭐', x: -60, y: 8, rotate: -8, delay: 0.12 },
+  { emoji: '🎉', x: 56, y: 12, rotate: 10, delay: 0.08 },
+  { emoji: '✨', x: 4, y: -46, rotate: 0, delay: 0.16 },
+];
+
+/**
+ * The actual payoff of a build, played as a real moment — not just a styled
+ * box. Mirrors `PathwayWalkthrough`'s finished-state beat (spring-in, 🎉,
+ * a tally) for a teacher instead of a student: the receipt (steps, standard,
+ * time) and the share link are the same "here's what you made" idea, just
+ * read here as a build summary rather than a stars count.
+ */
+export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
+  if (state.status !== 'done' || !state.sessionId) return null;
+
+  const stepCount = state.plan?.steps?.length ?? 0;
+  const code = state.anchor?.standard.verified ? state.anchor.standard.code : null;
+  const elapsedMs = state.startedAt !== null && state.finishedAt !== null ? state.finishedAt - state.startedAt : null;
+
+  const summary = [
+    stepCount > 0 ? `${stepCount} step${stepCount === 1 ? '' : 's'}` : null,
+    code ? `matched to ${code}` : null,
+    elapsedMs !== null ? `built in ${(elapsedMs / 1000).toFixed(0)}s` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+      className="mt-6 rounded-3xl border-3 border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-5 dark:border-emerald-900 dark:from-emerald-950/40 dark:via-transparent dark:to-amber-950/10"
+    >
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300">
+          <Check className="size-6" aria-hidden />
+          {CONFETTI.map((p, i) => (
+            <motion.span
+              key={i}
+              aria-hidden
+              initial={{ opacity: 0, x: 0, y: 0, scale: 0.4, rotate: 0 }}
+              animate={{ opacity: [0, 1, 0], x: p.x, y: p.y, scale: 1, rotate: p.rotate }}
+              transition={{ duration: 0.9, delay: p.delay, ease: 'easeOut' }}
+              className="pointer-events-none absolute text-lg"
+            >
+              {p.emoji}
+            </motion.span>
+          ))}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-heading text-lg font-black text-balance">Your pathway is ready! 🎉</p>
+          {summary && <p className="text-sm text-muted-foreground">{summary}</p>}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-violet-100 bg-white/70 px-4 py-3 dark:border-violet-900 dark:bg-white/5">
+        <ShareLink sessionId={state.sessionId} />
+      </div>
+    </motion.div>
+  );
+}
+
+/** One placeholder outcome row — shared by the full pre-anchor skeleton and the real document's own outcomes section while `plan` is still in flight. */
+function OutcomeSkeletonRow() {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border-3 border-emerald-100 bg-card px-4 py-3.5 dark:border-emerald-950">
+      <Skeleton className="mt-0.5 size-6 shrink-0 rounded-full" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  );
+}
+
+/** One placeholder step card — same sharing rationale as `OutcomeSkeletonRow`. */
+function StepSkeletonCard({ border }: { border: string }) {
+  return (
+    <div className={cn('rounded-2xl border-3 bg-card px-4 py-3.5', border)}>
+      <Skeleton className="h-5 w-20 rounded-full" />
+      <Skeleton className="mt-2.5 h-4 w-1/2" />
+      <Skeleton className="mt-1.5 h-3.5 w-3/4" />
+    </div>
+  );
+}
+
+/**
+ * Fills the gap between "submitted" and "the first real event arrived" so
+ * the document reads as assembling itself rather than staying blank while
+ * `ActivityTrail`'s progress strip is the only thing on screen. Shapes are
+ * generic (a plausible outcome count, step count) rather than tied to the
+ * eventual plan — nothing about the real topic is known yet at this point.
+ */
+function PathwayDocumentSkeleton() {
+  return (
+    <article className="mt-8 space-y-10" aria-hidden>
+      <header>
+        <Skeleton className="h-5 w-40 rounded-full" />
+        <Skeleton className="mt-3 h-7 w-3/4" />
+        <Skeleton className="mt-2.5 h-4 w-full" />
+        <Skeleton className="mt-1.5 h-4 w-2/3" />
+      </header>
+
+      <section>
+        <Skeleton className="mb-3 h-3 w-56" />
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <OutcomeSkeletonRow key={i} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <Skeleton className="mb-3 h-3 w-44" />
+        <StepWaypointSkeletonList />
+      </section>
+    </article>
+  );
+}
+
+/** The waypoint-threaded skeleton step list — shared by the full pre-anchor skeleton and the real document's own steps section while `plan.steps` is still in flight. */
+function StepWaypointSkeletonList() {
+  return (
+    <div className="space-y-0">
+      {STEP_SKELETON_WAYPOINTS.map(({ border, dot, line }, i) => (
+        <div key={i} className="flex gap-3">
+          <div className="flex w-8 shrink-0 flex-col items-center" aria-hidden>
+            <Skeleton className={cn('size-8 shrink-0 rounded-full', dot)} />
+            {i < STEP_SKELETON_WAYPOINTS.length - 1 && (
+              <span className={cn('my-1 w-0.5 flex-1 rounded-full', line)} />
+            )}
+          </div>
+          <div className="min-w-0 flex-1 pb-4">
+            <StepSkeletonCard border={border} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DocumentHeader({
   anchor,
   plan,
@@ -291,7 +565,9 @@ function DocumentHeader({
       <div className="flex flex-wrap items-center gap-2">
         {standard.verified ? (
           <>
-            <Badge className="font-mono">{standard.code}</Badge>
+            <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 font-mono text-xs font-bold text-violet-600 dark:border-violet-800 dark:bg-white/5 dark:text-violet-300">
+              {standard.code}
+            </span>
             <span className="text-xs text-muted-foreground">
               {standard.subject} · Grade {standard.gradeLevels.join(', ')} · {standard.jurisdiction}
             </span>
@@ -303,7 +579,7 @@ function DocumentHeader({
         )}
       </div>
 
-      <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight">{topic}</h2>
+      <h2 className="mt-3 font-heading text-3xl font-black tracking-tight text-balance">{topic}</h2>
 
       {onEditBigIdea ? (
         <EditableText
@@ -322,7 +598,7 @@ function DocumentHeader({
           but a teacher planning a lesson does not need it open by default. */}
       <Collapsible className="mt-4">
         <CollapsibleTrigger className="group/why flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-          <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]/why:rotate-180" />
+          <ChevronDown className="size-3.5 transition-transform group-data-panel-open/why:rotate-180" />
           {standard.verified ? 'Why this standard' : 'Why no standard'}
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -386,16 +662,25 @@ const StepCard = memo(function StepCard({
   const purpose = step?.purpose;
   const hasWidget = widget !== undefined;
   const pending = Boolean(step?.widgetKind) && !hasWidget;
+  const meta = (purpose && PURPOSE_META[purpose]) ?? null;
 
   return (
-    <li className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-      <div className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:gap-4">
-        <span className="shrink-0 sm:w-20">
-          {/* A filing tab, not a chip — border-left rather than a filled pill,
-              square rather than rounded-full. This is a category marker in a
-              lesson sequence, closer to a binder divider than a marketing tag. */}
-          <span className="inline-flex items-center border-l-2 border-primary bg-primary/5 py-0.5 pl-1.5 font-mono text-[10px] font-semibold tracking-widest text-primary-tint-foreground uppercase">
-            {(purpose && PURPOSE_LABEL[purpose]) ?? purpose}
+    <div
+      className={cn(
+        'overflow-hidden rounded-2xl border-3 bg-card shadow-sm transition-colors',
+        meta ? meta.border : 'border-border',
+      )}
+    >
+      <div className="flex flex-col gap-1.5 px-4 py-3.5 sm:flex-row sm:gap-4">
+        <span className="shrink-0">
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full py-0.5 pr-2 pl-1.5 font-mono text-[10px] font-semibold tracking-widest uppercase',
+              meta?.tint ?? 'bg-muted',
+            )}
+          >
+            {meta ? <meta.Icon className={cn('size-3', meta.icon)} aria-hidden /> : null}
+            {meta?.label ?? purpose}
           </span>
         </span>
         <div className="min-w-0 flex-1">
@@ -436,14 +721,23 @@ const StepCard = memo(function StepCard({
       </div>
 
       {(hasWidget || pending || note) && (
-        <div className={cn('border-t border-border bg-muted/30 px-4 py-4', 'sm:pl-24')}>
+        <div
+          className={cn(
+            'border-t-3 bg-muted/30 px-4 py-4 sm:pl-24',
+            meta ? meta.border : 'border-border',
+          )}
+        >
+
           {hasWidget ? (
             <WidgetRenderer key={widgetSeq} spec={widget} />
           ) : pending ? (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Sparkles className="size-3.5 animate-pulse" aria-hidden />
-              Building the interaction for this step…
-            </p>
+            <div>
+              <p className={cn('mb-2.5 flex items-center gap-2 text-xs', meta?.icon ?? 'text-muted-foreground')}>
+                <Sparkles className="size-3.5 animate-pulse" aria-hidden />
+                Building the interaction for this step…
+              </p>
+              <Skeleton className="h-20 w-full" />
+            </div>
           ) : (
             <Alert variant="warning">
               <AlertDescription>{note}</AlertDescription>
@@ -451,7 +745,7 @@ const StepCard = memo(function StepCard({
           )}
         </div>
       )}
-    </li>
+    </div>
   );
 });
 

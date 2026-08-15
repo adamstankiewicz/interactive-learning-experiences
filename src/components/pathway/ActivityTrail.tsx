@@ -1,113 +1,144 @@
 'use client';
 
 import { Check, ChevronDown, Minus, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { STAGES } from '@/lib/pathway/events';
+import type { StageId } from '@/lib/pathway/events';
 import type { PathwayState, StageStatus } from '@/lib/pathway/use-pathway-stream';
+
+/** A small warmth accent on top of each stage's real copy — not a substitute for it. */
+const STAGE_EMOJI: Record<StageId, string> = {
+  propose: '🔍',
+  verify: '✅',
+  graph: '🕸️',
+  plan: '🧠',
+  widget: '🛠️',
+};
 
 /**
  * The run's own progress, shown as work happens rather than as a spinner.
  *
- * The whole stage list renders up front, pending steps included, so the shape
- * of the work is legible before any of it finishes. Once the run completes the
- * trail collapses to a one-line receipt — it is scaffolding for the wait, not
- * something to keep reading afterwards.
+ * A slim segmented strip is the primary, always-visible view — it doesn't
+ * compete with the document forming below it for attention. The full stage
+ * list (candidate codes, verdicts) a teacher doesn't need mid-wait moves
+ * behind "How this was built", collapsed by default even while streaming —
+ * demoted, not removed, the same "provenance stays reachable, not upfront"
+ * rule `DocumentHeader`'s "Why this standard" already follows.
  */
 export function ActivityTrail({ state }: { state: PathwayState }) {
   const streaming = state.status === 'streaming';
   const elapsed = useElapsed(state.startedAt, state.finishedAt);
-  const [open, setOpen] = useState(true);
-  const [prevStatus, setPrevStatus] = useState(state.status);
-
-  // Open for the wait, collapse once there is real output to look at instead.
-  // Adjusting during render rather than in an effect avoids a second pass.
-  if (state.status !== prevStatus) {
-    setPrevStatus(state.status);
-    if (state.status === 'done') setOpen(false);
-    if (state.status === 'streaming') setOpen(true);
-  }
+  const [open, setOpen] = useState(false);
 
   const rejected = Object.values(state.verdicts).filter((ok) => !ok).length;
+  const activeStage = STAGES.find((stage) => state.stages[stage.id].status === 'active');
+
+  const headline = streaming
+    ? (activeStage?.active ?? 'Building the pathway')
+    : state.status === 'error'
+      ? 'Stopped'
+      : 'Built the pathway';
+  const emoji = streaming ? STAGE_EMOJI[activeStage?.id ?? 'propose'] : state.status === 'error' ? '🙃' : '🎉';
 
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className="mt-8 overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10"
-    >
-      <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
-        <ChevronDown
-          className={cn(
-            'size-4 shrink-0 text-muted-foreground transition-transform',
-            !open && '-rotate-90',
-          )}
-        />
-        <span className="font-heading text-sm font-medium">
-          {streaming ? 'Building the pathway' : state.status === 'error' ? 'Stopped' : 'Built the pathway'}
-        </span>
-        {!open && rejected > 0 && (
-          <span className="text-xs text-muted-foreground">
-            · {rejected} code{rejected === 1 ? '' : 's'} rejected by the graph
-          </span>
-        )}
-        <span className="ml-auto shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+    <div className="mt-8">
+      <div className="flex items-center gap-2.5">
+        <ol className="flex flex-1 gap-1.5" aria-label="Build progress">
+          {STAGES.map((stage) => (
+            <li key={stage.id} className="h-2 flex-1 overflow-hidden rounded-full bg-violet-100 dark:bg-violet-950/50">
+              <span
+                className={cn(
+                  'block h-full rounded-full transition-colors',
+                  state.stages[stage.id].status === 'done' && 'bg-emerald-400',
+                  state.stages[stage.id].status === 'active' && 'w-full animate-pulse bg-violet-400',
+                  state.stages[stage.id].status === 'skipped' && 'bg-muted-foreground/30',
+                )}
+              />
+            </li>
+          ))}
+        </ol>
+        <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
           {(elapsed / 1000).toFixed(1)}s
         </span>
-      </CollapsibleTrigger>
+      </div>
 
-      <CollapsibleContent>
-        <ol className="space-y-0 px-4 pb-3">
-          {STAGES.map((stage) => {
-            const entry = state.stages[stage.id];
-            const isVerify = stage.id === 'verify';
-            const showCandidates = isVerify && state.candidates.length > 0 && entry.status !== 'pending';
+      <div className="mt-2 flex items-center gap-2">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={headline}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 text-sm font-medium text-violet-700 dark:text-violet-300"
+          >
+            <span aria-hidden>{emoji}</span> {headline}
+            {!streaming && rejected > 0 && (
+              <span className="font-normal text-muted-foreground">
+                {' '}
+                · {rejected} code{rejected === 1 ? '' : 's'} rejected by the graph
+              </span>
+            )}
+          </motion.p>
+        </AnimatePresence>
+      </div>
 
-            return (
-              <li key={stage.id} className="flex gap-3 py-1.5">
-                <StatusDot status={entry.status} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span
-                      className={cn(
-                        'text-sm',
-                        entry.status === 'pending'
-                          ? 'text-muted-foreground/50'
-                          : entry.status === 'active'
-                            ? 'font-medium'
-                            : 'text-muted-foreground',
-                      )}
-                    >
-                      {stage.label}
-                    </span>
-                    {entry.detail && <span className="text-xs text-muted-foreground">{entry.detail}</span>}
-                  </div>
+      <Collapsible open={open} onOpenChange={setOpen} className="mt-1.5">
+        <CollapsibleTrigger className="group/why flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <ChevronDown className="size-3.5 transition-transform group-data-panel-open/why:rotate-180" />
+          How this was built
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ol className="mt-2 space-y-0 border-l-2 border-border pl-3">
+            {STAGES.map((stage) => {
+              const entry = state.stages[stage.id];
+              const isVerify = stage.id === 'verify';
+              const showCandidates = isVerify && state.candidates.length > 0 && entry.status !== 'pending';
 
-                  {entry.status === 'active' && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{stage.active}</p>
-                  )}
-
-                  {showCandidates && (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {state.candidates.map((candidate) => (
-                        <Verdict
-                          key={candidate.statementCode}
-                          code={candidate.statementCode}
-                          verdict={state.verdicts[candidate.statementCode]}
-                        />
-                      ))}
+              return (
+                <li key={stage.id} className="flex gap-3 py-1.5">
+                  <StatusDot status={entry.status} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span
+                        className={cn(
+                          'text-sm',
+                          entry.status === 'pending'
+                            ? 'text-muted-foreground/50'
+                            : entry.status === 'active'
+                              ? 'font-medium'
+                              : 'text-muted-foreground',
+                        )}
+                      >
+                        {stage.label}
+                      </span>
+                      {entry.detail && <span className="text-xs text-muted-foreground">{entry.detail}</span>}
                     </div>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </CollapsibleContent>
-    </Collapsible>
+
+                    {showCandidates && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {state.candidates.map((candidate) => (
+                          <Verdict
+                            key={candidate.statementCode}
+                            code={candidate.statementCode}
+                            verdict={state.verdicts[candidate.statementCode]}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 

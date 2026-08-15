@@ -1,0 +1,40 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - generic [ref=f1e4]:
+        - generic [ref=f1e5]: Pathways
+        - navigation [ref=f1e6]:
+          - link "Pathway Builder" [ref=f1e7] [cursor=pointer]:
+            - /url: /
+          - link "Pathways" [ref=f1e8] [cursor=pointer]:
+            - /url: /pathways
+          - link "Roster" [ref=f1e9] [cursor=pointer]:
+            - /url: /roster
+        - group "Colour theme" [ref=f1e11]:
+          - button "Light" [pressed] [ref=f1e12]
+          - button "Dark" [ref=f1e13]
+          - button "System" [ref=f1e14]
+    - main [ref=f1e16]:
+      - generic [ref=f1e21]:
+        - textbox "Topic" [ref=f1e22]:
+          - /placeholder: What are you teaching?
+          - text: understanding fractions
+        - combobox "Grade level" [ref=f1e23]:
+          - generic [ref=f1e24]: Grade 4
+          - img: ▼
+        - textbox [ref=f1e25]: "4"
+        - button "Stop" [ref=f1e52] [cursor=pointer]
+      - generic [ref=f1e53]:
+        - generic [ref=f1e54]:
+          - list "Build progress" [ref=f1e55]:
+            - listitem [ref=f1e56]
+            - listitem [ref=f1e58]
+            - listitem [ref=f1e60]
+            - listitem [ref=f1e62]
+            - listitem [ref=f1e64]
+          - generic [ref=f1e66]: 6.0s
+        - paragraph [ref=f1e68]: 🔍 Guessing a few standards this topic could be teaching, before checking any of them
+        - button "How this was built" [ref=f1e70]
+      - article [ref=f1e73]
+  - button "Open Next.js Dev Tools" [ref=f1e46] [cursor=pointer]
+  - alert [ref=f1e50]

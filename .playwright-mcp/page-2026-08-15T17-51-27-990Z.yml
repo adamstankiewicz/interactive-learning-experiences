@@ -1,0 +1,132 @@
+- generic [active] [ref=f18e1]:
+  - generic [ref=f18e2]:
+    - banner [ref=f18e3]:
+      - generic [ref=f18e4]:
+        - generic [ref=f18e5]: Pathways
+        - navigation [ref=f18e6]:
+          - link "Pathway Builder" [ref=f18e7] [cursor=pointer]:
+            - /url: /
+          - link "Pathways" [ref=f18e8] [cursor=pointer]:
+            - /url: /pathways
+          - link "Roster" [ref=f18e9] [cursor=pointer]:
+            - /url: /roster
+        - group "Colour theme" [ref=f18e11]:
+          - button "Light" [pressed] [ref=f18e12]
+          - button "Dark" [ref=f18e13]
+          - button "System" [ref=f18e14]
+    - main [ref=f18e16]:
+      - generic [ref=f18e20]:
+        - textbox "Topic" [ref=f18e21]:
+          - /placeholder: What are you teaching?
+          - text: finding the main idea of a text
+        - generic [ref=f18e46]:
+          - combobox "Grade level" [ref=f18e47]:
+            - generic [ref=f18e48]: Grade 5
+            - img: ▼
+          - textbox [ref=f18e49]: "5"
+          - button "Stop" [ref=f18e52] [cursor=pointer]
+      - generic [ref=f18e53]:
+        - generic [ref=f18e54]:
+          - list "Build progress" [ref=f18e55]:
+            - listitem [ref=f18e56]
+            - listitem [ref=f18e58]
+            - listitem [ref=f18e60]
+            - listitem [ref=f18e62]
+            - listitem [ref=f18e64]
+          - generic [ref=f18e66]: 53.8s
+        - paragraph [ref=f18e219]: 🛠️ Matching each step to the interactive that actually fits what it teaches
+        - button "How this was built" [ref=f18e70]
+      - article [ref=f18e130]:
+        - generic [ref=f18e131]:
+          - generic [ref=f18e132]:
+            - generic [ref=f18e133]: RI.5.2
+            - generic [ref=f18e134]: English Language Arts · Grade 5 · Multi-State
+          - heading "finding the main idea of a text" [level=2] [ref=f18e135]
+          - paragraph [ref=f18e136]: A long informational text usually carries more than one big idea, and each big idea is held up by specific details you can point to in the text.
+          - button "Why this standard" [ref=f18e138]
+        - generic [ref=f18e141]:
+          - generic [ref=f18e142]:
+            - heading "What students will be able to do" [level=3] [ref=f18e143]
+            - paragraph [ref=f18e144]: This standard has no published learning components
+          - list [ref=f18e145]:
+            - listitem [ref=f18e146]:
+              - generic [ref=f18e152]:
+                - paragraph [ref=f18e153]: I can find two or more main ideas in an informational text and say them in my own words.
+                - paragraph [ref=f18e154]: "You’ll know they have it when: Given a multi-section article, the student states two distinct main ideas as full sentences (not one-word topics) and shows which sections each one covers."
+            - listitem [ref=f18e155]:
+              - generic [ref=f18e161]:
+                - paragraph [ref=f18e162]: I can match key details to the main idea they support and quote the words that prove it.
+                - paragraph [ref=f18e163]: "You’ll know they have it when: The student sorts details under the correct main idea and, for each, copies an exact phrase from the text that supports it, leaving out details that support neither."
+            - listitem [ref=f18e164]:
+              - generic [ref=f18e170]:
+                - paragraph [ref=f18e171]: I can write a summary that includes both main ideas and leaves out minor details and my own opinions.
+                - paragraph [ref=f18e172]: "You’ll know they have it when: The student produces a 3-5 sentence summary containing both main ideas, no opinion words, and no more than one supporting detail per idea; and can spot a summary that breaks these rules."
+        - generic [ref=f18e173]:
+          - generic [ref=f18e174]:
+            - heading "The pathway" [level=3] [ref=f18e175]
+            - paragraph [ref=f18e176]: Each step, in order, with its interaction
+          - list [ref=f18e177]:
+            - listitem [ref=f18e178]:
+              - generic [ref=f18e185]:
+                - generic [ref=f18e186]:
+                  - generic [ref=f18e187]: Activate
+                  - generic [ref=f18e192]:
+                    - paragraph [ref=f18e193]: Big enough to be a main idea?
+                    - paragraph [ref=f18e194]: "Students swipe statements drawn from a short article about honeybee colonies into two piles: 'big idea — covers a lot of the text' or 'just one detail'. Items include a bare topic ('honeybees'), a single fact ('a queen can lay 2,000 eggs a day'), and a true main-idea sentence, so the topic-versus-main-idea confusion surfaces before any teaching."
+                - paragraph [ref=f18e223]: Building the interaction for this step…
+            - listitem [ref=f18e228]:
+              - generic [ref=f18e235]:
+                - generic [ref=f18e236]:
+                  - generic [ref=f18e237]: Model
+                  - generic [ref=f18e241]:
+                    - paragraph [ref=f18e242]: Two ideas, one text
+                    - paragraph [ref=f18e243]: A step-reveal walks through a four-section article on wildfires. Each reveal shows one section, names what that section is mostly about, then reveals that sections 1-2 build one main idea (fire destroys habitat fast) and sections 3-4 build a second (some plants need fire to reproduce). The final reveal states both main ideas in sentence form and shows why one main idea alone would leave half the text unexplained.
+                - paragraph [ref=f18e246]: Building the interaction for this step…
+            - listitem [ref=f18e251]:
+              - generic [ref=f18e261]:
+                - generic [ref=f18e262]:
+                  - generic [ref=f18e263]: Practice
+                  - generic [ref=f18e270]:
+                    - paragraph [ref=f18e271]: Which idea does this detail hold up?
+                    - paragraph [ref=f18e272]: "Students drag ten quoted details from the wildfire article into three buckets: 'supports main idea 1', 'supports main idea 2', and 'interesting but supports neither'. Quotations are exact text excerpts, so students practise accurate quoting (RI.5.1) while sorting, and the third bucket forces them to reject details that do not do the work."
+                - paragraph [ref=f18e275]: Building the interaction for this step…
+            - listitem [ref=f18e280]:
+              - generic [ref=f18e290]:
+                - generic [ref=f18e291]:
+                  - generic [ref=f18e292]: Practice
+                  - generic [ref=f18e299]:
+                    - paragraph [ref=f18e300]: The summary that goes wrong
+                    - paragraph [ref=f18e301]: "Students read a classmate's five-sentence summary of the wildfire article. One sentence is the flaw: it states the topic instead of the second main idea, and the following sentence slips in an opinion. Students click the sentence where the summary goes wrong and explain why — naming whether the problem is a topic-not-an-idea, a missing main idea, or an opinion."
+                - paragraph [ref=f18e304]: Building the interaction for this step…
+            - listitem [ref=f18e309]:
+              - generic [ref=f18e316]:
+                - generic [ref=f18e317]:
+                  - generic [ref=f18e318]: Check
+                  - generic [ref=f18e323]:
+                    - paragraph [ref=f18e324]: Words for the work
+                    - paragraph [ref=f18e325]: A crossword built from the lesson's own vocabulary — main idea, key detail, summary, topic, support, quote, paraphrase, section — with clues written as short definitions tied back to the wildfire article ('the sentence that tells what a whole section is mostly about'). Consolidates the language students now need to explain their thinking in writing.
+                - paragraph [ref=f18e328]: Building the interaction for this step…
+        - generic [ref=f18e195]:
+          - generic [ref=f18e196]:
+            - heading "Watch for" [level=3] [ref=f18e197]
+            - paragraph [ref=f18e198]: Specific, diagnosable misconceptions
+          - list [ref=f18e199]:
+            - listitem [ref=f18e200]: Thinks the topic is the main idea — answers 'volcanoes' instead of 'volcanoes reshape the land around them for centuries'.
+            - listitem [ref=f18e202]: Assumes the first sentence of the text, or the sentence under the heading, is automatically the main idea, even when the paragraph builds to a different point.
+            - listitem [ref=f18e204]: Believes a text has only one main idea, so once one is found the rest of the text is treated as details for that single idea.
+            - listitem [ref=f18e206]: Treats a summary as a full retelling — includes every interesting fact and adds opinions like 'this was the coolest part'.
+        - generic [ref=f18e208]:
+          - generic [ref=f18e209]:
+            - heading "Also touches" [level=3] [ref=f18e210]
+            - paragraph [ref=f18e211]: Peer standards from other subjects this topic resolved against — informed the framing, not the outcomes
+          - list [ref=f18e212]:
+            - listitem [ref=f18e213]:
+              - generic [ref=f18e214]: RL.5.2
+              - generic [ref=f18e215]: English Language Arts ·
+              - text: Determine a theme of a story, drama, or poem from details in the text, including how characters in a story or drama respond to challenges or how the speaker in a poem reflects upon a topic; summarize the text.
+            - listitem [ref=f18e216]:
+              - generic [ref=f18e217]: RI.5.1
+              - generic [ref=f18e218]: English Language Arts ·
+              - text: Quote accurately from a text when explaining what the text says explicitly and when drawing inferences from the text.
+  - button "Open Next.js Dev Tools" [ref=f18e40] [cursor=pointer]
+  - alert [ref=f18e44]

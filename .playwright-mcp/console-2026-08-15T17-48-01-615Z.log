@@ -1,0 +1,80 @@
+[      50ms] [LOG] [Fast Refresh] done in 23ms @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[      87ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[     109ms] [LOG] [HMR] connected @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[   66514ms] [ERROR] In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <li> li 
+
+  ...
+    <RedirectErrorBoundary router={{...}}>
+      <InnerLayoutRouter url="/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>
+        <SegmentViewNode type="page" pagePath="(teacher)/...">
+          <SegmentTrieNode>
+          <Home>
+            <Suspense fallback={{...}}>
+              <PathwayBuilder>
+                <div className="flex min-h...">
+                  <main className="mx-auto w-...">
+                    <form>
+                    <ActivityTrail>
+                    <PathwayCompletionStrip>
+                    <PathwayDocument state={{status:"st...", ...}} ...>
+                      <article className="mt-8 space...">
+                        <DocumentHeader>
+                        <Section>
+                        <Section title="The pathway" note="Each step,...">
+                          <section>
+                            <div>
+                            <ol className="space-y-0">
+>                             <li className="flex gap-3">
+                                <div>
+                                <div className="min-w-0 fl...">
+                                  <StepCard step={{title:"Top...", ...}} index={0} widget={undefined} widgetSeq={0} ...>
+>                                   <li
+>                                     className="overflow-hidden rounded-2xl border-3 bg-card shadow-sm transition-col..."
+>                                   >
+                        ...
+        ...
+      ...
+ @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:1052
+[   66514ms] [ERROR] <%s> cannot contain a nested %s.
+See this log for the ancestor stack trace. li <li> @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:1052
+[   75005ms] InvalidCharacterError: Failed to execute 'createElement' on 'Document': The tag name provided ('') is not a valid name.
+    at completeWork (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:6785:59)
+    at runWithFiberInDEV (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:761:74)
+    at completeUnitOfWork (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:9452:23)
+    at performUnitOfWork (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:9387:28)
+    at workLoopSync (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:9279:40)
+    at renderRootSync (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:9263:13)
+    at performWorkOnRoot (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_react-dom_1wdhq6c._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3101/_next/static/chunks/1d50_next_dist_compiled_0afq14g._.js:2647:64)
+[  111990ms] [ERROR] ./src/components/pathway/PathwayDocument.tsx:748:7
+Error: Expected corresponding JSX closing tag for <div>
+  746 |         </div>
+  747 |       )}
+> 748 |     </li>
+      |       ^^
+  749 |   );
+  750 | });
+  751 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/components/pathway/PathwayDocument.tsx [Client Component Browser]
+    ./src/components/PathwayBuilder.tsx [Client Component Browser]
+    ./src/components/PathwayBuilder.tsx [Server Component]
+    ./src/app/(teacher)/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/pathway/PathwayDocument.tsx [Client Component SSR]
+    ./src/components/PathwayBuilder.tsx [Client Component SSR]
+    ./src/components/PathwayBuilder.tsx [Server Component]
+    ./src/app/(teacher)/page.tsx [Server Component] @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:1052
+[  112055ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[  117533ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[  117544ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[  117585ms] [LOG] [Fast Refresh] done in 13ms @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[  117626ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776
+[  117634ms] [LOG] [HMR] connected @ http://localhost:3101/_next/static/chunks/1d50_next_dist_0vlr69f._.js:776

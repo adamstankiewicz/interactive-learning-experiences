@@ -1,0 +1,145 @@
+- generic [ref=f16e1]:
+  - generic [active]:
+    - generic [ref=f16e131]:
+      - generic [ref=f16e132]:
+        - navigation [ref=f16e134]:
+          - button [disabled] [ref=f16e135]:
+            - img "previous" [ref=f16e136]
+          - generic [ref=f16e138]:
+            - generic [ref=f16e139]: 1/
+            - generic [ref=f16e140]: "3"
+          - button [ref=f16e141] [cursor=pointer]:
+            - img "next" [ref=f16e142]
+        - generic [ref=f16e145]:
+          - generic "Latest available version is detected (16.3.1)." [ref=f16e148]: Next.js 16.3.1
+          - generic [ref=f16e149]: Turbopack
+      - dialog "Console Error" [ref=f16e151]:
+        - generic [ref=f16e154]:
+          - generic [ref=f16e156]:
+            - generic [ref=f16e157]:
+              - generic [ref=f16e158]: Console Error
+              - generic [ref=f16e160]:
+                - button "Copy Error Info" [ref=f16e161] [cursor=pointer]
+                - button "No related documentation found" [disabled] [ref=f16e164]
+                - button "Attach Node.js inspector" [ref=f16e167] [cursor=pointer]
+            - generic [ref=f16e176]: In HTML, <li> cannot be a descendant of <li>. This will cause a hydration error.
+          - generic [ref=f16e178]:
+            - paragraph [ref=f16e180]:
+              - text: "See more info here:"
+              - link "https://nextjs.org/docs/messages/react-hydration-error" [ref=f16e181] [cursor=pointer]:
+                - /url: https://nextjs.org/docs/messages/react-hydration-error
+            - generic [ref=f16e182]:
+              - generic [ref=f16e183]:
+                - button "complete Component Stack" [ref=f16e184] [cursor=pointer]
+                - generic [ref=f16e187]:
+                  - generic [ref=f16e188]:
+                    - generic [ref=f16e189]: +
+                    - text: Client
+                  - generic [ref=f16e190]:
+                    - generic [ref=f16e191]: "-"
+                    - text: Server
+              - code [ref=f16e193]:
+                - generic [ref=f16e194]: ...
+                - generic [ref=f16e195]: "<RedirectErrorBoundary router={{...}}>"
+                - generic [ref=f16e196]: "<InnerLayoutRouter url=\"/\" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>"
+                - generic [ref=f16e197]: <SegmentViewNode type="page" pagePath="(teacher)/...">
+                - generic [ref=f16e198]: <SegmentTrieNode>
+                - generic [ref=f16e199]: <Home>
+                - generic [ref=f16e200]: "<Suspense fallback={{...}}>"
+                - generic [ref=f16e201]: <PathwayBuilder>
+                - generic [ref=f16e202]: <div className="flex min-h...">
+                - generic [ref=f16e203]: <main className="mx-auto w-...">
+                - generic [ref=f16e204]: <form>
+                - generic [ref=f16e205]: <ActivityTrail>
+                - generic [ref=f16e206]: <PathwayCompletionStrip>
+                - generic [ref=f16e207]: "<PathwayDocument state={{status:\"st...\", ...}} ...>"
+                - generic [ref=f16e208]: <article className="mt-8 space...">
+                - generic [ref=f16e209]: <DocumentHeader>
+                - generic [ref=f16e210]: <Section>
+                - generic [ref=f16e211]: <Section title="The pathway" note="Each step,...">
+                - generic [ref=f16e212]: <section>
+                - generic [ref=f16e213]: <div>
+                - generic [ref=f16e214]: <ol className="space-y-0">
+                - generic [ref=f16e215]: "> <li className=\"flex gap-3\">"
+                - generic [ref=f16e216]: <div>
+                - generic [ref=f16e217]: <div className="min-w-0 fl...">
+                - generic [ref=f16e218]: "<StepCard step={{title:\"Top...\", ...}} index={0} widget={undefined} widgetSeq={0} ...>"
+                - generic [ref=f16e219]: "> <li"
+                - generic [ref=f16e220]: "> className=\"overflow-hidden rounded-2xl border-3 bg-card shadow-sm transition-col...\""
+                - generic [ref=f16e221]: "> >"
+                - generic [ref=f16e222]: ...
+                - generic [ref=f16e223]: ...
+                - generic [ref=f16e224]: ...
+            - generic [ref=f16e225]:
+              - paragraph [ref=f16e227]:
+                - generic [ref=f16e232]: src/components/pathway/PathwayDocument.tsx (668:5) @ StepCard
+                - button "Open in editor" [ref=f16e233] [cursor=pointer]
+              - generic [ref=f16e237]:
+                - generic [ref=f16e238]: 666 |
+                - generic [ref=f16e239]: 667 | return (
+                - generic [ref=f16e240]: "> 668 | <li"
+                - generic [ref=f16e241]: "| ^"
+                - generic [ref=f16e242]: "669 | className={cn("
+                - generic [ref=f16e243]: 670 | 'overflow-hidden rounded-2xl border-3 bg-card shadow-sm transition-colors',
+                - generic [ref=f16e244]: "671 | meta ? meta.border : 'border-border',"
+            - generic [ref=f16e245]:
+              - generic [ref=f16e246]:
+                - paragraph [ref=f16e247]:
+                  - text: Call Stack
+                  - generic [ref=f16e248]: "20"
+                - button "Show 13 ignore-listed frame(s)" [ref=f16e249] [cursor=pointer]
+              - generic [ref=f16e252]:
+                - generic [ref=f16e253]: li
+                - text: <anonymous>
+              - generic [ref=f16e254]:
+                - generic [ref=f16e255]:
+                  - text: StepCard
+                  - button "Open StepCard in editor" [ref=f16e256] [cursor=pointer]
+                - text: src/components/pathway/PathwayDocument.tsx (668:5)
+              - generic [ref=f16e259]:
+                - generic [ref=f16e260]:
+                  - text: <unknown>
+                  - button "Open <unknown> in editor" [ref=f16e261] [cursor=pointer]
+                - text: src/components/pathway/PathwayDocument.tsx (320:21)
+              - generic [ref=f16e264]:
+                - generic [ref=f16e265]: Array.map
+                - text: <anonymous>
+              - generic [ref=f16e266]:
+                - generic [ref=f16e267]:
+                  - text: PathwayDocument
+                  - button "Open PathwayDocument in editor" [ref=f16e268] [cursor=pointer]
+                - text: src/components/pathway/PathwayDocument.tsx (299:27)
+              - generic [ref=f16e271]:
+                - generic [ref=f16e272]:
+                  - text: PathwayBuilder
+                  - button "Open PathwayBuilder in editor" [ref=f16e273] [cursor=pointer]
+                - text: src/components/PathwayBuilder.tsx (292:9)
+              - generic [ref=f16e276]:
+                - generic [ref=f16e277]:
+                  - text: Home
+                  - button "Open Home in editor" [ref=f16e278] [cursor=pointer]
+                - text: src/app/(teacher)/page.tsx (7:7)
+      - contentinfo [ref=f16e281]:
+        - region "Error feedback" [ref=f16e282]:
+          - paragraph [ref=f16e283]:
+            - link "Was this helpful?" [ref=f16e284] [cursor=pointer]:
+              - /url: https://nextjs.org/telemetry#error-feedback
+          - button "Mark as helpful" [ref=f16e285] [cursor=pointer]
+          - button "Mark as not helpful" [ref=f16e289] [cursor=pointer]
+    - generic [ref=f16e39] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=f16e40]
+      - generic [ref=f16e292]:
+        - button "Open issues overlay" [ref=f16e293]:
+          - generic [ref=f16e294]:
+            - generic [ref=f16e295]: "2"
+            - generic [ref=f16e296]: "3"
+          - generic [ref=f16e297]:
+            - text: Issue
+            - generic [ref=f16e298]: s
+        - button "Collapse issues badge" [ref=f16e299]
+  - generic [ref=f16e303]:
+    - heading "This page couldn’t load" [level=1] [ref=f16e306]
+    - paragraph [ref=f16e307]: Reload to try again, or go back.
+    - generic [ref=f16e308]:
+      - button "Reload" [ref=f16e310] [cursor=pointer]
+      - button "Back" [ref=f16e311] [cursor=pointer]
