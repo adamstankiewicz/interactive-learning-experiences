@@ -96,6 +96,28 @@ const STEP_SKELETON_WAYPOINTS = (['activate', 'model', 'practice', 'check'] as c
   line: WAYPOINT_META[purpose].line,
 }));
 
+/**
+ * The plan names a step's `widgetKind` before the spec exists — real
+ * information the pending state can use instead of a generic "loading"
+ * label. Plain-English names, not the kind's identifier.
+ */
+const WIDGET_KIND_LABEL: Record<string, string> = {
+  crossword: 'a crossword',
+  'defend-claim': 'a defend-the-claim activity',
+  'draft-meter': 'a live-scored draft',
+  'drag-categorize': 'a sorting activity',
+  'drag-sort': 'a drag-to-order activity',
+  'draw-the-curve': 'a draw-the-curve activity',
+  'find-the-flaw': 'a spot-the-mistake activity',
+  flashcard: 'flashcards',
+  'fraction-area-model': 'a fraction area model',
+  'markdown-card': 'a reading card',
+  'narrated-card': 'a narrated walkthrough',
+  'step-reveal': 'a step-by-step reveal',
+  'swiper-flashcard': 'a swipe activity',
+  'timeline-builder': 'a timeline activity',
+};
+
 type PartialStep = DeepPartial<PathwayPlan>['steps'] extends (infer S)[] | undefined ? S : never;
 
 /**
@@ -731,12 +753,19 @@ const StepCard = memo(function StepCard({
           {hasWidget ? (
             <WidgetRenderer key={widgetSeq} spec={widget} />
           ) : pending ? (
-            <div>
-              <p className={cn('mb-2.5 flex items-center gap-2 text-xs', meta?.icon ?? 'text-muted-foreground')}>
-                <Sparkles className="size-3.5 animate-pulse" aria-hidden />
-                Building the interaction for this step…
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <motion.span
+                animate={{ scale: [1, 1.12, 1] }}
+                transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+                className={cn('flex size-10 items-center justify-center rounded-full', meta?.tint ?? 'bg-muted')}
+                aria-hidden
+              >
+                {meta ? <meta.Icon className={cn('size-4.5', meta.icon)} /> : <Sparkles className="size-4.5" />}
+              </motion.span>
+              <p className={cn('text-sm font-semibold', meta?.icon ?? 'text-muted-foreground')}>
+                Building {(step?.widgetKind && WIDGET_KIND_LABEL[step.widgetKind]) ?? 'the interaction'}…
               </p>
-              <Skeleton className="h-20 w-full" />
+              <Skeleton className={cn('h-2.5 w-32 rounded-full', meta?.tint ?? 'bg-muted')} />
             </div>
           ) : (
             <Alert variant="warning">
