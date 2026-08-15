@@ -7,7 +7,7 @@ import { defineCatalog } from '@json-render/core';
 import { defineRegistry, useStateStore, useStateValue, type Spec } from '@json-render/react';
 
 import { cn } from '@/lib/utils';
-import type { ComposedElement, ComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
+import type { ComposedElement, ComposedWidget, PartialComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
 
 /**
  * The render half of the composition prototype. Four primitives
@@ -332,10 +332,72 @@ export function toRenderSpec(widget: ComposedWidget): Spec {
   return { root: widget.root, elements };
 }
 
+/**
+ * The same conversion, tolerant of an in-progress `streamStructured` partial
+ * instead of the final validated widget — every field but an element's own
+ * `id`/`type` can still be `undefined` mid-stream, and the elements array
+ * can be shorter than its final length. Elements missing `id` or `type`
+ * aren't renderable yet and are dropped; once dropped, an element's `id`
+ * doesn't shift on the next partial (the model writes elements in order and
+ * doesn't revise earlier ones), so this never flickers content away once
+ * shown. `elementProps`/`elementChildren` already default every other field
+ * via `??`, so a cast to `ComposedElement` here is safe at runtime even
+ * though only `id`/`type` are actually guaranteed at this point.
+ */
+export function toPartialRenderSpec(partial: PartialComposedWidget): Spec | null {
+  if (!partial.root || !partial.elements) return null;
+
+  const elements: Spec['elements'] = {};
+  for (const element of partial.elements) {
+    if (!element?.id || !element.type) continue;
+    const full = element as ComposedElement;
+    elements[full.id] = { type: full.type, props: elementProps(full), children: elementChildren(full) };
+  }
+
+  if (!elements[partial.root]) return null;
+
+  // A Stack/Card/RevealWhen's own fields can be complete while a child it
+  // references hasn't streamed in yet (or was itself dropped above for
+  // missing id/type) — trim every children list down to ids that actually
+  // exist right now, so the renderer never sees a dangling reference.
+  for (const element of Object.values(elements)) {
+    if (element.children) element.children = element.children.filter((childId) => childId in elements);
+  }
+
+  return { root: partial.root, elements };
+}
+
 function elementChildren(element: ComposedElement): string[] {
   return element.type === 'Stack' || element.type === 'Card' || element.type === 'RevealWhen'
     ? (element.children ?? [])
     : [];
+}
+
+type OptionLike = { id?: string; label?: string } | null | undefined;
+
+/**
+ * A streaming partial array can carry `null`/`undefined` holes for entries
+ * the model hasn't written yet — the Vercel AI SDK reserves array slots once
+ * it commits to a length, before every item is filled. Passed straight
+ * through, those holes reach json-render's own prop resolution and throw
+ * ("Cannot convert undefined or null to object") — caught live via the
+ * browser console during streaming verification. Filtered here to entries
+ * that are actually complete enough to render; harmless on the final,
+ * fully-validated widget, where every entry already qualifies.
+ */
+function compactOptions(options: OptionLike[] | null | undefined): { id: string; label: string }[] {
+  return (options ?? []).filter((option): option is { id: string; label: string } =>
+    Boolean(option?.id && option.label),
+  );
+}
+
+function compactGridQuestions(questions: ComposedElement['gridQuestions']) {
+  return (questions ?? [])
+    .filter((question): question is NonNullable<typeof question> =>
+      Boolean(question?.id && question.prompt && question.correctOptionId),
+    )
+    .map((question) => ({ ...question, options: compactOptions(question.options) }))
+    .filter((question) => question.options.length >= 2);
 }
 
 function elementProps(element: ComposedElement): Record<string, unknown> {
@@ -351,7 +413,7 @@ function elementProps(element: ComposedElement): Record<string, unknown> {
     case 'Text':
       return { id, text: element.text ?? '' };
     case 'SingleChoice':
-      return { id, question: element.question ?? '', options: element.options ?? [] };
+      return { id, question: element.question ?? '', options: compactOptions(element.options) };
     case 'FeedbackBanner':
       return {
         id,
@@ -365,6 +427,6 @@ function elementProps(element: ComposedElement): Record<string, unknown> {
     case 'Counter':
       return { id, bindTo: element.bindTo ?? '', counterLabel: element.counterLabel ?? null };
     case 'QuizGrid':
-      return { id, questions: element.gridQuestions ?? [] };
+      return { id, questions: compactGridQuestions(element.gridQuestions) };
   }
 }

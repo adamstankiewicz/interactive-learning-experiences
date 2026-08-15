@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { EventType, type CustomEvent, type RunFinishedEvent, type RunStartedEvent } from '@ag-ui/core';
 
-import { generateStructured } from '@/lib/structured';
+import { streamStructured } from '@/lib/structured';
 import { composePrompt, composedWidget, validateComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
 
 export const maxDuration = 60;
@@ -15,6 +15,12 @@ export const maxDuration = 60;
  * boundary as everywhere else in this app: the model picks from a
  * developer-registered set by name, it never authors executable logic or
  * rendering code. Isolated from the production pipeline the same way.
+ *
+ * Streams rather than blocking on the whole generation (`generate.ts`'s
+ * `planPathway` is the precedent for driving `streamStructured`'s generator
+ * by hand to get both the partials and its final return value) — a 20+
+ * element composition can take 30+ seconds; without this the page shows
+ * nothing but "Composing…" that whole time.
  */
 function encodeEvent(event: unknown): string {
   return `${JSON.stringify(event)}\n`;
@@ -52,16 +58,25 @@ export async function POST(request: Request) {
 
       try {
         const { system, prompt } = composePrompt(topic);
-        const widget = await generateStructured({ schema: composedWidget, system, prompt });
+        const stream = streamStructured({ schema: composedWidget, system, prompt });
 
+        // Carried as CUSTOM events, not STATE_DELTA: a freshly-composed
+        // widget's *structure* is a new artifact each time, not a patch
+        // against something the client already had — draft-meter's
+        // prototype patches scalar state because there's a stable shape
+        // underneath to patch; a growing element tree doesn't have one
+        // until the model has finished writing it.
+        let step = await stream.next();
+        while (!step.done) {
+          const partial: CustomEvent = { type: EventType.CUSTOM, name: 'widget-partial', value: step.value };
+          emit(partial);
+          step = await stream.next();
+        }
+
+        const widget = step.value;
         const problem = validateComposedWidget(widget);
         if (problem) throw new Error(`Composed widget failed validation: ${problem}`);
 
-        // Carried as a CUSTOM event, not STATE_DELTA: a freshly-composed
-        // widget's *structure* is a new artifact, not a patch against
-        // something the client already had — draft-meter's prototype
-        // patches scalar state because there's a stable shape underneath to
-        // patch; a novel element tree has no "before" to diff against.
         const composed: CustomEvent = { type: EventType.CUSTOM, name: 'widget-composed', value: widget };
         emit(composed);
 

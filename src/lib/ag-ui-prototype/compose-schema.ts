@@ -103,6 +103,19 @@ export const composedWidget = z.object({
 
 export type ComposedWidget = z.infer<typeof composedWidget>;
 
+/**
+ * Local, not imported from `structured.ts` — that module stays domain-agnostic
+ * on purpose (same reasoning as `pathway/events.ts`'s own copy of this type).
+ * What `streamStructured` yields before the final, schema-validated result.
+ */
+type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
+export type PartialComposedWidget = DeepPartial<ComposedWidget>;
+
 const PRIMITIVE_GUIDE = [
   'Compose a small interactive mini-lesson from exactly nine element types — never invent a tenth. Every',
   'element shares one flat shape; set fields that apply, null everything else.',

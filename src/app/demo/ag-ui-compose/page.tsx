@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { JSONUIProvider, Renderer, type Spec } from '@json-render/react';
 
-import { registry, toRenderSpec } from '@/lib/ag-ui-prototype/compose-catalog';
-import type { ComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
+import { registry, toPartialRenderSpec, toRenderSpec } from '@/lib/ag-ui-prototype/compose-catalog';
+import type { ComposedWidget, PartialComposedWidget } from '@/lib/ag-ui-prototype/compose-schema';
 
 /**
  * Phase 3a research prototype #2 — the model composes a genuinely new
@@ -35,14 +35,14 @@ type Phase = 'idle' | 'composing' | 'done' | 'error';
 export default function AgUiComposePrototype() {
   const [topic, setTopic] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
-  const [widget, setWidget] = useState<ComposedWidget | null>(null);
+  const [spec, setSpec] = useState<Spec | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function compose(chosenTopic: string) {
     if (!chosenTopic.trim() || phase === 'composing') return;
     setPhase('composing');
     setError(null);
-    setWidget(null);
+    setSpec(null);
 
     try {
       const response = await fetch('/api/ag-ui/compose', {
@@ -77,8 +77,14 @@ export default function AgUiComposePrototype() {
             continue;
           }
 
-          if (event.type === 'CUSTOM' && event.name === 'widget-composed') {
-            setWidget(event.value as ComposedWidget);
+          if (event.type === 'CUSTOM' && event.name === 'widget-partial') {
+            // Every render toward the final composition, not just the last
+            // one — this is the actual streaming: whatever the model has
+            // written far enough to render, appears immediately.
+            const partialSpec = toPartialRenderSpec(event.value as PartialComposedWidget);
+            if (partialSpec) setSpec(partialSpec);
+          } else if (event.type === 'CUSTOM' && event.name === 'widget-composed') {
+            setSpec(toRenderSpec(event.value as ComposedWidget));
           } else if (event.type === 'RUN_FINISHED') {
             setPhase('done');
           } else if (event.type === 'RUN_ERROR') {
@@ -92,8 +98,6 @@ export default function AgUiComposePrototype() {
       setError('Could not reach the composition service.');
     }
   }
-
-  const spec: Spec | null = widget ? toRenderSpec(widget) : null;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
@@ -112,9 +116,10 @@ export default function AgUiComposePrototype() {
           Not one of the app&rsquo;s six built-in widgets. The model picks from a nine-primitive catalog — layout,
           a question/feedback/reveal trio it can wire together by id to build branching logic, and — for a
           playful ask — a tic-tac-toe-style QuizGrid — and decides the structure itself, per topic. The whole
-          composition arrives as a single AG-UI <code className="rounded bg-muted px-1 py-0.5 text-xs">CUSTOM</code>{' '}
-          event, then renders through a json-render catalog registry. Try &ldquo;tic-tac-toe to learn
-          fractions,&rdquo; or a two-step branching quiz.
+          composition streams in as a series of AG-UI{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">CUSTOM</code> events — each new element renders the
+          moment it&rsquo;s written, well before the whole thing finishes — through a json-render catalog registry.
+          Try &ldquo;tic-tac-toe to learn fractions,&rdquo; or a two-step branching quiz.
         </p>
       </div>
 
@@ -160,6 +165,13 @@ export default function AgUiComposePrototype() {
       <div className="mt-8">
         {phase === 'composing' && !spec && (
           <p className="text-sm text-muted-foreground">Composing a widget for &ldquo;{topic}&rdquo;…</p>
+        )}
+
+        {phase === 'composing' && spec && (
+          <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden="true" />
+            Still composing — more is on the way
+          </p>
         )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
