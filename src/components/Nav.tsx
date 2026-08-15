@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/', label: 'Pathway Builder' },
   { href: '/pathways', label: 'Pathways' },
   { href: '/roster', label: 'Roster' },
+  { href: '/games', label: 'Games' },
 ];
 
 export function Nav() {

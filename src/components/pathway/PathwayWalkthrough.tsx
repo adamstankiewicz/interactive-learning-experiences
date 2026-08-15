@@ -204,18 +204,26 @@ export function PathwayWalkthrough({
         <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 text-xs font-bold text-violet-600">
           {session.standardCode ?? '✨ exploring'}
         </span>
-        <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
-          <motion.span
-            key={stars}
-            initial={{ scale: 1.8, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-            className="text-xl"
+        <div className="flex items-center gap-2">
+          <a
+            href="/games"
+            className="rounded-full border-2 border-pink-200 bg-white/80 px-3 py-1 text-xs font-bold text-pink-600 hover:bg-pink-50 transition-colors"
           >
-            ⭐
-          </motion.span>
-          <span className="text-lg font-black text-amber-600">{stars}</span>
-        </span>
+            🎮 Take a break
+          </a>
+          <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
+            <motion.span
+              key={stars}
+              initial={{ scale: 1.8, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+              className="text-xl"
+            >
+              ⭐
+            </motion.span>
+            <span className="text-lg font-black text-amber-600">{stars}</span>
+          </span>
+        </div>
       </div>
 
       {!finished && (
