@@ -50,9 +50,19 @@ export const modelTurn = z.object({
 export type ModelTurn = z.infer<typeof modelTurn>;
 
 /** What the widget posts. Parsed rather than trusted — it crosses the network. */
+export const debateSide = z.object({
+  id: z.string(),
+  label: z.string(),
+  summary: z.string(),
+});
+
+export type DebateSide = z.infer<typeof debateSide>;
+
 export const debateRequest = z.object({
   motion: z.string(),
-  aiPosition: z.string(),
+  /** Which side the assistant drew — the student took the other one. */
+  aiSide: debateSide,
+  studentSide: debateSide,
   aiPersona: z.string(),
   moves: z.array(debateMove).default([]),
   transcript: z.array(debateMessage).default([]),

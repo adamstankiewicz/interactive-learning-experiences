@@ -6,29 +6,34 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import { useVoiceIntake } from '@/hooks/useVoiceIntake';
-import type { DebateMessage, DebateTurnResult } from '@/lib/debate/schema';
+import type { DebateMessage, DebateSide, DebateTurnResult } from '@/lib/debate/schema';
 import type { DebateAiSpec } from '@/lib/pathway/schema';
 
 type Props = { spec: DebateAiSpec; onComplete?: () => void };
 
 /**
- * A short debate with an opponent that argues back.
+ * A debate: two sides, the student takes one, the assistant takes the other.
  *
- * Aimed at Bloom's *evaluate*, and everything here follows from that. What gets
- * credited is not winning and not disagreeing — it is the evaluative move:
- * naming why a piece of evidence fails, catching an unsupported leap, granting
- * a fair point. Those are the chips along the bottom, and they are the only
- * scoring the student sees.
+ * The side-picking screen is not ceremony. An earlier version fixed the
+ * assistant's position and asked the student to "test my argument" — which is a
+ * real task, but it is not debating: nobody is arguing *for* anything, and the
+ * student never has to hold a case of their own. Choosing a side is what turns
+ * it into an argument they own, and seeing both sides put fairly before they
+ * choose is what stops it being a loyalty test.
+ *
+ * Nobody wins. What gets tracked instead is whether the student argued like
+ * someone evaluating — challenged the evidence rather than the person, caught a
+ * leap, granted a fair point. Those are the chips, and they are the only
+ * scoring shown.
  *
  * The opponent never says how the student is doing. Praise inside the reply
  * would flatter, leak the judgement, and turn an opponent into a teacher — so
- * the assessment rides back on the same call and is rendered somewhere else
- * entirely.
+ * the assessment rides back on the same call and renders somewhere else.
  */
 export function DebateAI({ spec, onComplete }: Props) {
-  const [messages, setMessages] = useState<DebateMessage[]>([
-    { role: 'ai', text: spec.openingMessage },
-  ]);
+  const [studentSide, setStudentSide] = useState<DebateSide | null>(null);
+  const [aiSide, setAiSide] = useState<DebateSide | null>(null);
+  const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [made, setMade] = useState<Set<string>>(new Set());
   const [turn, setTurn] = useState(0);
@@ -67,9 +72,36 @@ export function DebateAI({ spec, onComplete }: Props) {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, pending]);
 
+  /**
+   * `chosen` is passed in rather than read from state: the assistant's opening
+   * has to be the one for the side it actually drew, and state set in the same
+   * tick is not readable yet.
+   */
+  const chooseSide = useCallback(
+    (chosen: (typeof spec.sides)[number]) => {
+      const opponent = spec.sides.find((side) => side.id !== chosen.id) ?? spec.sides[0]!;
+
+      setStudentSide({ id: chosen.id, label: chosen.label, summary: chosen.summary });
+      setAiSide({ id: opponent.id, label: opponent.label, summary: opponent.summary });
+      setMessages([{ role: 'ai', text: opponent.opening }]);
+
+      telemetry.track({
+        eventType: 'answer_checked',
+        widgetKind: spec.kind,
+        learningComponentId: spec.learningComponentId,
+        standardCode: telemetry.standardCode,
+        correct: null,
+        // Which side a student picks is worth knowing: a class that all picks
+        // the same way is a sign the motion is not actually contestable.
+        payload: { phase: 'side-chosen', studentSide: chosen.id },
+      });
+    },
+    [spec, telemetry],
+  );
+
   const send = useCallback(async () => {
     const message = draft.trim();
-    if (!message || pending || done) return;
+    if (!message || pending || done || !aiSide || !studentSide) return;
 
     const nextTurn = turn + 1;
     const transcript = messages;
@@ -86,7 +118,8 @@ export function DebateAI({ spec, onComplete }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           motion: spec.motion,
-          aiPosition: spec.aiPosition,
+          aiSide,
+          studentSide,
           aiPersona: spec.aiPersona,
           moves: spec.moves,
           transcript,
@@ -149,17 +182,68 @@ export function DebateAI({ spec, onComplete }: Props) {
     } finally {
       setPending(false);
     }
-  }, [draft, pending, done, turn, messages, spec, made, telemetry, onComplete, voice]);
+  }, [draft, pending, done, turn, messages, spec, made, telemetry, onComplete, voice, aiSide, studentSide]);
 
   const remaining = spec.turnLimit - turn;
+
+  // Both sides put fairly, then a choice. Seeing the strongest version of the
+  // side you are about to argue against is what keeps this a debate rather than
+  // a loyalty test.
+  if (!studentSide || !aiSide) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
+          <p className="mt-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed">
+            {spec.motion}
+          </p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {spec.sides.map((side) => (
+            <button
+              key={side.id}
+              type="button"
+              onClick={() => chooseSide(side)}
+              className="flex cursor-pointer flex-col gap-1 rounded-lg border-2 border-border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <span className="text-sm font-semibold text-foreground">{side.label}</span>
+              <span className="text-xs leading-relaxed text-muted-foreground">{side.summary}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => chooseSide(spec.sides[Math.floor(Math.random() * spec.sides.length)]!)}
+          >
+            Pick one for me
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            You&apos;ll argue your side. I&apos;ll take the other, and I won&apos;t make it easy.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          <span className="font-medium">Motion:</span> {spec.motion}
-        </p>
+        <p className="text-xs text-muted-foreground">{spec.motion}</p>
+        {/* Who holds what, kept on screen. In a four-turn exchange it is
+            genuinely easy to lose track of which side you took. */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full bg-primary px-2.5 py-1 font-medium text-primary-foreground">
+            You: {studentSide.label}
+          </span>
+          <span className="text-muted-foreground">vs</span>
+          <span className="rounded-full border border-border px-2.5 py-1 font-medium text-muted-foreground">
+            Me: {aiSide.label}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-4">
@@ -223,7 +307,7 @@ export function DebateAI({ spec, onComplete }: Props) {
           role="status"
           className="rounded-lg border border-border bg-muted px-4 py-3 text-sm leading-relaxed"
         >
-          <span className="font-medium">That&apos;s the debate.</span>{' '}
+          <span className="font-medium">That&apos;s the debate — no winner, by design.</span>{' '}
           {made.size === spec.moves.length
             ? 'You made every move on the list — you tested the argument rather than just disagreeing with it.'
             : made.size > 0

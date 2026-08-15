@@ -612,29 +612,60 @@ export const debateAiSpec = z.object({
   prompt: z
     .string()
     .describe(
-      'Instruction shown above the exchange, e.g. "I\'ll argue that homework should be abolished. Your job is to test my argument — not just disagree with it."',
+      'One line above the exchange, addressed to the student. It should frame this as a debate they are taking part in, e.g. "Pick a side. I\'ll argue the other one — and I won\'t make it easy."',
     ),
   motion: z.string().describe('The contestable claim under debate, stated in one sentence.'),
   /**
-   * What the assistant argues, and how. The persona matters more than it looks:
-   * an opponent that argues flawlessly gives a student nothing to evaluate, and
-   * one that argues stupidly makes the exercise trivial. It should be
-   * *plausible but flawed* — real evidence used slightly wrongly.
+   * Both sides, as first-class things.
+   *
+   * The student picks one and the assistant takes the other, which is what
+   * makes this a debate rather than a critique exercise. An earlier version
+   * fixed the assistant's position and asked the student to "test my argument"
+   * — that is a worthwhile task, but it is not debating: nobody is arguing
+   * *for* anything, and the student never has to build a case they own.
+   *
+   * Each side carries its own opening, so the exchange can start the moment a
+   * side is chosen rather than spending a model call working out how to begin.
    */
-  aiPosition: z.string().describe('The side the assistant takes and holds, in one sentence.'),
+  sides: z
+    .array(
+      z.object({
+        id: z.string().describe('Short stable lowercase key, e.g. "for", "against".'),
+        label: z.string().describe('Short name for this side, 2-6 words, as it appears on the button.'),
+        summary: z
+          .string()
+          .describe('One sentence putting the strongest version of this side, so a student can choose knowingly.'),
+        opening: z
+          .string()
+          .describe(
+            'The message the assistant sends when it holds THIS side: states the position and gives one supporting reason. Two or three sentences, conversational.',
+          ),
+      }),
+    )
+    .describe(
+      'Give exactly 2 sides, both genuinely arguable. If one is obviously right the debate is a formality and the student learns to recite rather than argue.',
+    ),
+  /**
+   * How the assistant argues — deliberately separate from *what* it argues,
+   * because it could end up on either side. An opponent that argues flawlessly
+   * gives a student nothing to work with, and one that argues stupidly makes
+   * winning meaningless. Plausible but findably flawed is the target.
+   */
   aiPersona: z
     .string()
     .describe(
-      'How the assistant argues, including the specific weaknesses a student could find: e.g. "Confident and friendly. Cites real statistics but sometimes ones that do not quite fit the claim, and occasionally treats a correlation as a cause."',
+      'How the assistant argues whichever side it ends up on, including the specific weaknesses a student could find: e.g. "Confident and friendly. Cites real statistics but sometimes ones that do not quite fit the claim, and occasionally treats a correlation as a cause."',
     ),
-  openingMessage: z
-    .string()
-    .describe("The assistant's first message: states its position and gives one supporting reason. Two or three sentences, conversational."),
   /**
-   * The evaluative moves worth credit — the rubric, as data, in the same spirit
-   * as draft-meter's checks. Written in the student's language because they are
-   * shown: the point is that a student can see what counts as evaluating rather
-   * than having to infer it from a score.
+   * What counts as arguing well — the rubric, as data, in the same spirit as
+   * draft-meter's checks.
+   *
+   * Nobody declares a winner, and that is deliberate. Debates are not won on
+   * points by a judge in the corner, and a widget that announced one would
+   * teach students to play to it. What it tracks instead is whether the student
+   * argued like someone evaluating: challenged the evidence rather than the
+   * person, caught a leap, granted a fair point. Written in the student's own
+   * language because they are shown before the debate starts.
    */
   moves: z
     .array(

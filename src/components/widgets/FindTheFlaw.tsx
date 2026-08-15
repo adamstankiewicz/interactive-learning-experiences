@@ -138,43 +138,74 @@ export function FindTheFlaw({ spec, onComplete }: Props) {
         <p className="mt-1.5 text-sm leading-relaxed">{spec.scenario.setup}</p>
       </div>
 
-      <ol className="flex flex-col gap-2">
+      {/*
+        A vertical timeline rather than a numbered list.
+
+        The task is "find the step where it goes wrong", which only makes sense
+        if the reader can see that these are steps *in order* — one thing
+        happening after another, each following from the last. Numbers said that
+        weakly: 1-2-3-4 down a page reads as a list of items, and the thing that
+        makes an error findable is noticing where one step stops following from
+        the one above it. A connected rail says "this flows" without a numeral,
+        so a broken link in it is the thing you are looking for.
+      */}
+      <ol className="flex flex-col">
         {spec.steps.map((step, index) => {
           const isFlaw = step.id === spec.flawedStepId;
           const isRuledOut = ruledOut.has(step.id);
           const revealed = foundIt && isFlaw;
+          const last = index === spec.steps.length - 1;
 
           return (
-            <li key={step.id}>
-              <button
-                type="button"
-                onClick={() => pickStep(step.id)}
-                disabled={foundIt || isRuledOut}
-                aria-pressed={pickedStep === step.id}
-                className={`flex w-full items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors ${
-                  revealed
-                    ? 'border-destructive bg-destructive/5'
-                    : isRuledOut
-                      ? 'border-border bg-card opacity-45'
-                      : foundIt
-                        ? 'border-border bg-card opacity-70'
-                        : 'cursor-pointer border-border bg-card hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
-                }`}
-              >
+            <li key={step.id} className="flex gap-3">
+              {/* The rail. The connector stops at the last node so the sequence
+                  reads as ending rather than trailing off. */}
+              <div className="flex w-4 shrink-0 flex-col items-center" aria-hidden="true">
                 <span
-                  className={`w-5 shrink-0 text-center text-xs font-bold tabular-nums ${
-                    revealed ? 'text-destructive' : 'text-muted-foreground'
+                  className={`mt-4 size-3 shrink-0 rounded-full border-2 transition-colors ${
+                    revealed
+                      ? 'border-destructive bg-destructive'
+                      : isRuledOut
+                        ? 'border-muted-foreground/30 bg-card'
+                        : 'border-muted-foreground/50 bg-card'
+                  }`}
+                />
+                {!last && (
+                  <span
+                    className={`w-0.5 flex-1 transition-colors ${
+                      revealed ? 'bg-destructive/40' : 'bg-border'
+                    }`}
+                  />
+                )}
+              </div>
+
+              {/* Full width, so the cards form a straight column beside the rail
+                  rather than a ragged edge that hugs each sentence. */}
+              <div className={`min-w-0 flex-1 ${last ? '' : 'pb-2'}`}>
+                <button
+                  type="button"
+                  onClick={() => pickStep(step.id)}
+                  disabled={foundIt || isRuledOut}
+                  aria-pressed={pickedStep === step.id}
+                  aria-label={`Step ${index + 1} of ${spec.steps.length}: ${step.label}`}
+                  className={`flex w-full items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors ${
+                    revealed
+                      ? 'border-destructive bg-destructive/5'
+                      : isRuledOut
+                        ? 'border-border bg-card opacity-45'
+                        : foundIt
+                          ? 'border-border bg-card opacity-70'
+                          : 'cursor-pointer border-border bg-card hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
                   }`}
                 >
-                  {index + 1}
-                </span>
-                <span className={`text-sm ${isRuledOut ? 'line-through' : ''}`}>{step.label}</span>
-                {revealed && (
-                  <span className="ml-auto shrink-0 text-xs font-semibold text-destructive">
-                    here
-                  </span>
-                )}
-              </button>
+                  <span className={`text-sm ${isRuledOut ? 'line-through' : ''}`}>{step.label}</span>
+                  {revealed && (
+                    <span className="ml-auto shrink-0 text-xs font-semibold text-destructive">
+                      here
+                    </span>
+                  )}
+                </button>
+              </div>
             </li>
           );
         })}
