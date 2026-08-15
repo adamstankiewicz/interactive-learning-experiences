@@ -79,7 +79,21 @@ function findSpec(value: unknown, depth = 0): unknown {
 }
 
 function Shell() {
-  const [hostSpec, setHostSpec] = useState<unknown>(null);
+  // Slack's app reads its props off the mount node; ours accepts the same.
+  // Read during render rather than in the effect below: it is already in the
+  // DOM before this mounts, so setting it from an effect only cost a second
+  // render pass.
+  const [hostSpec, setHostSpec] = useState<unknown>(() => {
+    if (typeof document === 'undefined') return null;
+    const props = document.getElementById('mcp-app-root')?.dataset.props;
+    if (!props) return null;
+    try {
+      return findSpec(JSON.parse(props)) ?? null;
+    } catch {
+      // A malformed data-props is not worth failing the render over.
+      return null;
+    }
+  });
 
   useEffect(() => {
     const bridge = new HostBridge();
@@ -128,17 +142,6 @@ function Shell() {
         bridge.notify('ui/notifications/initialized', {});
         bridge.reportSizeOnResize();
       });
-
-    // Slack's app reads its props off the mount node; ours accepts the same.
-    const props = document.getElementById('mcp-app-root')?.dataset.props;
-    if (props) {
-      try {
-        const found = findSpec(JSON.parse(props));
-        if (found) setHostSpec(found);
-      } catch {
-        // A malformed data-props is not worth failing the render over.
-      }
-    }
   }, []);
 
   const spec = hostSpec ?? window.__WIDGET_SPEC__;

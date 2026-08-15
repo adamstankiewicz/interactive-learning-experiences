@@ -7,6 +7,18 @@ import { storageAdapter } from '@/lib/storage';
 export const maxDuration = 300;
 
 /**
+ * One accepted id runs a whole pathway generation — several model calls plus
+ * standards verification. These caps are the difference between a class-sized
+ * request and an unbounded one: the route has no authentication, so without
+ * them a single POST can start arbitrarily many generations on the operator's
+ * API key.
+ */
+const MAX_STUDENTS_PER_REQUEST = 40;
+const MAX_TOPIC_LENGTH = 200;
+/** Generations run concurrently, but not all at once — the provider rate-limits. */
+const GENERATION_CONCURRENCY = 4;
+
+/**
  * POST /api/assign
  *
  * Body: { topic: string; gradeHint?: string; rosterStudentIds: string[] }
@@ -30,11 +42,23 @@ export async function POST(request: Request) {
 
   const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
   if (!topic) return Response.json({ error: 'topic is required.' }, { status: 400 });
+  if (topic.length > MAX_TOPIC_LENGTH) {
+    return Response.json(
+      { error: `topic must be ${MAX_TOPIC_LENGTH} characters or fewer.` },
+      { status: 400 },
+    );
+  }
 
   const gradeHint = typeof body.gradeHint === 'string' && body.gradeHint.trim() ? body.gradeHint.trim() : undefined;
 
   const ids = Array.isArray(body.rosterStudentIds) ? (body.rosterStudentIds as unknown[]).filter((x) => typeof x === 'string') as string[] : [];
   if (ids.length === 0) return Response.json({ error: 'rosterStudentIds must be a non-empty array.' }, { status: 400 });
+  if (ids.length > MAX_STUDENTS_PER_REQUEST) {
+    return Response.json(
+      { error: `Cannot assign to more than ${MAX_STUDENTS_PER_REQUEST} students in one request.` },
+      { status: 400 },
+    );
+  }
 
   const storage = storageAdapter();
   const students = await Promise.all(ids.map((id) => storage.getRosterStudent(id)));
@@ -48,8 +72,8 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      await Promise.all(
-        valid.map(async (student) => {
+      const queue = [...valid];
+      const runOne = async (student: RosterStudent) => {
           emit(controller, { type: 'started', studentId: student.id, name: student.name });
           try {
             // Build a teacher note from the student's profile so the planner
@@ -97,6 +121,15 @@ export async function POST(request: Request) {
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             emit(controller, { type: 'error', studentId: student.id, name: student.name, message });
+          }
+      };
+
+      // Workers pull from a shared queue, so a slow generation delays only its
+      // own lane. Events still stream as each student finishes.
+      await Promise.all(
+        Array.from({ length: Math.min(GENERATION_CONCURRENCY, queue.length) }, async () => {
+          for (let next = queue.shift(); next; next = queue.shift()) {
+            await runOne(next);
           }
         }),
       );
