@@ -1,6 +1,6 @@
 import { flashcardSpec, type FlashcardSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 const MIN_CARDS = 3;
 
@@ -37,15 +37,9 @@ registerWidgetGenerator({
     const widget = normalize(spec);
     if (widget) return { widget, note: null };
 
-    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
     return {
-      widget: fallback.widget,
-      note: [
-        "The flashcard deck didn't have enough valid cards — built a fallback activity for this step instead.",
-        fallback.note,
-      ]
-        .filter(Boolean)
-        .join(' '),
+      widget: null,
+      note: "The flashcard deck didn't have enough valid cards — built a fallback activity for this step instead.",
     };
   },
 });

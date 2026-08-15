@@ -319,9 +319,21 @@ async function attemptStepWidget(
   }
 
   const result = await generator.generate(ctx);
-  const widget = (result.widget ?? (await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx)).widget) as WidgetSpec;
 
-  return { widget, note: [substitutionNote, result.note].filter(Boolean).join(' ') || null };
+  // A generator that can't produce something usable returns a null widget and
+  // says why; the fallback lives here rather than in each of them.
+  let widget = result.widget;
+  let fallbackNote: string | null = null;
+  if (!widget) {
+    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
+    widget = fallback.widget;
+    fallbackNote = fallback.note;
+  }
+
+  return {
+    widget: widget as WidgetSpec,
+    note: [substitutionNote, result.note, fallbackNote].filter(Boolean).join(' ') || null,
+  };
 }
 
 /**

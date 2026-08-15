@@ -1,6 +1,6 @@
 import { narratedCardSpec, type NarratedCardSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 const MIN_STEPS = 2;
 
@@ -33,15 +33,9 @@ registerWidgetGenerator({
     const widget = normalize(spec);
     if (widget) return { widget, note: null };
 
-    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
     return {
-      widget: fallback.widget,
-      note: [
-        "The narrated card didn't produce enough valid steps — built a fallback activity for this step instead.",
-        fallback.note,
-      ]
-        .filter(Boolean)
-        .join(' '),
+      widget: null,
+      note: "The narrated card didn't produce enough valid steps — built a fallback activity for this step instead.",
     };
   },
 });

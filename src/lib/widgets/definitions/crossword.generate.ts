@@ -1,7 +1,7 @@
 import { layoutCrossword, sanitizeAnswer } from '@/lib/pathway/crossword';
 import { crosswordSpec, type CrosswordSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 const MIN_ENTRIES = 5;
 const MAX_ENTRIES = 18;
@@ -72,10 +72,6 @@ registerWidgetGenerator({
       prompt: [ctx.prompt, '', 'Prerequisite standards (source of the supporting terms):', prerequisiteBlock].join('\n'),
     });
 
-    const result = normalize(spec);
-    if (result.widget) return result;
-
-    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
-    return { widget: fallback.widget, note: [result.note, fallback.note].filter(Boolean).join(' ') };
+    return normalize(spec);
   },
 });
