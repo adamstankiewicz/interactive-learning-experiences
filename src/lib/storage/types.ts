@@ -145,9 +145,11 @@ export interface StorageAdapter {
   updateRosterStudent(id: string, student: Omit<RosterStudent, 'id'>): Promise<RosterStudent | null>;
 
   // Assignments: one personalized session per roster student
-  createAssignment(input: { rosterStudentId: string; sessionId: string; topic: string }): Promise<Assignment>;
+  createAssignment(input: { rosterStudentId: string; sessionId: string; parentSessionId: string | null; topic: string }): Promise<Assignment>;
   listAssignmentsForStudent(rosterStudentId: string): Promise<Assignment[]>;
   listAssignmentsForSession(sessionId: string): Promise<Assignment[]>;
+  /** All assignments where parentSessionId matches — the personalized child sessions of a parent. */
+  listChildAssignments(parentSessionId: string): Promise<Assignment[]>;
 
   // Pathway dashboard
   listSessions(limit?: number): Promise<SessionSummary[]>;

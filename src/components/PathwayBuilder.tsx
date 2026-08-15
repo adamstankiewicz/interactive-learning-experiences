@@ -244,6 +244,7 @@ export function PathwayBuilder() {
           <AssignToStudents
             topic={state.topic}
             gradeHint={gradeHint || undefined}
+            parentSessionId={state.sessionId ?? undefined}
           />
         )}
 

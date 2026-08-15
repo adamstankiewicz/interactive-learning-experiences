@@ -57,6 +57,8 @@ export type Assignment = {
   rosterStudentId: string;
   /** The personalized session generated for this student. */
   sessionId: string;
+  /** The teacher's original session this was derived from. */
+  parentSessionId: string | null;
   topic: string;
   createdAt: string;
 };

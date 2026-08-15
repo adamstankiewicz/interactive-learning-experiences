@@ -12,24 +12,48 @@ type AssignEvent =
 
 type StudentStatus = 'idle' | 'generating' | 'done' | 'error';
 
-export function AssignToStudents({ topic, gradeHint }: { topic: string; gradeHint?: string }) {
+export function AssignToStudents({ topic, gradeHint, parentSessionId }: { topic: string; gradeHint?: string; parentSessionId?: string }) {
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [assigning, setAssigning] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, StudentStatus>>({});
   const [sessionIds, setSessionIds] = useState<Record<string, string>>({});
-  const [allDone, setAllDone] = useState(false);
+  const [complete, setComplete] = useState(false);
+  // students already assigned this topic (persisted or just completed this session)
+  const [alreadyAssigned, setAlreadyAssigned] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch('/api/roster')
       .then((r) => r.json())
-      .then((data) => {
-        setStudents(Array.isArray(data) ? data : []);
+      .then(async (data: unknown) => {
+        const roster: RosterStudent[] = Array.isArray(data) ? data : [];
+        setStudents(roster);
+
+        // Fetch existing assignments for all students in parallel, mark those
+        // who already have this topic assigned so they appear disabled.
+        const results = await Promise.all(
+          roster.map((s) =>
+            fetch(`/api/roster/${s.id}/assignments`)
+              .then((r) => r.json())
+              .then((assignments: unknown) => ({ id: s.id, assignments }))
+              .catch(() => ({ id: s.id, assignments: [] })),
+          ),
+        );
+        const assigned = new Set<string>();
+        for (const { id, assignments } of results) {
+          if (
+            Array.isArray(assignments) &&
+            assignments.some((a: { topic?: string }) => a.topic === topic)
+          ) {
+            assigned.add(id);
+          }
+        }
+        setAlreadyAssigned(assigned);
         setLoadingRoster(false);
       })
       .catch(() => setLoadingRoster(false));
-  }, []);
+  }, [topic]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -43,18 +67,15 @@ export function AssignToStudents({ topic, gradeHint }: { topic: string; gradeHin
   async function assign() {
     if (selected.size === 0 || assigning) return;
     setAssigning(true);
-    setAllDone(false);
+    setComplete(false);
     setSessionIds({});
-
-    const initialStatuses: Record<string, StudentStatus> = {};
-    for (const id of selected) initialStatuses[id] = 'idle';
-    setStatuses(initialStatuses);
+    setStatuses(Object.fromEntries([...selected].map((id) => [id, 'idle' as StudentStatus])));
 
     try {
       const res = await fetch('/api/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, gradeHint, rosterStudentIds: [...selected] }),
+        body: JSON.stringify({ topic, gradeHint, parentSessionId: parentSessionId ?? null, rosterStudentIds: [...selected] }),
       });
 
       if (!res.ok || !res.body) throw new Error('Request failed.');
@@ -79,10 +100,11 @@ export function AssignToStudents({ topic, gradeHint }: { topic: string; gradeHin
             } else if (event.type === 'done') {
               setStatuses((prev) => ({ ...prev, [event.studentId]: 'done' }));
               setSessionIds((prev) => ({ ...prev, [event.studentId]: event.sessionId }));
+              setAlreadyAssigned((prev) => new Set([...prev, event.studentId]));
             } else if (event.type === 'error') {
               setStatuses((prev) => ({ ...prev, [event.studentId]: 'error' }));
             } else if (event.type === 'complete') {
-              setAllDone(true);
+              setComplete(true);
             }
           } catch {
             // ignore malformed lines
@@ -115,20 +137,26 @@ export function AssignToStudents({ topic, gradeHint }: { topic: string; gradeHin
         {students.map((student) => {
           const status = statuses[student.id];
           const sid = sessionIds[student.id];
+          const isAssigned = alreadyAssigned.has(student.id);
+          const isDisabled = assigning || isAssigned;
           return (
             <label
               key={student.id}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 border cursor-pointer transition-colors ${
-                selected.has(student.id) && !assigning
-                  ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/40'
-                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 border transition-colors ${
+                isAssigned
+                  ? 'border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                  : isDisabled
+                  ? 'border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                  : selected.has(student.id)
+                  ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/40 cursor-pointer'
+                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer'
               }`}
             >
               <input
                 type="checkbox"
                 className="accent-indigo-600"
                 checked={selected.has(student.id)}
-                disabled={assigning}
+                disabled={isDisabled}
                 onChange={() => toggle(student.id)}
               />
               <div className="flex-1 min-w-0">
@@ -137,6 +165,9 @@ export function AssignToStudents({ topic, gradeHint }: { topic: string; gradeHin
                   Gr. {student.grade} · {student.learningStyle.primary}
                 </p>
               </div>
+              {isAssigned && !status && (
+                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">Assigned</span>
+              )}
               {status === 'generating' && (
                 <span className="text-xs text-indigo-500 animate-pulse">Generating…</span>
               )}
@@ -159,27 +190,50 @@ export function AssignToStudents({ topic, gradeHint }: { topic: string; gradeHin
         })}
       </div>
 
-      {allDone && (
-        <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-3 font-medium">
-          All personalized pathways generated. Students can view them on their homepages.
-        </p>
-      )}
+      {complete && (() => {
+        const vals = Object.values(statuses);
+        const succeeded = vals.filter((s) => s === 'done').length;
+        const failed = vals.filter((s) => s === 'error').length;
+        if (succeeded === 0) return (
+          <p className="text-xs text-red-600 dark:text-red-400 mb-3 font-medium">
+            Generation failed for all students. Check the console for details.
+          </p>
+        );
+        if (failed > 0) return (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 font-medium">
+            {succeeded} pathway{succeeded !== 1 ? 's' : ''} generated — {failed} failed. Retry the failed students.
+          </p>
+        );
+        return (
+          <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-3 font-medium">
+            All personalized pathways generated. Students can view them on their homepages.
+          </p>
+        );
+      })()}
 
-      <Button
-        size="sm"
-        onClick={assign}
-        disabled={selected.size === 0 || assigning}
-        className="w-full"
-      >
-        {assigning
-          ? 'Generating personalized pathways…'
-          : `Assign to ${selected.size} student${selected.size !== 1 ? 's' : ''}`}
-      </Button>
-
-      {selected.size > 0 && !assigning && (
-        <p className="mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
-          This will generate a separate AI-personalized pathway for each selected student.
+      {students.every((s) => alreadyAssigned.has(s.id)) ? (
+        <p className="text-center text-xs text-slate-400 dark:text-slate-500 py-1">
+          All students have been assigned this pathway.
         </p>
+      ) : (
+        <>
+          <Button
+            size="sm"
+            onClick={assign}
+            disabled={selected.size === 0 || assigning}
+            className="w-full"
+          >
+            {assigning
+              ? 'Generating personalized pathways…'
+              : `Assign to ${selected.size} student${selected.size !== 1 ? 's' : ''}`}
+          </Button>
+
+          {selected.size > 0 && !assigning && (
+            <p className="mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
+              This will generate a separate AI-personalized pathway for each selected student.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

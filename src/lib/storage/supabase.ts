@@ -277,7 +277,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
   async createAssignment(input): Promise<Assignment> {
     const { data, error } = await supabaseAdmin()
       .from('assignments')
-      .insert({ roster_student_id: input.rosterStudentId, session_id: input.sessionId, topic: input.topic })
+      .insert({ roster_student_id: input.rosterStudentId, session_id: input.sessionId, parent_session_id: input.parentSessionId, topic: input.topic })
       .select('*')
       .single();
     if (error || !data) throw new Error(`[storage] createAssignment failed: ${error?.message}`);
@@ -304,58 +304,119 @@ export const supabaseStorageAdapter: StorageAdapter = {
     return (data ?? []).map(rowToAssignment);
   },
 
-  async listSessions(limit = 50): Promise<SessionSummary[]> {
+  async listChildAssignments(parentSessionId): Promise<Assignment[]> {
     if (!supabaseConfigured()) return [];
     const { data } = await supabaseAdmin()
+      .from('assignments')
+      .select('*')
+      .eq('parent_session_id', parentSessionId)
+      .order('created_at', { ascending: false });
+    return (data ?? []).map(rowToAssignment);
+  },
+
+  async listSessions(limit = 50): Promise<SessionSummary[]> {
+    if (!supabaseConfigured()) return [];
+
+    // assignments: session_id = child, parent_session_id = parent
+    const { data: assignmentRows } = await supabaseAdmin()
+      .from('assignments')
+      .select('session_id, parent_session_id');
+
+    const childIdSet = new Set((assignmentRows ?? []).map((r) => String(r.session_id)));
+    // parentId → [childIds]
+    const childrenByParent = new Map<string, string[]>();
+    for (const r of assignmentRows ?? []) {
+      if (!r.parent_session_id) continue;
+      const pid = String(r.parent_session_id);
+      const arr = childrenByParent.get(pid) ?? [];
+      arr.push(String(r.session_id));
+      childrenByParent.set(pid, arr);
+    }
+
+    let query = supabaseAdmin()
       .from('pathway_sessions')
       .select('id, topic, standard_code, grade_hint, completion_count, created_at, session_opens(count)')
       .order('created_at', { ascending: false })
       .limit(limit);
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      topic: String(row.topic),
-      standardCode: row.standard_code ? String(row.standard_code) : null,
-      gradeHint: row.grade_hint ? String(row.grade_hint) : null,
-      openCount: Number((row.session_opens as unknown as { count: number }[])?.[0]?.count ?? 0),
-      completionCount: Number(row.completion_count ?? 0),
-      createdAt: String(row.created_at),
-    }));
+    const childIds = [...childIdSet];
+    if (childIds.length > 0) query = query.not('id', 'in', `(${childIds.join(',')})`);
+    const { data } = await query;
+
+    // For each parent, sum child completions and opens from Supabase.
+    // Fetched in one batch to avoid N+1.
+    const allChildIds = [...new Set([...childrenByParent.values()].flat())];
+    const childSessions = allChildIds.length > 0
+      ? await supabaseAdmin()
+          .from('pathway_sessions')
+          .select('id, completion_count')
+          .in('id', allChildIds)
+          .then((r) => r.data ?? [])
+      : [];
+    const childOpens = allChildIds.length > 0
+      ? await supabaseAdmin()
+          .from('session_opens')
+          .select('session_id')
+          .in('session_id', allChildIds)
+          .then((r) => r.data ?? [])
+      : [];
+
+    const childCompletionById = new Map(childSessions.map((r) => [String(r.id), Number(r.completion_count ?? 0)]));
+    const childOpenCount = new Map<string, number>();
+    for (const r of childOpens) {
+      const sid = String(r.session_id);
+      childOpenCount.set(sid, (childOpenCount.get(sid) ?? 0) + 1);
+    }
+
+    return (data ?? []).map((row) => {
+      const pid = String(row.id);
+      const kids = childrenByParent.get(pid) ?? [];
+      const childCompletionsTotal = kids.reduce((s, cid) => s + (childCompletionById.get(cid) ?? 0), 0);
+      const childOpensTotal = kids.reduce((s, cid) => s + (childOpenCount.get(cid) ?? 0), 0);
+      return {
+        id: pid,
+        topic: String(row.topic),
+        standardCode: row.standard_code ? String(row.standard_code) : null,
+        gradeHint: row.grade_hint ? String(row.grade_hint) : null,
+        openCount: Number((row.session_opens as unknown as { count: number }[])?.[0]?.count ?? 0) + childOpensTotal,
+        completionCount: Number(row.completion_count ?? 0) + childCompletionsTotal,
+        createdAt: String(row.created_at),
+      };
+    });
   },
 
   async sessionReport(sessionId): Promise<SessionStudentRow[]> {
     if (!supabaseConfigured()) return [];
 
-    // Get all assignments for this session to map anon studentId → roster student.
+    // Get child assignments where this is the parent session.
     const { data: assignmentRows } = await supabaseAdmin()
       .from('assignments')
       .select('roster_student_id, session_id, roster_students(id, name)')
-      .eq('session_id', sessionId);
+      .eq('parent_session_id', sessionId);
 
-    // Get the session's own student_id (the anon owner).
+    // Get the session's own student_id (the anon owner / teacher).
     const { data: sessionRow } = await supabaseAdmin()
       .from('pathway_sessions')
       .select('student_id, plan')
       .eq('id', sessionId)
       .maybeSingle();
 
-    // Build anon studentId → roster info mapping via the session owner.
-    // Each assignment creates a fresh anon student + session — the session's
-    // student_id IS the anon student for that assignment's pathway copy.
-    // We need: for each assignment's session, get the session's student_id.
+    // For each child assignment, resolve its session's anon student_id so we
+    // can attribute that student's interactions to the right roster name.
     const anonToRoster = new Map<string, { rosterStudentId: string; name: string }>();
+    const childSessionIds: string[] = [];
     if (assignmentRows) {
       for (const a of assignmentRows) {
         const rs = (a as Record<string, unknown>).roster_students as { id: string; name: string } | null;
         if (!rs) continue;
-        // Each assignment points to a specific session (the personalized copy).
-        // That session's student_id is the anon student who did the work.
-        const { data: assignedSession } = await supabaseAdmin()
+        const childSid = String((a as Record<string, unknown>).session_id);
+        childSessionIds.push(childSid);
+        const { data: childSession } = await supabaseAdmin()
           .from('pathway_sessions')
           .select('student_id')
-          .eq('id', String((a as Record<string, unknown>).session_id))
+          .eq('id', childSid)
           .maybeSingle();
-        if (assignedSession) {
-          anonToRoster.set(String(assignedSession.student_id), {
+        if (childSession) {
+          anonToRoster.set(String(childSession.student_id), {
             rosterStudentId: String(rs.id),
             name: String(rs.name),
           });
@@ -363,11 +424,12 @@ export const supabaseStorageAdapter: StorageAdapter = {
       }
     }
 
-    // Aggregate interactions for this session grouped by student.
+    // Aggregate interactions from the parent session AND all child sessions.
+    const allSessionIds = [sessionId, ...childSessionIds];
     const { data: interactionRows } = await supabaseAdmin()
       .from('interactions')
       .select('student_id, event_type, correct, elapsed_ms')
-      .eq('session_id', sessionId);
+      .in('session_id', allSessionIds);
 
     const byStudent = new Map<string, {
       attempts: number; correctCount: number; hintsUsed: number;
@@ -383,6 +445,13 @@ export const supabaseStorageAdapter: StorageAdapter = {
       if (row.elapsed_ms != null) entry.elapsedMs.push(Number(row.elapsed_ms));
       entry.lastSeenAt = new Date().toISOString();
       byStudent.set(sid, entry);
+    }
+
+    // Include roster students from child assignments even with no interactions yet.
+    for (const [anonId] of anonToRoster) {
+      if (!byStudent.has(anonId)) {
+        byStudent.set(anonId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date().toISOString() });
+      }
     }
 
     // Include session owner even with no interactions.
@@ -452,6 +521,7 @@ function rowToAssignment(row: Record<string, unknown>): Assignment {
     id: String(row.id),
     rosterStudentId: String(row.roster_student_id),
     sessionId: String(row.session_id),
+    parentSessionId: row.parent_session_id != null ? String(row.parent_session_id) : null,
     topic: String(row.topic),
     createdAt: String(row.created_at),
   };

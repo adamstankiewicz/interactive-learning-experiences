@@ -21,7 +21,7 @@ export const maxDuration = 300;
  *   { type: 'complete' }   — all students processed
  */
 export async function POST(request: Request) {
-  let body: { topic?: unknown; gradeHint?: unknown; rosterStudentIds?: unknown };
+  let body: { topic?: unknown; gradeHint?: unknown; parentSessionId?: unknown; rosterStudentIds?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   if (!topic) return Response.json({ error: 'topic is required.' }, { status: 400 });
 
   const gradeHint = typeof body.gradeHint === 'string' && body.gradeHint.trim() ? body.gradeHint.trim() : undefined;
+  const parentSessionId = typeof body.parentSessionId === 'string' ? body.parentSessionId : null;
 
   const ids = Array.isArray(body.rosterStudentIds) ? (body.rosterStudentIds as unknown[]).filter((x) => typeof x === 'string') as string[] : [];
   if (ids.length === 0) return Response.json({ error: 'rosterStudentIds must be a non-empty array.' }, { status: 400 });
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
             const assignment = await storage.createAssignment({
               rosterStudentId: student.id,
               sessionId,
+              parentSessionId,
               topic,
             });
 
