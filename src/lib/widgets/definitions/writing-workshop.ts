@@ -18,6 +18,7 @@ const MIN_GRADE = 5;
 registerWidgetCatalog<WritingWorkshopSpec>({
   kind: 'writing-workshop',
   schema: writingWorkshopSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/WritingWorkshop').then((m) => ({ default: m.WritingWorkshop })),
   ),

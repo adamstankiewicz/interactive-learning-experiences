@@ -15,6 +15,7 @@ const MIN_GRADE = 3;
 registerWidgetCatalog<DrawTheCurveSpec>({
   kind: 'draw-the-curve',
   schema: drawTheCurveSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/DrawTheCurve').then((m) => ({ default: m.DrawTheCurve })),
   ),

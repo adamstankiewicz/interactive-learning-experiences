@@ -5,6 +5,7 @@ import { registerWidgetCatalog } from '@/lib/widgets/types';
 registerWidgetCatalog<FractionAreaModelSpec>({
   kind: 'fraction-area-model',
   schema: fractionAreaModelSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/FractionAreaModel').then((m) => ({ default: m.FractionAreaModel })),
   ),

@@ -18,6 +18,7 @@ const MIN_GRADE = 7;
 registerWidgetCatalog<DefendClaimSpec>({
   kind: 'defend-claim',
   schema: defendClaimSpec,
+  assesses: true,
   component: lazy(() =>
     import('@/components/widgets/DefendClaim').then((m) => ({ default: m.DefendClaim })),
   ),
@@ -30,5 +31,5 @@ registerWidgetCatalog<DefendClaimSpec>({
   coverageRule: (standard) =>
     standard.tags.includes('history') && reachesGrade(standard.gradeLevels, MIN_GRADE),
   plannerDescription:
-    'A contestable historical claim, two conflicting sources, and a defense the student revises against feedback they ask for. Only for history and social-studies standards at grade 7 and above — it needs a claim historians genuinely disagree about, and the heaviest interaction in the set, so use it for at most one step in a pathway.',
+    'A contestable historical claim, two conflicting sources, and a defense the student revises against feedback they ask for. Only for history and social-studies standards at grade 7 and above — it needs a claim historians genuinely disagree about. Prefer it over draft-meter when the standard is about historical argument or sourcing. The heaviest interaction in the set, so use it for at most one step in a pathway.',
 });
