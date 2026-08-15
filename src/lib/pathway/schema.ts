@@ -431,6 +431,20 @@ export const drawTheCurveSpec = z.object({
     .describe(
       'Instruction shown above the chart, e.g. "Drag each point to show how the tension changes across the story."',
     ),
+  /**
+   * The situation being graphed.
+   *
+   * Without this the task is unanswerable for anything but a conventional
+   * shape: "show how far Ana is from home during her walk" cannot be predicted
+   * unless the walk is described, and a student who misses the five minutes she
+   * spent in the shop was never told about them. The setup has to carry every
+   * fact the shape depends on, while stopping short of naming the shape.
+   */
+  setup: z
+    .string()
+    .describe(
+      'One to three sentences describing what happens, in enough detail that the shape can be worked out — every event that changes the line must be mentioned. Never describe the line itself ("it rises then flattens"); describe the situation and let the student infer the shape.',
+    ),
   xAxis: z
     .object({
       label: z.string().describe('What the horizontal axis runs over, e.g. "Stage of the story", "Time".'),

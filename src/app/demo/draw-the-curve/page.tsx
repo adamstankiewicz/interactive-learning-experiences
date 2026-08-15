@@ -22,6 +22,8 @@ const SPECS: { label: string; standard: string; spec: DrawTheCurveSpec }[] = [
       kind: 'draw-the-curve',
       learningComponentId: null,
       prompt: 'Drag each point to show how the tension changes across a story.',
+      setup:
+        'Think about almost any story you have read. It opens by introducing people and a place, a problem develops and gets worse, everything comes to a head, and then things settle before the ending.',
       xAxis: {
         label: 'Stage of the story',
         points: [
@@ -52,6 +54,8 @@ const SPECS: { label: string; standard: string; spec: DrawTheCurveSpec }[] = [
       kind: 'draw-the-curve',
       learningComponentId: null,
       prompt: "Drag each point to show how far Ana is from home during her walk.",
+      setup:
+        "Ana leaves home and walks steadily to the corner shop, arriving after five minutes. She spends the next five minutes inside choosing what to buy. Then she walks on to her friend's house, arriving fifteen minutes after she set off, and stays there.",
       xAxis: {
         label: 'Time',
         points: [
@@ -82,6 +86,8 @@ const SPECS: { label: string; standard: string; spec: DrawTheCurveSpec }[] = [
       kind: 'draw-the-curve',
       learningComponentId: null,
       prompt: "Drag each point to show a typical industrial city's population across the 1800s.",
+      setup:
+        'In 1800 this was a small market town. The first factories opened in the 1820s, and more followed every decade as machines replaced handwork. Railways arrived mid-century, making it far easier for people to leave farms and come to the city for work.',
       xAxis: {
         label: 'Decade',
         points: [
@@ -110,6 +116,8 @@ const SPECS: { label: string; standard: string; spec: DrawTheCurveSpec }[] = [
       kind: 'draw-the-curve',
       learningComponentId: null,
       prompt: 'A ball is thrown straight up. Drag each point to show its height over time.',
+      setup:
+        'Someone throws a ball straight up from the ground. It slows as it climbs, stops for an instant at its highest point two seconds later, then falls back and lands four seconds after the throw.',
       xAxis: {
         label: 'Time after the throw',
         points: [
