@@ -306,7 +306,7 @@ async function attemptStepWidget(
   if (!requested || (requested.coverageRule && !requested.coverageRule(anchor.standard))) {
     kind = fallbackWidgetKind() as typeof step.widgetKind;
     substitutionNote = requested
-      ? `${requested.plannerDescription.split('.')[0]} doesn't fit ${anchor.standard.code} — built a fallback activity for this step instead.`
+      ? `"${step.widgetKind}" doesn't fit ${anchor.standard.code} — built a fallback activity for this step instead.`
       : `"${step.widgetKind}" isn't a registered widget — built a fallback activity for this step instead.`;
   } else if (step.purpose === 'check' && !requested.assesses) {
     kind = fallbackWidgetKind() as typeof step.widgetKind;
