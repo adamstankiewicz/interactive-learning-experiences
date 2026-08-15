@@ -1,6 +1,6 @@
 import { timelineBuilderSpec, type TimelineBuilderSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 const MIN_ZONES = 3;
 const MIN_EVENTS = 4;
@@ -44,15 +44,9 @@ registerWidgetGenerator({
     const widget = normalize(spec);
     if (widget) return { widget, note: null };
 
-    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
     return {
-      widget: fallback.widget,
-      note: [
-        "The timeline didn't produce enough valid zones and events — built a fallback activity for this step instead.",
-        fallback.note,
-      ]
-        .filter(Boolean)
-        .join(' '),
+      widget: null,
+      note: "The timeline didn't produce enough valid zones and events — built a fallback activity for this step instead.",
     };
   },
 });

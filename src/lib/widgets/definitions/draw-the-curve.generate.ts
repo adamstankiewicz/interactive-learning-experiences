@@ -1,6 +1,6 @@
 import { drawTheCurveSpec, type DrawTheCurveSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 const MIN_POINTS = 4;
 const MAX_POINTS = 7;
@@ -81,15 +81,9 @@ registerWidgetGenerator({
     const widget = normalize(spec);
     if (widget) return { widget, note: null };
 
-    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
     return {
-      widget: fallback.widget,
-      note: [
-        "This standard didn't yield a quantity with a shape worth predicting — built a fallback activity for this step instead.",
-        fallback.note,
-      ]
-        .filter(Boolean)
-        .join(' '),
+      widget: null,
+      note: "This standard didn't yield a quantity with a shape worth predicting — built a fallback activity for this step instead.",
     };
   },
 });

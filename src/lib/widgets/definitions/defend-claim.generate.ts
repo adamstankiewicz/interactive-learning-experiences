@@ -1,6 +1,6 @@
 import { defendClaimSpec, type DefendClaimSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 /**
  * Two sources is the whole mechanism, so it is the one thing enforced rather
@@ -83,15 +83,9 @@ registerWidgetGenerator({
     const normalized = normalize(spec);
 
     if (!normalized) {
-      const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
       return {
-        widget: fallback.widget,
-        note: [
-          'Could not build a claim with two genuinely opposing sources for this standard — built a fallback activity for this step instead.',
-          fallback.note,
-        ]
-          .filter(Boolean)
-          .join(' '),
+        widget: null,
+        note: 'Could not build a claim with two genuinely opposing sources for this standard — built a fallback activity for this step instead.',
       };
     }
 

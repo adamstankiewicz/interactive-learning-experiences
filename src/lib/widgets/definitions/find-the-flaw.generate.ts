@@ -1,6 +1,6 @@
 import { findTheFlawSpec, type FindTheFlawSpec } from '@/lib/pathway/schema';
 import { generateStructured } from '@/lib/structured';
-import { fallbackWidgetKind, getWidgetGenerator, registerWidgetGenerator } from '@/lib/widgets/types';
+import { registerWidgetGenerator } from '@/lib/widgets/types';
 
 const MIN_STEPS = 4;
 const MIN_WHY_OPTIONS = 3;
@@ -66,15 +66,9 @@ registerWidgetGenerator({
     const widget = normalize(spec);
     if (widget) return { widget, note: null };
 
-    const fallback = await getWidgetGenerator(fallbackWidgetKind())!.generate(ctx);
     return {
-      widget: fallback.widget,
-      note: [
-        "The worked example didn't come out with a single findable mistake — built a fallback activity for this step instead.",
-        fallback.note,
-      ]
-        .filter(Boolean)
-        .join(' '),
+      widget: null,
+      note: "The worked example didn't come out with a single findable mistake — built a fallback activity for this step instead.",
     };
   },
 });
