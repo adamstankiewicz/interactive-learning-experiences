@@ -53,6 +53,62 @@ function directionOf(from: number, to: number): Direction {
   return delta > 0 ? 'up' : 'down';
 }
 
+/**
+ * A smooth path through the points that is guaranteed never to overshoot them.
+ *
+ * The obvious spline (Catmull-Rom) bulges past a point when its neighbours pull
+ * on it, and here that bulge would be a lie: on a distance graph a flat stretch
+ * means standing still, and a curve that dips below its own flat segment says
+ * she walked back. Monotone cubic interpolation (Fritsch–Carlson) keeps every
+ * segment within the values it connects — flat stays flat, rising never dips —
+ * so the line can be curvy without asserting motion that isn't in the data.
+ */
+function smoothPath(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return '';
+
+  const n = pts.length;
+  const h: number[] = [];
+  const delta: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    h.push(pts[i + 1]!.x - pts[i]!.x);
+    delta.push((pts[i + 1]!.y - pts[i]!.y) / (pts[i + 1]!.x - pts[i]!.x));
+  }
+
+  // Tangents: average of neighbouring slopes, flattened at every local extreme.
+  const m: number[] = [delta[0]!];
+  for (let i = 1; i < n - 1; i++) {
+    m.push(delta[i - 1]! * delta[i]! <= 0 ? 0 : (delta[i - 1]! + delta[i]!) / 2);
+  }
+  m.push(delta[n - 2]!);
+
+  // Fritsch–Carlson: rein in any tangent that would carry the curve past the
+  // segment's own endpoints.
+  for (let i = 0; i < n - 1; i++) {
+    if (delta[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    const a = m[i]! / delta[i]!;
+    const b = m[i + 1]! / delta[i]!;
+    const s = a * a + b * b;
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s);
+      m[i] = tau * a * delta[i]!;
+      m[i + 1] = tau * b * delta[i]!;
+    }
+  }
+
+  let d = `M ${pts[0]!.x},${pts[0]!.y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const third = h[i]! / 3;
+    d += ` C ${pts[i]!.x + third},${pts[i]!.y + m[i]! * third} ${pts[i + 1]!.x - third},${
+      pts[i + 1]!.y - m[i + 1]! * third
+    } ${pts[i + 1]!.x},${pts[i + 1]!.y}`;
+  }
+  return d;
+}
+
 export function DrawTheCurve({ spec, onComplete }: Props) {
   const points = spec.xAxis.points;
 
@@ -190,12 +246,19 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
     setRevealed(false);
   }, [points]);
 
-  const line = (vals: number[]) => vals.map((v, i) => `${xOf(i)},${yOf(v)}`).join(' ');
+  const line = (vals: number[]) => smoothPath(vals.map((v, i) => ({ x: xOf(i), y: yOf(v) })));
   const untouched = values.every((v) => v === START_VALUE);
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm font-medium text-foreground">{spec.prompt}</p>
+
+      {/* Every fact the shape depends on lives here. Without it the task is
+          unanswerable: a student cannot predict a pause they were never told
+          about, and the hint would be scolding them for it. */}
+      <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed">
+        {spec.setup}
+      </p>
 
       <div>
         <div className="min-w-0">
@@ -268,24 +331,22 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
 
             {/* The real curve, only after they have committed to their own. */}
             {revealed && (
-              <polyline
-                points={line(actual)}
+              <path
+                d={line(actual)}
                 fill="none"
                 className="stroke-success"
-                strokeWidth={3}
-                strokeDasharray="7 5"
+                strokeWidth={2.5}
+                strokeDasharray="7 6"
                 strokeLinecap="round"
-                strokeLinejoin="round"
               />
             )}
 
-            <polyline
-              points={line(values)}
+            <path
+              d={line(values)}
               fill="none"
               className={revealed && !allRight ? 'stroke-destructive' : 'stroke-primary'}
-              strokeWidth={3}
+              strokeWidth={2.5}
               strokeLinecap="round"
-              strokeLinejoin="round"
             />
 
             {points.map((point, i) => (
@@ -293,11 +354,11 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
                 <circle
                   cx={xOf(i)}
                   cy={yOf(values[i]!)}
-                  r={dragging === i ? 11 : 8}
+                  r={dragging === i ? 7 : 5}
                   className={`fill-card ${
                     revealed && !allRight ? 'stroke-destructive' : 'stroke-primary'
-                  } ${revealed ? '' : 'cursor-grab'}`}
-                  strokeWidth={3}
+                  } ${revealed ? '' : 'cursor-grab'} transition-[r]`}
+                  strokeWidth={2.5}
                 />
                 {/* The handle is a slider, so arrow keys work and a screen reader
                     reads a value — freehand drawing could never offer either. */}
@@ -336,7 +397,7 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
                 <circle
                   cx={xOf(i)}
                   cy={yOf(values[i]!)}
-                  r={14}
+                  r={11}
                   fill="none"
                   className="stroke-ring opacity-0 focus-within:opacity-100"
                   strokeWidth={2}
