@@ -9,6 +9,8 @@ import { DraftMeter } from '@/components/widgets/DraftMeter';
 import { MarkdownCard } from '@/components/widgets/MarkdownCard';
 import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
+import { NarratedCard } from '@/components/widgets/NarratedCard';
+import { StepReveal } from '@/components/widgets/StepReveal';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
 
 /**
@@ -32,6 +34,10 @@ function render(spec: WidgetSpec) {
       return <MarkdownCard spec={spec} />;
     case 'flashcard':
       return <Flashcard spec={spec} />;
+    case 'step-reveal':
+      return <StepReveal spec={spec} />;
+    case 'narrated-card':
+      return <NarratedCard spec={spec} />;
     case 'crossword':
       return <Crossword spec={spec} />;
   }

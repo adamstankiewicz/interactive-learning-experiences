@@ -46,6 +46,19 @@ const WIDGETS = [
     tags: ['vocabulary', 'study', 'flip'],
   },
   {
+    slug: 'narrated-card',
+    name: 'Narrated Card',
+    description:
+      'Reads content aloud using the browser\'s text-to-speech engine, revealing each sentence as it is spoken. Steps stack up as they complete.',
+    tags: ['audio', 'narration', 'accessibility'],
+  },
+  {
+    slug: 'step-reveal',
+    name: 'Step Reveal',
+    description: 'Walk through a concept or worked example one step at a time. Each step stacks up so students can follow the full chain of reasoning.',
+    tags: ['worked example', 'step-by-step', 'reasoning'],
+  },
+  {
     slug: 'markdown-card',
     name: 'Markdown Card',
     description:

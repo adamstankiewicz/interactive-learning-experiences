@@ -210,6 +210,29 @@ export const flashcardSpec = z.object({
 
 export type FlashcardSpec = z.infer<typeof flashcardSpec>;
 
+const stepShape = z.object({
+  id: z.string(),
+  title: z.string().describe('Short label for this step, e.g. "Step 1: Isolate the variable"'),
+  body: z.string().describe('Markdown explanation of this step. Be clear and direct. Avoid markdown headings — use bold instead.'),
+  why: z.string().nullable().describe('Optional one-sentence callout explaining the reasoning behind this step. Null to omit.'),
+});
+
+export const stepRevealSpec = z.object({
+  kind: z.literal('step-reveal'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Framing sentence shown above the steps, e.g. "Let\'s walk through this together."'),
+  steps: z.array(stepShape).describe('Give 3-6 steps.'),
+});
+export type StepRevealSpec = z.infer<typeof stepRevealSpec>;
+
+export const narratedCardSpec = z.object({
+  kind: z.literal('narrated-card'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Framing sentence shown above the steps, e.g. "Listen along as we walk through this."'),
+  steps: z.array(stepShape).describe('Give 3-6 steps. Keep body text concise — it will be read aloud sentence by sentence.'),
+});
+export type NarratedCardSpec = z.infer<typeof narratedCardSpec>;
+
 export const crosswordEntrySpec = z.object({
   answer: z
     .string()
@@ -262,6 +285,8 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   dragCategorizeSpec,
   markdownCardSpec,
   flashcardSpec,
+  stepRevealSpec,
+  narratedCardSpec,
   crosswordSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
