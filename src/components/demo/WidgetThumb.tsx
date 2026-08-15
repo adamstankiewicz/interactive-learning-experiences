@@ -271,6 +271,58 @@ function MarkdownCard() {
   );
 }
 
+function WritingWorkshop() {
+  return (
+    <>
+      {/* Prose on the left with one sentence marked, and the note that marking
+          earned sitting beside it — the review lands on the sentence, and says
+          why. */}
+      {[
+        [10, 52],
+        [18, 40],
+        [26, 52],
+        [34, 30],
+      ].map(([y, w]) => (
+        <rect key={y} x={14} y={y} width={w} height={3} rx={1.5} className="fill-muted-foreground/30" />
+      ))}
+      <rect x={14} y={18} width={40} height={3} rx={1.5} className="fill-primary/70" />
+      <path d="M14 23h40" className="stroke-primary" strokeWidth={1.25} strokeDasharray="2 2" />
+      <path d="M56 21h8" className="stroke-primary/60" strokeWidth={1.25} />
+      <rect x={64} y={12} width={42} height={20} rx={3} className={ACTIVE} strokeWidth={1.5} />
+      {[17, 22, 27].map((y, i) => (
+        <rect
+          key={y}
+          x={69}
+          y={y}
+          width={[32, 26, 18][i]}
+          height={2}
+          rx={1}
+          className="fill-primary/45"
+        />
+      ))}
+    </>
+  );
+}
+
+function DebateAI() {
+  return (
+    <>
+      {/* Two voices facing each other, one filled and one not: the student
+          argues, the opponent argues back and does not fold. */}
+      <path
+        d="M14 10h48a3 3 0 013 3v13a3 3 0 01-3 3H30l-8 7v-7h-8a3 3 0 01-3-3V13a3 3 0 013-3z"
+        className={ACTIVE}
+        strokeWidth={1.5}
+      />
+      <path
+        d="M106 22H62a3 3 0 00-3 3v13a3 3 0 003 3h28l8 7v-7h8a3 3 0 003-3V25a3 3 0 00-3-3z"
+        className={SURFACE}
+        strokeWidth={1.5}
+      />
+    </>
+  );
+}
+
 function Crossword() {
   const filled = new Set(['1-0', '1-1', '1-2', '1-3', '0-2', '2-2', '3-2']);
   return (
@@ -311,6 +363,8 @@ const THUMBS: Record<string, () => React.ReactElement> = {
   'step-reveal': StepReveal,
   'markdown-card': MarkdownCard,
   crossword: Crossword,
+  'debate-ai': DebateAI,
+  'writing-workshop': WritingWorkshop,
 };
 
 export function WidgetThumb({ slug }: { slug: string }) {
