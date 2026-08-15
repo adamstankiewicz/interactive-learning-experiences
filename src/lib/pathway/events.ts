@@ -38,11 +38,31 @@ export type DeepPartial<T> = T extends (infer U)[]
  * visible before any of it finishes.
  */
 export const STAGES = [
-  { id: 'propose', label: 'Proposing standards', active: 'Asking the model for candidate codes' },
-  { id: 'verify', label: 'Verifying against the graph', active: 'Checking each code for a real match' },
-  { id: 'graph', label: 'Loading the standard’s spine', active: 'Fetching learning components and prerequisites' },
-  { id: 'plan', label: 'Planning the pathway', active: 'Writing outcomes, misconceptions and steps' },
-  { id: 'widget', label: 'Building the interactions', active: 'Configuring a widget for every step' },
+  {
+    id: 'propose',
+    label: 'Proposing standards',
+    active: 'Guessing a few standards this topic could be teaching, before checking any of them',
+  },
+  {
+    id: 'verify',
+    label: 'Verifying against the graph',
+    active: 'Checking that your standard really covers what you asked for',
+  },
+  {
+    id: 'graph',
+    label: 'Loading the standard’s spine',
+    active: 'Pulling in what comes before and after it, so the plan builds on real prerequisites',
+  },
+  {
+    id: 'plan',
+    label: 'Planning the pathway',
+    active: 'Deciding where students tend to get stuck before writing the steps that address it',
+  },
+  {
+    id: 'widget',
+    label: 'Building the interactions',
+    active: 'Matching each step to the interactive that actually fits what it teaches',
+  },
 ] as const;
 
 export type StageId = (typeof STAGES)[number]['id'];
