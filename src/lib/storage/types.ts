@@ -71,8 +71,18 @@ export interface StorageAdapter {
     rejectedCodes: string[];
   }): Promise<string | null>;
   loadSession(sessionId: string): Promise<PersistedSession | null>;
-  /** True when `studentId` owns `sessionId`. Needed explicitly wherever the backend has no RLS of its own to lean on. */
-  sessionBelongsTo(sessionId: string, studentId: string): Promise<boolean>;
+  /**
+   * True when `sessionId` names a real session — the gate on accepting
+   * telemetry for it.
+   *
+   * Deliberately existence, not ownership. A shared pathway is walked by
+   * students who do not own it: the session belongs to the teacher who built
+   * it, while each student arrives with their own anonymous id. Gating on
+   * ownership silently drops every interaction a shared link produces, which
+   * is the entire point of sharing one. Interactions stay attributed to the
+   * student who made them, so participation never masquerades as ownership.
+   */
+  sessionExists(sessionId: string): Promise<boolean>;
   /** A teacher hand-edited a prose field after generation — overwrite the persisted plan so a share link reflects the edit. */
   updateSessionPlan(sessionId: string, plan: PathwayPlan): Promise<void>;
 

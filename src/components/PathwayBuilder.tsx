@@ -221,6 +221,19 @@ export function PathwayBuilder() {
 
         {state.status === 'done' && state.sessionId && <ShareLink sessionId={state.sessionId} />}
 
+        {/* A share link is the only way a student reaches this pathway, so its
+            absence is worth a sentence. Silently rendering nothing here made a
+            fully-built feature look like one that was never built. */}
+        {state.status === 'done' && !state.sessionId && state.sessionError && (
+          <Alert className="mt-6">
+            <AlertDescription>
+              <span className="font-medium text-foreground">Nothing to share yet.</span>{' '}
+              {state.sessionError} The pathway below is still yours to read — it just
+              isn&rsquo;t saved anywhere a student could open.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <PathwayDocument state={state} onRegenerateStep={regenerateStep} onEditPlan={editPlan} />
       </main>
     </div>

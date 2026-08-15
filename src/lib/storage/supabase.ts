@@ -45,32 +45,33 @@ export const supabaseStorageAdapter: StorageAdapter = {
   },
 
   async persistSession(input) {
+    // Genuinely declining to write (no credentials) — distinct from failing to.
     if (!supabaseConfigured()) return null;
 
-    try {
-      const db = supabaseAdmin();
-      await db.from('students').upsert({ id: input.studentId }, { onConflict: 'id', ignoreDuplicates: true });
+    const db = supabaseAdmin();
+    await db.from('students').upsert({ id: input.studentId }, { onConflict: 'id', ignoreDuplicates: true });
 
-      const { data, error } = await db
-        .from('pathway_sessions')
-        .insert({
-          student_id: input.studentId,
-          topic: input.topic,
-          grade_hint: input.gradeHint,
-          anchor: input.anchor,
-          rejected_codes: input.rejectedCodes,
-          plan: input.plan,
-          step_widgets: input.stepWidgets,
-        })
-        .select('id')
-        .single();
+    const { data, error } = await db
+      .from('pathway_sessions')
+      .insert({
+        student_id: input.studentId,
+        topic: input.topic,
+        grade_hint: input.gradeHint,
+        anchor: input.anchor,
+        rejected_codes: input.rejectedCodes,
+        plan: input.plan,
+        step_widgets: input.stepWidgets,
+      })
+      .select('id')
+      .single();
 
-      if (error) throw error;
-      return data.id;
-    } catch (error) {
-      console.error('[storage] persistSession failed', error);
-      return null;
-    }
+    // Thrown, not swallowed into a null: this is the one write whose failure
+    // costs the teacher their share link, and a schema that has drifted from
+    // `supabase/migrations` reports itself here ("Could not find the
+    // 'step_widgets' column…") or nowhere at all. The caller logs it and
+    // carries the reason to the UI.
+    if (error) throw new Error(error.message);
+    return data.id;
   },
 
   async loadSession(sessionId) {
@@ -94,16 +95,16 @@ export const supabaseStorageAdapter: StorageAdapter = {
     } satisfies PersistedSession;
   },
 
-  async sessionBelongsTo(sessionId, studentId) {
+  async sessionExists(sessionId) {
     if (!supabaseConfigured()) return false;
 
     const { data } = await supabaseAdmin()
       .from('pathway_sessions')
-      .select('student_id')
+      .select('id')
       .eq('id', sessionId)
       .maybeSingle();
 
-    return Boolean(data) && data?.student_id === studentId;
+    return Boolean(data);
   },
 
   async updateSessionPlan(sessionId, plan) {

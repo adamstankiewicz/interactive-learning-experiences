@@ -87,8 +87,13 @@ export type PathwayEvent =
    * substitution is transparent, not silent, but it isn't a failure either.
    */
   | { type: 'step-widget'; stepIndex: number; widget: WidgetSpec; note: string | null }
-  /** Persisted session id, once there is one. Telemetry attaches to it. */
-  | { type: 'session'; sessionId: string | null }
+  /**
+   * Persisted session id, once there is one. Telemetry attaches to it, and a
+   * share link is only possible with one. `sessionId` is null when the write
+   * didn't happen — `reason` says why, because a missing share link with no
+   * explanation is indistinguishable from a share link that was never built.
+   */
+  | { type: 'session'; sessionId: string | null; reason?: string }
   | { type: 'error'; message: string }
   | { type: 'done' };
 

@@ -37,8 +37,10 @@ export type PathwayState = {
   regeneratingSteps: Record<number, boolean>;
   /** A regenerate call that failed, keyed by step index — cleared on retry. */
   stepErrors: Record<number, string>;
-  /** Set once the run is persisted; null when there is no student to persist for. */
+  /** Set once the run is persisted; null when the write didn't happen. */
   sessionId: string | null;
+  /** Why there is no `sessionId`, so an absent share link can explain itself. */
+  sessionError: string | null;
   error: string | null;
   /**
    * Run timing. Timestamps are taken in event handlers and passed in, so the
@@ -64,6 +66,7 @@ const initialState: PathwayState = {
   regeneratingSteps: {},
   stepErrors: {},
   sessionId: null,
+  sessionError: null,
   error: null,
   startedAt: null,
   finishedAt: null,
@@ -164,7 +167,7 @@ function reducer(state: PathwayState, action: Action): PathwayState {
           : state.stepWidgetNotes,
       };
     case 'session':
-      return { ...state, sessionId: event.sessionId };
+      return { ...state, sessionId: event.sessionId, sessionError: event.reason ?? null };
     case 'error':
       return { ...state, status: 'error', error: event.message, finishedAt: action.at };
     case 'done':

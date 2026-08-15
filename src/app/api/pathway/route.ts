@@ -1,4 +1,4 @@
-import { encodeEvent, type Anchor } from '@/lib/pathway/events';
+import { encodeEvent, type Anchor, type PathwayEvent } from '@/lib/pathway/events';
 import { streamPathway } from '@/lib/pathway/generate';
 import type { PathwayPlan } from '@/lib/pathway/schema';
 import { storageAdapter } from '@/lib/storage';
@@ -57,15 +57,20 @@ export async function POST(request: Request) {
           if (event.type === 'verdict' && !event.resolved) rejected.push(event.code);
 
           // The session id has to reach the client before `done`, so telemetry
-          // has something to attach to.
-          if (event.type === 'done' && studentId && anchor && plan) {
-            const sessionId = await persistSession(studentId, topic, gradeHint, {
-              anchor,
-              plan,
-              stepWidgets,
-              rejected,
-            });
-            emit({ type: 'session', sessionId });
+          // has something to attach to. Emitted unconditionally, even when
+          // there is nothing to save — the client needs to know a share link
+          // is impossible and why, not just never receive one.
+          if (event.type === 'done') {
+            emit(
+              anchor && plan
+                ? await persistSession(studentId, topic, gradeHint, {
+                    anchor,
+                    plan,
+                    stepWidgets,
+                    rejected,
+                  })
+                : { type: 'session', sessionId: null, reason: 'This run did not produce a pathway to save.' },
+            );
           }
 
           emit(event);
@@ -92,17 +97,25 @@ export async function POST(request: Request) {
 }
 
 /**
- * Best-effort: a storage failure must not lose a pathway the student is already
- * looking at. Telemetry simply has nothing to attach itself to.
+ * Best-effort: a storage failure must not lose a pathway the teacher is already
+ * looking at. But it must not be *invisible* either — an unshareable pathway
+ * that says nothing about why looks exactly like a build that simply has no
+ * share feature, which is how a broken write path can sit unnoticed. So the
+ * failure is swallowed as far as the stream is concerned and reported as far
+ * as the teacher is concerned.
  */
 async function persistSession(
-  studentId: string,
+  studentId: string | null,
   topic: string,
   gradeHint: string | undefined,
   result: { anchor: Anchor; plan: PathwayPlan; stepWidgets: Record<number, unknown>; rejected: string[] },
-): Promise<string | null> {
+): Promise<Extract<PathwayEvent, { type: 'session' }>> {
+  if (!studentId) {
+    return { type: 'session', sessionId: null, reason: 'This browser has no learner id, so the pathway was not saved.' };
+  }
+
   try {
-    return await storageAdapter().persistSession({
+    const sessionId = await storageAdapter().persistSession({
       studentId,
       topic,
       gradeHint: gradeHint ?? null,
@@ -111,8 +124,15 @@ async function persistSession(
       stepWidgets: result.stepWidgets,
       rejectedCodes: result.rejected,
     });
+
+    // An adapter returning null rather than throwing means it declined to
+    // write (unconfigured, or it logged its own error) — still not shareable.
+    return sessionId
+      ? { type: 'session', sessionId }
+      : { type: 'session', sessionId: null, reason: 'Storage is not accepting writes, so the pathway was not saved.' };
   } catch (error) {
     console.error('[pathway] could not persist session', error);
-    return null;
+    const detail = error instanceof Error ? error.message : 'Unknown storage error.';
+    return { type: 'session', sessionId: null, reason: `The pathway could not be saved: ${detail}` };
   }
 }

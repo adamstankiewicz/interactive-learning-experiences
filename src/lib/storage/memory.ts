@@ -121,8 +121,8 @@ export const memoryStorageAdapter: StorageAdapter = {
     return { id, studentId, topic, anchor, plan, stepWidgets };
   },
 
-  async sessionBelongsTo(sessionId, studentId) {
-    return sessions.get(sessionId)?.studentId === studentId;
+  async sessionExists(sessionId) {
+    return sessions.has(sessionId);
   },
 
   async recordInteractions(events) {

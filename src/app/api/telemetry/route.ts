@@ -22,10 +22,11 @@ export async function POST(request: Request) {
 
   const adapter = storageAdapter();
 
-  // A backend without its own RLS (or the in-memory adapter, which has none)
-  // needs ownership checked explicitly here rather than left to the database.
-  const belongsToStudent = await adapter.sessionBelongsTo(sessionId, studentId);
-  if (!belongsToStudent) {
+  // Existence, not ownership: a student walking a shared pathway has their own
+  // anonymous id and never owns the session they were sent. Checking ownership
+  // here rejected every interaction a share link produced. Events remain
+  // attributed to `studentId`, so the rollup still separates the students.
+  if (!(await adapter.sessionExists(sessionId))) {
     return Response.json({ error: 'Session not found' }, { status: 404 });
   }
 
