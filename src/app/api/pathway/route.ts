@@ -1,7 +1,7 @@
 import { encodeEvent, type Anchor } from '@/lib/pathway/events';
 import { streamPathway } from '@/lib/pathway/generate';
 import type { PathwayPlan } from '@/lib/pathway/schema';
-import { supabaseAdmin, supabaseConfigured } from '@/lib/supabase/client';
+import { storageAdapter } from '@/lib/storage';
 import { loadProfile } from '@/lib/student/profile';
 
 export const maxDuration = 120;
@@ -99,31 +99,16 @@ async function persistSession(
   gradeHint: string | undefined,
   result: { anchor: Anchor; plan: PathwayPlan; stepWidgets: Record<number, unknown>; rejected: string[] },
 ): Promise<string | null> {
-  if (!supabaseConfigured()) return null;
-
   try {
-    const db = supabaseAdmin();
-
-    // The id comes from the browser's localStorage and can outlive the row it
-    // referred to. Reinstate it rather than losing the session to a foreign key.
-    await db.from('students').upsert({ id: studentId }, { onConflict: 'id', ignoreDuplicates: true });
-
-    const { data, error } = await db
-      .from('pathway_sessions')
-      .insert({
-        student_id: studentId,
-        topic,
-        grade_hint: gradeHint ?? null,
-        anchor: result.anchor,
-        rejected_codes: result.rejected,
-        plan: result.plan,
-        step_widgets: result.stepWidgets,
-      })
-      .select('id')
-      .single();
-
-    if (error) throw error;
-    return data.id;
+    return await storageAdapter().persistSession({
+      studentId,
+      topic,
+      gradeHint: gradeHint ?? null,
+      anchor: result.anchor,
+      plan: result.plan,
+      stepWidgets: result.stepWidgets,
+      rejectedCodes: result.rejected,
+    });
   } catch (error) {
     console.error('[pathway] could not persist session', error);
     return null;
