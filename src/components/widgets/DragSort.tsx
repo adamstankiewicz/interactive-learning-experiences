@@ -99,7 +99,7 @@ function SortableItem({
       >
         {index + 1}
       </span>
-      <span className="text-sm font-medium">{item.label}</span>
+      <span className="text-sm font-medium text-foreground">{item.label}</span>
       {phase !== 'idle' && (
         <span className="ml-auto text-base" aria-hidden="true">
           {isCorrectPosition ? '✓' : isWrongPosition ? '✗' : ''}
@@ -275,7 +275,7 @@ export function DragSort({ spec, onComplete }: Props) {
               <span className="w-5 shrink-0 text-center text-xs font-bold tabular-nums text-muted-foreground">
                 {items.findIndex((it) => it.id === activeItem.id) + 1}
               </span>
-              <span className="text-sm font-medium">{activeItem.label}</span>
+              <span className="text-sm font-medium text-foreground">{activeItem.label}</span>
             </div>
           )}
         </DragOverlay>
