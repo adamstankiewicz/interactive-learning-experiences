@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
+import { reportToConversation } from '@/lib/mcp/report';
 import type { FindTheFlawSpec } from '@/lib/pathway/schema';
 
 type Props = { spec: FindTheFlawSpec; onComplete?: (correct: boolean) => void };
@@ -121,8 +122,34 @@ export function FindTheFlaw({ spec, onComplete }: Props) {
         payload: { attempts: attempts + 1 },
       });
       telemetry.flush();
+
+      // The wrong guesses are the interesting part: a student who ruled out two
+      // sound steps first, or who misdiagnosed the error before getting it,
+      // has told the assistant something worth responding to.
+      const ruledOutLabels = spec.steps
+        .filter((step) => ruledOut.has(step.id))
+        .map((step) => `"${step.label}"`);
+      const misdiagnoses = spec.whyOptions
+        .filter((option) => wrongWhy.has(option.id))
+        .map((option) => `"${option.label}"`);
+
+      reportToConversation(
+        [
+          `The student worked through a find-the-flaw activity: ${spec.scenario.setup}`,
+          `They found the mistake and diagnosed it correctly.`,
+          ruledOutLabels.length
+            ? `On the way they wrongly blamed ${ruledOutLabels.length === 1 ? 'a step that was' : `${ruledOutLabels.length} steps that were`} actually fine: ${ruledOutLabels.join(', ')}.`
+            : 'They found the flawed step first time.',
+          misdiagnoses.length
+            ? `They first misdiagnosed it as: ${misdiagnoses.join(', ')} — worth addressing, since that is the misconception they actually hold.`
+            : 'They named what was wrong with it first time.',
+        ].join(' '),
+      );
     },
-    [stage, wrongWhy, spec, attempts, telemetry, onComplete],
+    // `ruledOut` is only read for the report, and cannot change once the
+    // diagnosis stage opens — but leaving it out means the next person to touch
+    // this gets a stale set with no warning.
+    [stage, wrongWhy, ruledOut, spec, attempts, telemetry, onComplete],
   );
 
   const foundIt = stage !== 'locating';

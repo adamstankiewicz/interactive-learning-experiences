@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWidgetTelemetry } from '@/components/widgets/telemetry-context';
 import { doneMessageFor, type Band, type ScoreResult } from '@/lib/draft-meter/schema';
+import { reportToConversation } from '@/lib/mcp/report';
 import type { DraftMeterSpec } from '@/lib/pathway/schema';
 
 /**
@@ -146,7 +147,10 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
    * out of mastery.
    */
   const recordScore = useCallback(
-    (scored: ScoreResult) => {
+    // `draft` is passed in rather than read from state: this callback is
+    // memoised on the spec, so closing over `text` would report whatever the
+    // box held when it was created — the empty string.
+    (scored: ScoreResult, draft: string) => {
       const t = telemetryRef.current;
 
       if (scored.band !== lastBandRef.current) {
@@ -179,8 +183,18 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
         payload: { score: scored.score, band: scored.band },
       });
       t.flush();
+
+      // Hosted in a chat, the assistant otherwise has no idea any of this
+      // happened. Reported once, at the finish line, and phrased for a reader.
+      reportToConversation(
+        [
+          `The student answered a short-response task on ${spec.standardCode} and met every check.`,
+          `Their response: "${draft}"`,
+          `It scored ${scored.score} out of 100 — ${scored.label}.`,
+        ].join(' '),
+      );
     },
-    [spec.kind, spec.learningComponentId],
+    [spec.kind, spec.learningComponentId, spec.standardCode],
   );
 
   useEffect(() => {
@@ -217,7 +231,7 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
           if (id !== seq.current) return;
           setResult(scored);
           setPhase('scored');
-          recordScore(scored);
+          recordScore(scored, draft);
         })
         .catch(() => {
           // A cancelled call is expected, not a failure. A stale one is ignored.
