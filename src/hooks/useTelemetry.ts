@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { InteractionEvent } from '@/lib/student/schema';
 
@@ -93,7 +93,12 @@ export function useTelemetry(sessionId: string | null, studentId: string | null)
     };
   }, [flush]);
 
-  return { track, trackHesitation, flush };
+  // The three functions are already stable; the object holding them has to be
+  // too, or every consumer sees a new handle on each render.
+  return useMemo(
+    () => ({ track, trackHesitation, flush }),
+    [track, trackHesitation, flush],
+  );
 }
 
 export type Telemetry = ReturnType<typeof useTelemetry>;

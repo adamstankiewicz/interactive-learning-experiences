@@ -9,16 +9,11 @@ import { pathwayModel } from '@/lib/model';
  * deprecated in AI SDK v7 in favour of `generateText` with an `output` spec, so
  * that lives here rather than being repeated at each call site.
  *
- * The model is resolved lazily and memoised: `pathwayModel()` throws when its
- * provider env vars are missing, and doing that at module scope would fail the
- * import rather than the request that actually needed a model.
+ * The model is resolved per call rather than at module scope: `pathwayModel()`
+ * throws when its provider env vars are missing, and doing that at import time
+ * would fail the module rather than the request that actually needed a model.
+ * It memoises internally, so this costs nothing.
  */
-
-let cached: ReturnType<typeof pathwayModel> | null = null;
-
-function model() {
-  return (cached ??= pathwayModel());
-}
 
 export async function generateStructured<T>(options: {
   schema: FlexibleSchema<T>;
@@ -34,7 +29,7 @@ export async function generateStructured<T>(options: {
   model?: LanguageModel;
 }): Promise<T> {
   const result = await generateText({
-    model: options.model ?? model(),
+    model: options.model ?? pathwayModel(),
     output: Output.object({ schema: options.schema }),
     system: options.system,
     prompt: options.prompt,

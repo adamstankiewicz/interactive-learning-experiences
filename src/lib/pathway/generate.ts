@@ -41,8 +41,6 @@ import { generateStructured } from '@/lib/structured';
 
 export type { Anchor };
 
-const MODEL = pathwayModel();
-
 /**
  * The same call, surfaced incrementally. The plan is the slowest stage by far
  * and the only one whose intermediate state is worth showing, so it is the only
@@ -54,7 +52,10 @@ async function* streamStructured<T>(options: {
   prompt: string;
 }): AsyncGenerator<DeepPartial<T>, T> {
   const result = streamText({
-    model: MODEL,
+    // Resolved here rather than at module scope: `pathwayModel()` throws when
+    // its provider env vars are missing, and at import time that fails the
+    // whole module instead of the request that needed a model. It memoises.
+    model: pathwayModel(),
     output: Output.object({ schema: options.schema }),
     system: options.system,
     prompt: options.prompt,
@@ -722,14 +723,16 @@ const structuralChoice = z.object({
  * Which of the two structural manipulatives a standard can support is a fact
  * about its content, not its code, so there is no regex that answers it: some
  * science standards are sequences, some are taxonomies, and plenty are neither.
- * The judgement is small and closed enough for the fast model, and asking it is
- * what stops a standard with no natural order from being handed a shuffled list
- * whose "correct" sequence is arbitrary.
+ * Asking is what stops a standard with no natural order from being handed a
+ * shuffled list whose "correct" sequence is arbitrary.
+ *
+ * It reads only the anchor, which is what lets the caller start it against the
+ * graph result and let it run underneath the plan rather than after it.
  *
  * A failure here is not worth failing the pathway over — the student still gets
  * the flashcards and the crossword — so it degrades to `neither`.
  */
-async function chooseStructuralWidget(anchor: Anchor, plan: PathwayPlan): Promise<'order' | 'categorize' | 'neither'> {
+async function chooseStructuralWidget(anchor: Anchor): Promise<'order' | 'categorize' | 'neither'> {
   try {
     const choice = await generateStructured({
       schema: structuralChoice,
@@ -750,8 +753,6 @@ async function chooseStructuralWidget(anchor: Anchor, plan: PathwayPlan): Promis
         '',
         'Learning components:',
         componentBlockFor(anchor),
-        '',
-        `Big idea of the lesson: ${plan.bigIdea}`,
       ].join('\n'),
     });
 
@@ -769,10 +770,14 @@ async function chooseStructuralWidget(anchor: Anchor, plan: PathwayPlan): Promis
  * content-specific manipulative first, then the structural one, then the
  * judgement deck and the vocabulary puzzle — so the caller can await them in
  * turn and emit each result as it lands.
+ *
+ * `structural` is passed in already running: it only needs the anchor, so the
+ * caller starts it before the plan and it costs no wall time here.
  */
 function startWidgetGenerators(
   anchor: Anchor,
   plan: PathwayPlan,
+  structural: Promise<'order' | 'categorize' | 'neither'>,
 ): Promise<{ widget: WidgetSpec | null; note: string | null }>[] {
   const code = anchor.standard.statementCode;
   const running: Promise<{ widget: WidgetSpec | null; note: string | null }>[] = [];
@@ -784,10 +789,6 @@ function startWidgetGenerators(
   if (WRITING_CODE.test(code) || READING_EVIDENCE_CODE.test(code)) {
     running.push(generateDraftMeter(anchor, plan).then((widget) => ({ widget, note: null })));
   }
-
-  // Decided once and awaited twice: the structural widget itself, and the note
-  // below that should only appear if nothing else did.
-  const structural = chooseStructuralWidget(anchor, plan);
 
   running.push(
     structural.then((choice) => {
@@ -881,6 +882,12 @@ export async function* streamPathway(
   };
 
   yield { type: 'stage', stage: 'plan', status: 'active' };
+
+  // Started here rather than with the other generators: it needs only the
+  // anchor, so running it against the plan call takes it off the critical path.
+  // Nothing awaits it until the plan lands, so a rejection cannot go unhandled.
+  const structural = chooseStructuralWidget(anchor);
+
   const planStream = planPathway(topic, anchor, proposal.gradeBand, profile);
   let planResult = await planStream.next();
 
@@ -898,7 +905,7 @@ export async function* streamPathway(
   // All applicable generators run together, and each result is emitted the
   // moment it lands rather than when the slowest one does.
   let built = 0;
-  for (const generator of startWidgetGenerators(anchor, plan)) {
+  for (const generator of startWidgetGenerators(anchor, plan, structural)) {
     const { widget, note } = await generator;
     // A generator that was offered and did not apply has nothing to report.
     if (!widget && !note) continue;

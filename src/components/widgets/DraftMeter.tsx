@@ -74,9 +74,9 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
 
   const telemetry = useWidgetTelemetry();
   /**
-   * Held in a ref, not read directly in the scoring effect below: the context
-   * value is rebuilt on every provider render, so putting it in that effect's
-   * dependencies would re-run the fetch on unrelated re-renders.
+   * Held in a ref so the scoring effect below need not depend on it. The handle
+   * is stable, but listing it there would tie a network call to the identity of
+   * something that has no bearing on when a draft should be scored.
    */
   const telemetryRef = useRef(telemetry);
   telemetryRef.current = telemetry;

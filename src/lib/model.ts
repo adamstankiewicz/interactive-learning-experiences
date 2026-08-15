@@ -97,12 +97,29 @@ function resolve(role: Role): LanguageModel {
   return anthropic(modelId('anthropic', role));
 }
 
+/**
+ * Resolved once per role. The provider clients hold no per-request state, and
+ * the environment they read cannot change under a running process, so building
+ * one on every call only repeated the work — on the scoring path, once per
+ * keystroke pause.
+ */
+const clients = new Map<Role, LanguageModel>();
+
+function cached(role: Role): LanguageModel {
+  const existing = clients.get(role);
+  if (existing) return existing;
+
+  const model = resolve(role);
+  clients.set(role, model);
+  return model;
+}
+
 /** The big model: standards proposal, pathway authoring, widget configuration. */
 export function pathwayModel(): LanguageModel {
-  return resolve('pathway');
+  return cached('pathway');
 }
 
 /** The fast model: one small structured judgement, on a debounce, per student. */
 export function scoringModel(): LanguageModel {
-  return resolve('scoring');
+  return cached('scoring');
 }

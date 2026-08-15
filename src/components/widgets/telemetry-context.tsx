@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
 import type { Telemetry } from '@/hooks/useTelemetry';
 
@@ -33,10 +33,16 @@ export function WidgetTelemetryProvider({
   standardCode: string | null;
   children: React.ReactNode;
 }) {
+  // A fresh object here would re-render every widget on the surface whenever
+  // the page re-rendered, and would re-fire any widget effect that depends on
+  // the telemetry handle — the draft meter's scoring call among them.
+  const value = useMemo(
+    () => ({ ...telemetry, standardCode }),
+    [telemetry, standardCode],
+  );
+
   return (
-    <WidgetTelemetryContext.Provider value={{ ...telemetry, standardCode }}>
-      {children}
-    </WidgetTelemetryContext.Provider>
+    <WidgetTelemetryContext.Provider value={value}>{children}</WidgetTelemetryContext.Provider>
   );
 }
 
