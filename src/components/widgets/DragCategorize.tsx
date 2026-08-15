@@ -7,8 +7,6 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
-  closestCorners,
-  getFirstCollision,
   useDraggable,
   useDroppable,
   useSensor,
@@ -51,44 +49,95 @@ const ARROW_CODES: string[] = [KeyboardCode.Up, KeyboardCode.Down, KeyboardCode.
  * This getter does the same "closest droppable in the pressed direction" search,
  * but skips the sort-insertion step and returns the center of that droppable
  * directly, which is what container-to-container movement actually needs.
+ *
+ * Direction and distance are both judged by rect *center*, not edges, and
+ * candidates are ranked by straight center-to-center distance rather than
+ * handed to dnd-kit's `closestCorners`. Three things go wrong with edges +
+ * `closestCorners` here, because the dragged chip is much smaller than the
+ * zones it moves between, and the bank is a single row spanning every
+ * category's columns:
+ *  - Edge comparisons (e.g. Left: `collisionRect.left > rect.left`) are
+ *    true for *any* zone sharing the chip's column, not just ones actually
+ *    further left, because the chip's own edge sits inset from its zone's
+ *    edge. A same-column zone one row down would then spuriously pass the
+ *    "left" filter — which is what made Left silently jump down a row
+ *    instead of sideways. Centers don't have this asymmetry: zones that
+ *    share a column/row also share a center on that axis, so the
+ *    inequality ties and correctly excludes them.
+ *  - `closestCorners` sums 4 corner-to-corner distances, which — again
+ *    because the chip is so much smaller than a zone — can favor a
+ *    diagonal zone over the directly-adjacent one. Once candidates are
+ *    already direction-filtered, plain nearest-center distance is both
+ *    simpler and matches what "closest in this direction" actually means.
+ *  - Center comparison alone still isn't enough for Left/Right out of a
+ *    category: the bank spans every column, so its horizontal center sits
+ *    between two category columns and reads as "to the right" from the
+ *    left column (or "to the left" from the right one) — and since it's
+ *    only a short vertical hop away, it can out-distance the real
+ *    same-row neighbor. Requiring the candidate to actually overlap the
+ *    chip on the perpendicular axis (vertically, for Left/Right;
+ *    horizontally, for Up/Down) rules out a zone that isn't really in that
+ *    row/column at all.
  */
 const zoneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { context }) => {
-  const { active, collisionRect, droppableRects, droppableContainers, over } = context;
+  const { active, collisionRect, droppableRects, droppableContainers } = context;
 
   if (!ARROW_CODES.includes(event.code) || !active || !collisionRect) return undefined;
   event.preventDefault();
 
-  const candidates = droppableContainers.getEnabled().filter((entry) => {
-    if (!entry || entry.disabled) return false;
+  const isHorizontal = event.code === KeyboardCode.Left || event.code === KeyboardCode.Right;
+  const activeCenterX = collisionRect.left + collisionRect.width / 2;
+  const activeCenterY = collisionRect.top + collisionRect.height / 2;
+
+  let closestId: string | number | null = null;
+  let closestDistance = Infinity;
+
+  for (const entry of droppableContainers.getEnabled()) {
+    if (!entry || entry.disabled) continue;
     const rect = droppableRects.get(entry.id);
-    if (!rect) return false;
+    if (!rect) continue;
 
-    switch (event.code) {
-      case KeyboardCode.Down:
-        return collisionRect.top < rect.top;
-      case KeyboardCode.Up:
-        return collisionRect.top > rect.top;
-      case KeyboardCode.Left:
-        return collisionRect.left > rect.left;
-      case KeyboardCode.Right:
-        return collisionRect.left < rect.left;
-      default:
-        return false;
+    // The zone the chip is already sitting in fully encloses collisionRect
+    // (the chip isn't centered in it yet before the first move, e.g. its
+    // natural flex-wrap position in the bank) — exclude it so it can never
+    // win as a "move in this direction" target for itself.
+    const encloses =
+      rect.left <= collisionRect.left &&
+      rect.top <= collisionRect.top &&
+      rect.right >= collisionRect.right &&
+      rect.bottom >= collisionRect.bottom;
+    if (encloses) continue;
+
+    // Perpendicular-axis overlap: a candidate has to actually share the
+    // chip's row (for Left/Right) or column (for Up/Down) to count, not
+    // just have a center that happens to fall on the right side.
+    const overlapsPerpendicular = isHorizontal
+      ? rect.top < collisionRect.bottom && rect.bottom > collisionRect.top
+      : rect.left < collisionRect.right && rect.right > collisionRect.left;
+    if (!overlapsPerpendicular) continue;
+
+    const rectCenterX = rect.left + rect.width / 2;
+    const rectCenterY = rect.top + rect.height / 2;
+
+    const inDirection =
+      event.code === KeyboardCode.Down
+        ? rectCenterY > activeCenterY
+        : event.code === KeyboardCode.Up
+          ? rectCenterY < activeCenterY
+          : event.code === KeyboardCode.Left
+            ? rectCenterX < activeCenterX
+            : rectCenterX > activeCenterX;
+    if (!inDirection) continue;
+
+    const dx = rectCenterX - activeCenterX;
+    const dy = rectCenterY - activeCenterY;
+    const distance = dx * dx + dy * dy;
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestId = entry.id;
     }
-  });
-
-  const collisions = closestCorners({
-    active,
-    collisionRect,
-    droppableRects,
-    droppableContainers: candidates,
-    pointerCoordinates: null,
-  });
-
-  let closestId = getFirstCollision(collisions, 'id');
-  if (closestId === over?.id && collisions.length > 1) {
-    closestId = collisions[1]?.id ?? closestId;
   }
+
   if (closestId == null) return undefined;
 
   const targetRect = droppableRects.get(closestId);
