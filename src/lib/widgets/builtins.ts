@@ -18,3 +18,4 @@ import '@/lib/widgets/definitions/step-reveal';
 import '@/lib/widgets/definitions/narrated-card';
 import '@/lib/widgets/definitions/timeline-builder';
 import '@/lib/widgets/definitions/find-the-flaw';
+import '@/lib/widgets/definitions/draw-the-curve';

@@ -15,3 +15,4 @@ import '@/lib/widgets/definitions/step-reveal.generate';
 import '@/lib/widgets/definitions/narrated-card.generate';
 import '@/lib/widgets/definitions/timeline-builder.generate';
 import '@/lib/widgets/definitions/find-the-flaw.generate';
+import '@/lib/widgets/definitions/draw-the-curve.generate';

@@ -25,6 +25,13 @@ const WIDGETS = [
     tags: ['writing', 'argument', 'live scoring'],
   },
   {
+    slug: 'draw-the-curve',
+    name: 'Draw the Curve',
+    description:
+      'Shape a line by dragging its points to predict how something changes, then see the real curve drawn over your guess. Checked on shape rather than numbers, so a story arc works the same way a motion graph does.',
+    tags: ['predict-then-reveal', 'any subject', 'chart'],
+  },
+  {
     slug: 'find-the-flaw',
     name: 'Find the Flaw',
     description:
