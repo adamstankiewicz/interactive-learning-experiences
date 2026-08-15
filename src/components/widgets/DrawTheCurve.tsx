@@ -185,6 +185,9 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   );
 
   const [values, setValues] = useState<number[]>(() => points.map(() => START_VALUE));
+  // Tracked rather than inferred from `values`: the floor is a legitimate
+  // answer, so a student who drags a point back down to it has still drawn.
+  const [touched, setTouched] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -217,9 +220,15 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   const setValue = useCallback(
     (index: number, value: number) => {
       if (revealed) return;
+      setTouched(true);
       setValues((prev) => {
+        const clamped = Math.min(100, Math.max(0, Math.round(value)));
+        // pointermove fires far faster than the value changes - while clamped
+        // at either edge, or moving horizontally, every event would otherwise
+        // allocate a new array and re-render the whole chart to no effect.
+        if (prev[index] === clamped) return prev;
         const next = [...prev];
-        next[index] = Math.min(100, Math.max(0, Math.round(value)));
+        next[index] = clamped;
         return next;
       });
     },
@@ -306,10 +315,11 @@ export function DrawTheCurve({ spec, onComplete }: Props) {
   const reset = useCallback(() => {
     setValues(points.map(() => START_VALUE));
     setRevealed(false);
+    setTouched(false);
   }, [points]);
 
   const legs = (vals: number[]) => curveSegments(vals.map((v, i) => ({ x: xOf(i), y: yOf(v) })));
-  const untouched = values.every((v) => v === START_VALUE);
+  const untouched = !touched;
 
   return (
     <div className="flex flex-col gap-4">
