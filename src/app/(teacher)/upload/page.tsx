@@ -1,11 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ThemeToggle } from '@/components/pathway/ThemeToggle';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 type ExtractedTopic = {
   topic: string;
@@ -43,22 +42,22 @@ export default function UploadPage() {
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await fetch('/api/lesson-plan', {
-        method: 'POST',
+      const response = await fetch("/api/lesson-plan", {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+        throw new Error(errorData.error || "Upload failed");
       }
 
       const data: UploadResponse = await response.json();
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setUploading(false);
     }
@@ -73,33 +72,26 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_3%,var(--background)),var(--background)_60%)]">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-3">
-          <Link href="/" className="font-heading text-sm font-semibold tracking-tight text-primary hover:underline">
-            Pathways
-          </Link>
-          <span className="text-xs text-muted-foreground">Upload Lesson Plan</span>
-          <div className="ml-auto">
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
+    <div className="flex min-h-full flex-col bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_3%,var(--background)),var(--background)_60%)]">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
         <div className="pt-14">
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance">
-            Upload a lesson plan <span className="text-primary">to extract topics</span>.
+            Upload a lesson plan{" "}
+            <span className="text-primary">to extract topics</span>.
           </h1>
           <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
-            Upload a text file (.txt) with your lesson plan and we&rsquo;ll extract the learning topics from it. Then you can
-            generate standards-grounded pathways for each topic using the Learning Commons knowledge graph.
+            Upload a text file (.txt) with your lesson plan and we&rsquo;ll
+            extract the learning topics from it. Then you can generate
+            standards-grounded pathways for each topic using the Learning
+            Commons knowledge graph.
           </p>
         </div>
 
         <div className="mt-8 space-y-6">
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-4 font-heading text-lg font-semibold">Select Text File</h2>
+            <h2 className="mb-4 font-heading text-lg font-semibold">
+              Select Text File
+            </h2>
 
             <div className="space-y-4">
               <div className="flex items-center gap-4">
@@ -121,12 +113,8 @@ export default function UploadPage() {
                   <span className="text-sm text-muted-foreground">
                     {file.name} ({(file.size / 1024).toFixed(1)} KB)
                   </span>
-                  <Button
-                    onClick={handleUpload}
-                    disabled={uploading}
-                    size="sm"
-                  >
-                    {uploading ? 'Processing...' : 'Extract Topics'}
+                  <Button onClick={handleUpload} disabled={uploading} size="sm">
+                    {uploading ? "Processing..." : "Extract Topics"}
                   </Button>
                 </div>
               )}
@@ -153,7 +141,8 @@ export default function UploadPage() {
 
                 {result.topics.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No topics found in the lesson plan. Try a different file or enter topics manually.
+                    No topics found in the lesson plan. Try a different file or
+                    enter topics manually.
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -174,7 +163,12 @@ export default function UploadPage() {
                           </div>
                           <Button
                             size="sm"
-                            onClick={() => handleGeneratePathway(topic.topic, topic.gradeLevel)}
+                            onClick={() =>
+                              handleGeneratePathway(
+                                topic.topic,
+                                topic.gradeLevel,
+                              )
+                            }
                           >
                             Generate Pathway
                           </Button>
@@ -187,9 +181,7 @@ export default function UploadPage() {
 
               <div className="text-center">
                 <Link href="/">
-                  <Button variant="outline">
-                    Back to Manual Entry
-                  </Button>
+                  <Button variant="outline">Back to Manual Entry</Button>
                 </Link>
               </div>
             </div>

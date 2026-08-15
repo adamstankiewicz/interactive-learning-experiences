@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     "Turn a topic into a standards-grounded learning pathway with an interactive widget.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
