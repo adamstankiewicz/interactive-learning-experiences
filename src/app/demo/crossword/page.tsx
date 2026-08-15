@@ -1,6 +1,10 @@
-import Link from 'next/link';
+'use client';
 
-import { Crossword } from '@/components/widgets/Crossword';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+
+import { Slider } from '@/components/ui/slider';
+import { Crossword, varyCrossword } from '@/components/widgets/Crossword';
 import type { CrosswordSpec } from '@/lib/pathway/schema';
 
 /**
@@ -98,6 +102,9 @@ const DEMO_SPEC: CrosswordSpec = {
 };
 
 export default function CrosswordDemo() {
+  const [variation, setVariation] = useState(100);
+  const spec = useMemo(() => varyCrossword(DEMO_SPEC, variation), [variation]);
+
   return (
     // Wider than the other demos: this widget is built for the pathway column,
     // and a grid worth solving needs most of it.
@@ -118,7 +125,21 @@ export default function CrosswordDemo() {
         </p>
       </div>
 
-      <Crossword spec={DEMO_SPEC} />
+      <div className="mb-4 flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+        <span className="text-xs font-medium text-muted-foreground">Smaller puzzle</span>
+        <Slider
+          value={[variation]}
+          onValueChange={(next) => setVariation(Array.isArray(next) ? next[0] : next)}
+          min={0}
+          max={100}
+          step={1}
+          className="flex-1"
+          aria-label="Variation"
+        />
+        <span className="text-xs font-medium text-muted-foreground">Larger puzzle</span>
+      </div>
+
+      <Crossword key={spec.entries.length} spec={spec} />
     </main>
   );
 }

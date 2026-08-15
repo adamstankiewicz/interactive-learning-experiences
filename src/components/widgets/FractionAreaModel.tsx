@@ -10,6 +10,40 @@ import { cn } from '@/lib/utils';
 import type { FractionAreaModelSpec } from '@/lib/pathway/schema';
 
 /**
+ * Derives a harder or easier instance of the same widget from a slider
+ * position — a pure remap of the spec, no model call, and no invented
+ * content. It only ever selects a denominator from `denominatorChoices`
+ * the model already grounded for this standard; level 0-100 maps linearly
+ * onto that list, ascending. `numerator` is always `denominator - 1`
+ * ("build all but one part") — a fixed formula, not a per-tier hand-picked
+ * number — so larger denominators stay hard to eyeball rather than needing
+ * their own authored target. The same level always derives the same spec,
+ * so dragging back to a position is a stable, revisitable state.
+ *
+ * This is the "variation" half of a difficulty knob: it changes how hard
+ * the same skill is, never which standard is being taught, so it never
+ * needs re-grounding against the graph the way a structural change would.
+ */
+export function varyFractionAreaModel(base: FractionAreaModelSpec, level: number): FractionAreaModelSpec {
+  const choices = [...base.denominatorChoices].sort((a, b) => a - b);
+  const index = Math.min(choices.length - 1, Math.floor((level / 100) * choices.length));
+  const denominator = choices[index];
+  const numerator = Math.max(1, denominator - 1);
+
+  return {
+    ...base,
+    denominator,
+    numerator,
+    prompt: `Build ${numerator}/${denominator} using the ${base.representation} model.`,
+    // successMessage/hint reference the old numerator/denominator by name, so they need
+    // re-templating too — leaving them as `...base` would announce a correct 7/8 answer
+    // as "you selected 3 out of 4 equal parts."
+    successMessage: `Exactly right — you selected ${numerator} out of ${denominator} equal parts.`,
+    hint: `Try selecting ${numerator} parts once you have split the bar into ${denominator} equal sections.`,
+  };
+}
+
+/**
  * Partition a whole into equal parts, then select parts to build a target
  * fraction. Choosing the denominator is part of the work: getting 3/4 by
  * selecting 6 of 8 parts is a different (and revealing) answer than 3 of 4.

@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { DragCategorize } from '@/components/widgets/DragCategorize';
+import { Slider } from '@/components/ui/slider';
+import { DragCategorize, varyDragCategorize } from '@/components/widgets/DragCategorize';
 import type { DragCategorizeSpec } from '@/lib/pathway/schema';
 
 const DEMO_SPEC: DragCategorizeSpec = {
@@ -35,6 +36,8 @@ const DEMO_SPEC: DragCategorizeSpec = {
 export default function DragCategorizeDemo() {
   const [events, setEvents] = useState<string[]>([]);
   const [key, setKey] = useState(0);
+  const [variation, setVariation] = useState(100);
+  const spec = useMemo(() => varyDragCategorize(DEMO_SPEC, variation), [variation]);
 
   function handleComplete(correct: boolean) {
     setEvents((prev) => [
@@ -60,7 +63,27 @@ export default function DragCategorizeDemo() {
         </p>
       </div>
 
-      <DragCategorize key={key} spec={DEMO_SPEC} onComplete={handleComplete} />
+      <div className="mb-4 flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+        <span className="text-xs font-medium text-muted-foreground">Fewer items</span>
+        <Slider
+          value={[variation]}
+          onValueChange={(next) => {
+            setVariation(Array.isArray(next) ? next[0] : next);
+            setKey((k) => k + 1);
+            setEvents([]);
+          }}
+          min={0}
+          max={100}
+          step={1}
+          className="flex-1"
+          aria-label="Variation"
+        />
+        <span className="text-xs font-medium text-muted-foreground">More items</span>
+      </div>
+
+      {/* Keyed on item count too: dragging the slider mid-attempt should reset the
+          board rather than leave stale placements pointing at trimmed items. */}
+      <DragCategorize key={`${key}-${spec.items.length}`} spec={spec} onComplete={handleComplete} />
 
       {events.length > 0 && (
         <div className="mt-8 flex flex-col gap-2">
