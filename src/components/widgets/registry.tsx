@@ -11,6 +11,7 @@ import { FractionAreaModel } from '@/components/widgets/FractionAreaModel';
 import { SwiperFlashcard } from '@/components/widgets/SwiperFlashcard';
 import { NarratedCard } from '@/components/widgets/NarratedCard';
 import { StepReveal } from '@/components/widgets/StepReveal';
+import { TimelineBuilder } from '@/components/widgets/TimelineBuilder';
 import { widgetSpec, type WidgetSpec } from '@/lib/pathway/schema';
 
 /**
@@ -38,6 +39,8 @@ function render(spec: WidgetSpec) {
       return <StepReveal spec={spec} />;
     case 'narrated-card':
       return <NarratedCard spec={spec} />;
+    case 'timeline-builder':
+      return <TimelineBuilder spec={spec} />;
     case 'crossword':
       return <Crossword spec={spec} />;
   }

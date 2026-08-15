@@ -25,6 +25,13 @@ const WIDGETS = [
     tags: ['writing', 'argument', 'live scoring'],
   },
   {
+    slug: 'timeline-builder',
+    name: 'Timeline Builder',
+    description:
+      'Drag historical events from a bank into labeled period zones on a horizontal timeline. Supports 3–5 zones with per-event correctness feedback.',
+    tags: ['history', 'sequencing', 'timeline'],
+  },
+  {
     slug: 'drag-sort',
     name: 'Drag & Sort',
     description:

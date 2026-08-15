@@ -276,6 +276,34 @@ export const crosswordSpec = z.object({
 
 export type CrosswordSpec = z.infer<typeof crosswordSpec>;
 
+export const timelineBuilderSpec = z.object({
+  kind: z.literal('timeline-builder'),
+  learningComponentId: z.string().nullable(),
+  prompt: z.string().describe('Instruction shown above the timeline, e.g. "Place each event in the correct period."'),
+  zones: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this zone'),
+        label: z.string().describe('Period or era label shown on the timeline, e.g. "1800s" or "Ancient Rome"'),
+        sublabel: z.string().nullable().describe('Optional date range or subtitle shown below the label, e.g. "1800–1899". Null to omit.'),
+      }),
+    )
+    .describe('Give 3-5 zones in chronological order, left to right.'),
+  events: z
+    .array(
+      z.object({
+        id: z.string().describe('Stable unique identifier for this event'),
+        label: z.string().describe('Short event name shown on the draggable chip, e.g. "Moon landing"'),
+        zoneId: z.string().describe('id of the zone this event belongs to'),
+      }),
+    )
+    .describe('Give 4-10 events spread across the zones. They will be shuffled before display.'),
+  successMessage: z.string().describe('Shown when all events are placed correctly.'),
+  hint: z.string().describe('Shown after a wrong submission; names the misconception or gives a nudge.'),
+});
+
+export type TimelineBuilderSpec = z.infer<typeof timelineBuilderSpec>;
+
 /** Discriminated union — add widget kinds here as generators are registered. */
 export const widgetSpec = z.discriminatedUnion('kind', [
   fractionAreaModelSpec,
@@ -287,6 +315,7 @@ export const widgetSpec = z.discriminatedUnion('kind', [
   flashcardSpec,
   stepRevealSpec,
   narratedCardSpec,
+  timelineBuilderSpec,
   crosswordSpec,
 ]);
 export type WidgetSpec = z.infer<typeof widgetSpec>;
