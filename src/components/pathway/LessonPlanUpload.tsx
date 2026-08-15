@@ -134,9 +134,9 @@ export function LessonPlanUpload({
                   onPick({ ...extracted, filename: status.filename, excerpt: status.excerpt })
                 }
                 title={extracted.description}
-                className="group flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:pointer-events-none disabled:opacity-50"
+                className="group flex items-center gap-1.5 rounded-full border-2 border-violet-200 bg-white/70 px-3 py-1.5 text-left text-sm transition-colors hover:border-violet-300 hover:bg-violet-50 disabled:pointer-events-none disabled:opacity-50 dark:border-violet-800 dark:bg-white/5 dark:hover:bg-violet-950/40"
               >
-                <span className="font-medium">{extracted.topic}</span>
+                <span className="font-medium text-violet-700 dark:text-violet-300">{extracted.topic}</span>
                 <Badge variant="secondary" className="pointer-events-none">
                   Gr {extracted.gradeLevel}
                 </Badge>
@@ -164,8 +164,8 @@ export function LessonPlanUpload({
           if (file && !disabled) void upload(file);
         }}
         className={cn(
-          'flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground transition-colors',
-          dragging && 'border-primary/50 bg-primary/5',
+          'flex cursor-pointer items-center gap-2.5 rounded-2xl border-2 border-dashed border-amber-300 px-4 py-3 text-sm text-amber-700 transition-colors dark:border-amber-800 dark:text-amber-400',
+          dragging && 'border-amber-400 bg-amber-50 dark:bg-amber-950/30',
           disabled && 'pointer-events-none opacity-50',
         )}
       >
@@ -184,14 +184,14 @@ export function LessonPlanUpload({
 
         {status.kind === 'uploading' ? (
           <>
-            <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-            <span>Reading {status.filename}…</span>
+            <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+            <span className="font-medium">Reading {status.filename}…</span>
           </>
         ) : (
           <>
-            <Upload className="size-4 shrink-0" />
+            <Upload className="size-4 shrink-0" aria-hidden />
             <span>
-              Or upload a lesson plan <span className="text-muted-foreground/60">(.txt or .pdf)</span> to
+              📎 Or upload a lesson plan <span className="text-amber-500/70 dark:text-amber-600">(.txt or .pdf)</span> to
               pull topics from it
             </span>
           </>

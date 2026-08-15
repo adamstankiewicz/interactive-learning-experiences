@@ -200,6 +200,9 @@ function Shell() {
     <div className="p-4 font-sans">
       {/* Widgets report through telemetry, which had no sink in here. Giving it
           one is what lets a finished activity reach the conversation. */}
+      {/* A standalone widget in a chat host, never part of a multi-step
+          pathway — it's the only one shown, so index 0 is accurate, not a
+          placeholder. */}
       <WidgetTelemetryProvider telemetry={telemetry} standardCode={standardCode} stepIndex={0}>
         <Component spec={spec} />
       </WidgetTelemetryProvider>

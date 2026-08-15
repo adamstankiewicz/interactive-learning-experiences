@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import type { RosterStudent } from '@/lib/roster/types';
 
 type AssignEvent =
@@ -120,16 +119,16 @@ export function AssignToStudents({ topic, gradeHint, parentSessionId }: { topic:
 
   if (loadingRoster) return null;
   if (students.length === 0) return (
-    <div className="mt-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-4 text-sm text-slate-500 dark:text-slate-400">
+    <div className="mt-4 rounded-2xl border-2 border-dashed border-violet-200 p-4 text-sm text-muted-foreground dark:border-violet-900">
       No students in your roster yet.{' '}
-      <a href="/roster" className="text-indigo-600 dark:text-indigo-400 hover:underline">Add students</a> to assign this pathway.
+      <a href="/roster" className="font-medium text-violet-600 hover:underline dark:text-violet-400">Add students</a> to assign this pathway.
     </div>
   );
 
   return (
-    <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Assign to students</h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+    <div className="mt-4 rounded-3xl border-3 border-violet-200 bg-card p-5 dark:border-violet-900">
+      <h3 className="font-heading text-base font-black">🎒 Assign to students</h3>
+      <p className="mt-1 mb-4 text-xs text-muted-foreground">
         Select students to generate a personalized version of this pathway for each one.
       </p>
 
@@ -142,48 +141,48 @@ export function AssignToStudents({ topic, gradeHint, parentSessionId }: { topic:
           return (
             <label
               key={student.id}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 border transition-colors ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border-2 transition-colors ${
                 isAssigned
-                  ? 'border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                  ? 'border-border opacity-50 cursor-not-allowed'
                   : isDisabled
-                  ? 'border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                  ? 'border-border cursor-not-allowed'
                   : selected.has(student.id)
-                  ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/40 cursor-pointer'
-                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer'
+                  ? 'border-violet-400 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/40 cursor-pointer'
+                  : 'border-border hover:border-violet-200 dark:hover:border-violet-800 cursor-pointer'
               }`}
             >
               <input
                 type="checkbox"
-                className="accent-indigo-600"
+                className="accent-violet-600"
                 checked={selected.has(student.id)}
                 disabled={isDisabled}
                 onChange={() => toggle(student.id)}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{student.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-sm font-medium text-foreground truncate">{student.name}</p>
+                <p className="text-xs text-muted-foreground">
                   Gr. {student.grade} · {student.learningStyle.primary}
                 </p>
               </div>
               {isAssigned && !status && (
-                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">Assigned</span>
+                <span className="text-xs text-muted-foreground shrink-0">Assigned</span>
               )}
               {status === 'generating' && (
-                <span className="text-xs text-indigo-500 animate-pulse">Generating…</span>
+                <span className="text-xs font-medium text-violet-500 animate-pulse">Generating…</span>
               )}
               {status === 'done' && sid && (
                 <a
                   href={`/learn/${sid}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
+                  className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
                   onClick={(e) => e.stopPropagation()}
                 >
                   Open →
                 </a>
               )}
               {status === 'error' && (
-                <span className="text-xs text-red-500">Failed</span>
+                <span className="text-xs font-medium text-destructive">Failed</span>
               )}
             </label>
           );
@@ -195,7 +194,7 @@ export function AssignToStudents({ topic, gradeHint, parentSessionId }: { topic:
         const succeeded = vals.filter((s) => s === 'done').length;
         const failed = vals.filter((s) => s === 'error').length;
         if (succeeded === 0) return (
-          <p className="text-xs text-red-600 dark:text-red-400 mb-3 font-medium">
+          <p className="text-xs text-destructive mb-3 font-medium">
             Generation failed for all students. Check the console for details.
           </p>
         );
@@ -206,30 +205,30 @@ export function AssignToStudents({ topic, gradeHint, parentSessionId }: { topic:
         );
         return (
           <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-3 font-medium">
-            All personalized pathways generated. Students can view them on their homepages.
+            🎉 All personalized pathways generated. Students can view them on their homepages.
           </p>
         );
       })()}
 
       {students.every((s) => alreadyAssigned.has(s.id)) ? (
-        <p className="text-center text-xs text-slate-400 dark:text-slate-500 py-1">
+        <p className="text-center text-xs text-muted-foreground py-1">
           All students have been assigned this pathway.
         </p>
       ) : (
         <>
-          <Button
-            size="sm"
+          <button
+            type="button"
             onClick={assign}
             disabled={selected.size === 0 || assigning}
-            className="w-full"
+            className="w-full rounded-xl bg-amber-400 py-3 text-sm font-black text-amber-950 shadow-[0_4px_0_0_#b45309] transition-transform active:translate-y-1 active:shadow-[0_1px_0_0_#b45309] disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
           >
             {assigning
               ? 'Generating personalized pathways…'
-              : `Assign to ${selected.size} student${selected.size !== 1 ? 's' : ''}`}
-          </Button>
+              : `Assign to ${selected.size} student${selected.size !== 1 ? 's' : ''} 🚀`}
+          </button>
 
           {selected.size > 0 && !assigning && (
-            <p className="mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
+            <p className="mt-2 text-center text-xs text-muted-foreground">
               This will generate a separate AI-personalized pathway for each selected student.
             </p>
           )}

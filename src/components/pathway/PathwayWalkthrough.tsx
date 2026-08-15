@@ -171,9 +171,17 @@ export function PathwayWalkthrough({
   const currentWidget = effectiveWidgets[displayStep];
   const currentKind = widgetKindOf(currentWidget);
 
-  // True once the current widget signals it's done. Resets when the displayed step changes.
+  // True once the current widget signals it's done. Resets when the displayed
+  // step changes — adjusted during render (same idiom `ActivityTrail` uses
+  // for its own prev-status comparison) rather than in an effect, so the
+  // reset lands in the same commit as the step change instead of one render
+  // later.
   const [widgetDone, setWidgetDone] = useState(false);
-  useEffect(() => { setWidgetDone(false); }, [displayStep]);
+  const [widgetDoneForStep, setWidgetDoneForStep] = useState(displayStep);
+  if (displayStep !== widgetDoneForStep) {
+    setWidgetDoneForStep(displayStep);
+    setWidgetDone(false);
+  }
   const markWidgetDone = useCallback(() => setWidgetDone(true), []);
 
   // Fires once per mount, the student's half of "close the loop back to the
