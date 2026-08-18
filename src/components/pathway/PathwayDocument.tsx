@@ -316,9 +316,14 @@ export function PathwayDocument({
               map's line is the point, not decoration. */}
           <ol className="space-y-0">
             {plan?.steps?.map((step, index) => {
-              const waypoint = (step?.purpose && WAYPOINT_META[step.purpose]) ?? null;
+              // `||`, not `??`. A streamed partial step arrives with
+              // `purpose: ""` before the token lands, and `??` only replaces
+              // null/undefined — so these expressions stayed `""`. React was
+              // handed `<"" />` and the whole page died on `createElement('')`
+              // every time a pathway was built.
+              const waypoint = (step?.purpose && WAYPOINT_META[step.purpose]) || null;
               const isLast = index === (plan?.steps?.length ?? 0) - 1;
-              const Icon = (step?.purpose && PURPOSE_META[step.purpose]?.Icon) ?? Sparkles;
+              const Icon = (step?.purpose && PURPOSE_META[step.purpose]?.Icon) || Sparkles;
 
               return (
                 <li key={index} className="flex gap-3">
