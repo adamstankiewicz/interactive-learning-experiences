@@ -1,7 +1,7 @@
 import { generateText, streamText, Output } from 'ai';
 import type { FlexibleSchema, LanguageModel } from 'ai';
 
-import { pathwayModel } from '@/lib/model';
+import { fallbackModel, pathwayModel } from '@/lib/model';
 
 /**
  * Every model call in this project is the same shape: a schema, a system
@@ -20,7 +20,7 @@ function model() {
   return (cached ??= pathwayModel());
 }
 
-export async function generateStructured<T>(options: {
+type StructuredOptions<T> = {
   schema: FlexibleSchema<T>;
   system: string;
   prompt: string;
@@ -32,16 +32,40 @@ export async function generateStructured<T>(options: {
   temperature?: number;
   /** Defaults to the pathway model; scoring passes the fast one. */
   model?: LanguageModel;
-}): Promise<T> {
-  const result = await generateText({
-    model: options.model ?? model(),
+};
+
+function callModel<T>(target: LanguageModel, options: StructuredOptions<T>) {
+  return generateText({
+    model: target,
     output: Output.object({ schema: options.schema }),
     system: options.system,
     prompt: options.prompt,
     ...(options.temperature === undefined ? {} : { temperature: options.temperature }),
   });
+}
 
-  return result.output;
+/**
+ * One retry, against a different vendor, before giving up.
+ *
+ * A hackathon prototype runs on borrowed or personal keys with nobody on call
+ * — a Bedrock bearer token expiring mid-demo, or an OpenRouter rate limit
+ * during a room full of people trying it at once, is the ordinary failure
+ * mode here, not the rare one. `fallbackModel()` is null unless
+ * `OPENAI_FALLBACK_API_KEY` is set, so this is a no-op everywhere that hasn't
+ * opted in.
+ */
+export async function generateStructured<T>(options: StructuredOptions<T>): Promise<T> {
+  const primary = options.model ?? model();
+
+  try {
+    return (await callModel(primary, options)).output;
+  } catch (error) {
+    const fallback = fallbackModel();
+    if (!fallback) throw error;
+
+    console.error('[model] primary provider failed, retrying once on the OpenAI fallback:', error);
+    return (await callModel(fallback, options)).output;
+  }
 }
 
 /** Local rather than imported from `pathway/events` — this module is domain-agnostic. */
@@ -56,22 +80,43 @@ type DeepPartial<T> = T extends (infer U)[]
  * highest-value calls — the plan authoring stage is the one that streams
  * today — so this stays a separate export rather than the default shape.
  */
-export async function* streamStructured<T>(options: {
-  schema: FlexibleSchema<T>;
-  system: string;
-  prompt: string;
-  model?: LanguageModel;
-}): AsyncGenerator<DeepPartial<T>, T> {
-  const result = streamText({
-    model: options.model ?? model(),
-    output: Output.object({ schema: options.schema }),
-    system: options.system,
-    prompt: options.prompt,
-  });
-
-  for await (const partial of result.partialOutputStream) {
-    yield partial as DeepPartial<T>;
+export async function* streamStructured<T>(
+  options: Omit<StructuredOptions<T>, 'temperature'>,
+): AsyncGenerator<DeepPartial<T>, T> {
+  function stream(target: LanguageModel) {
+    return streamText({
+      model: target,
+      output: Output.object({ schema: options.schema }),
+      system: options.system,
+      prompt: options.prompt,
+    });
   }
 
-  return (await result.output) as T;
+  let result = stream(options.model ?? model());
+
+  // Falling back mid-stream would mean un-yielding partials a caller has
+  // already rendered, so the retry only applies before the first partial
+  // arrives — exactly the window a dead credential or a 429 fails in anyway.
+  let startedStreaming = false;
+
+  try {
+    for await (const partial of result.partialOutputStream) {
+      startedStreaming = true;
+      yield partial as DeepPartial<T>;
+    }
+    return (await result.output) as T;
+  } catch (error) {
+    if (startedStreaming) throw error;
+
+    const fallback = fallbackModel();
+    if (!fallback) throw error;
+
+    console.error('[model] primary provider failed before first output, retrying once on the OpenAI fallback:', error);
+    result = stream(fallback);
+
+    for await (const partial of result.partialOutputStream) {
+      yield partial as DeepPartial<T>;
+    }
+    return (await result.output) as T;
+  }
 }

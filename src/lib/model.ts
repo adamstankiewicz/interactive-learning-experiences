@@ -1,5 +1,6 @@
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { anthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import type { LanguageModel } from 'ai';
 
@@ -95,6 +96,30 @@ function resolve(role: Role): LanguageModel {
   }
 
   return anthropic(modelId('anthropic', role));
+}
+
+/**
+ * The emergency exit, independent of whichever provider `LLM_PROVIDER` names.
+ *
+ * A hackathon deploy runs on borrowed or personal API keys with no ops team
+ * behind them — a Bedrock bearer token expiring mid-demo is the normal case,
+ * not the edge case. Rather than go dark when the primary provider 401s or
+ * 429s, `generateStructured`/`streamStructured` retry once against this model
+ * if it is configured. Deliberately a different vendor from every other
+ * option here: an OpenRouter outage and an Anthropic outage are correlated
+ * with each other in a way neither is with OpenAI's.
+ *
+ * Absent by default — set OPENAI_FALLBACK_API_KEY to arm it. Pair the key
+ * with a hard monthly budget in the OpenAI dashboard (Settings -> Limits);
+ * that is the actual mechanism for "with limits", not anything this code can
+ * enforce.
+ */
+export function fallbackModel(): LanguageModel | null {
+  const apiKey = process.env.OPENAI_FALLBACK_API_KEY;
+  if (!apiKey) return null;
+
+  const openai = createOpenAI({ apiKey });
+  return openai(process.env.OPENAI_FALLBACK_MODEL_ID ?? 'gpt-4o-mini');
 }
 
 /** The big model: standards proposal, pathway authoring, widget configuration. */
