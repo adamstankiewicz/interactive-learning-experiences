@@ -2,7 +2,7 @@
   "name": "interactive-student-experiences",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "description": "AI-authored, standards-grounded interactive learning pathways \u2014 self-hostable, with pluggable standards sources and an open widget registry.",
+  "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -19,6 +19,7 @@
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.55",
     "@ai-sdk/anthropic": "^4.0.38",
+    "@ai-sdk/openai": "^4.0.42",
     "@base-ui/react": "^1.7.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
