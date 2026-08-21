@@ -1,0 +1,40 @@
+name: Widget proposal
+description: Propose a new interactive widget kind for the open registry
+labels: [widget]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Widget name
+      placeholder: graph-the-story
+    validations:
+      required: true
+  - type: textarea
+    id: interaction
+    attributes:
+      label: What does the student actually do?
+      description: The interaction, not the topic — what do hands and eyes do from first render to done?
+    validations:
+      required: true
+  - type: textarea
+    id: pedagogy
+    attributes:
+      label: What does it teach that existing widgets don't?
+      description: Check the 16 current kinds (see src/lib/widgets/definitions/). What learning moment is missing?
+    validations:
+      required: true
+  - type: dropdown
+    id: assesses
+    attributes:
+      label: Does completing it measure correctness?
+      description: Every registered widget must answer this (`assesses` on its catalog entry) — "check" steps can only use widgets that measure.
+      options:
+        - "Yes — it can tell right from wrong"
+        - "No — it's exploratory / expressive"
+    validations:
+      required: true
+  - type: textarea
+    id: generation
+    attributes:
+      label: What would the model generate for it?
+      description: Sketch the spec — what fields, roughly? Flat structures generate far more reliably than nested unions.
