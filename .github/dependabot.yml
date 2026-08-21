@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # One PR per group keeps the update stream reviewable instead of noisy.
+    groups:
+      ai-sdk:
+        patterns: ["ai", "@ai-sdk/*", "@openrouter/*"]
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
