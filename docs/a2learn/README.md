@@ -19,7 +19,7 @@ emit-and-validate. The one part with protocol flavor — the event vocabulary �
 is specified as payload shapes with *bindings* to AG-UI and MCP, never as a
 new wire protocol.
 
-## The three documents
+## The documents
 
 1. [`surface.md`](./surface.md) — the activity itself: an A2UI-conformant
    surface carrying learning semantics (state contract, gating, language).
@@ -28,6 +28,20 @@ new wire protocol.
    the registry/marketplace's format.
 3. [`events.md`](./events.md) — what interactions report: result and action
    payloads, with two transport bindings.
+4. [`conformance.md`](./conformance.md) — conformance classes (Producer,
+   Renderer, Registry, Host), versioning and extension rules, and the gate
+   for 1.0.
+5. [`considerations.md`](./considerations.md) — security, privacy
+   (education records, minors), and accessibility considerations.
+6. [`CHANGELOG.md`](./CHANGELOG.md) — every breaking change, with what an
+   implementer must do about it.
+
+## Conventions
+
+The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and
+**MAY** are to be interpreted per RFC 2119; text without them is
+informative. Conformance is always claimed against a class in
+[`conformance.md`](./conformance.md), never against "a2learn" in general.
 
 ## Design principles
 
