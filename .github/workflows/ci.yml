@@ -38,3 +38,14 @@ jobs:
       # `next build` typechecks too, and it needs no secrets — verified by
       # building with no .env file present.
       - run: pnpm build
+
+      # public/widget-shell.html is a committed build artifact (next build
+      # copies public/ before mcp/build.mjs could run, so it can't be built
+      # on demand). It goes stale silently when widgets change — the failure
+      # mode is "No renderer registered" in every MCP host. The rebuild is
+      # byte-deterministic, so a diff means someone forgot `pnpm mcp:build`.
+      - name: widget-shell.html is current
+        run: |
+          node mcp/build.mjs
+          git diff --exit-code public/widget-shell.html \
+            || { echo '::error::public/widget-shell.html is stale — run `pnpm mcp:build` and commit the result'; exit 1; }
