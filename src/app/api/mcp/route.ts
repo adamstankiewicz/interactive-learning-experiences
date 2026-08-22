@@ -1,3 +1,4 @@
+import { findActivities } from '@/lib/activities/find';
 import { scoreDraft } from '@/lib/draft-meter/score';
 import { scoreRequest } from '@/lib/draft-meter/schema';
 import { buildWidget, WidgetBuildError, WIDGET_KINDS } from '@/lib/widgets/build';
@@ -143,8 +144,48 @@ const TOOL_DESCRIPTION = [
   'example can contain a mistake; crossword fits any standard with vocabulary.',
 ].join('\n');
 
+const FIND_DESCRIPTION = [
+  'Browse the activity registry: which interactive learning activities fit a learning need, before',
+  'building one. Returns ranked activity listings (a2learn manifests) for a verified standard —',
+  'each names the standard it teaches, whether completing it measures correctness (`assesses`),',
+  'and the exact `show_widget` arguments that build it.',
+  '',
+  'Listings are GENERATIVE: this registry lists capabilities that manufacture a standards-verified',
+  'activity on demand, not a shelf of files. Discovery is fast and model-free — call it whenever',
+  'there is a real choice to make or to offer: "what could my student do for X", comparing options,',
+  'or letting a teacher pick. When the user just wants an activity NOW, skip this and call',
+  '`show_widget` directly.',
+  '',
+  'Give a topic in plain words or a standard code; `need` biases ranking ("a game", "something',
+  'they write", "a quick check"). Then invoke the chosen listing via its `delivery.mcp.arguments`.',
+].join('\n');
+
 function tools(origin: string) {
   return [
+    {
+      name: 'find_activity',
+      title: 'Find learning activities for a need',
+      description: FIND_DESCRIPTION,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            description: 'The learning need in plain words — "comparing fractions", "the water cycle".',
+          },
+          standardCode: {
+            type: 'string',
+            description: 'Optional. A Common Core or NGSS code if known; verified against the standards graph.',
+          },
+          gradeHint: { type: 'string', description: 'Optional, e.g. "4th grade".' },
+          need: {
+            type: 'string',
+            description: 'Optional preference in plain words — "a game", "something they write", "a quick check".',
+          },
+        },
+        required: [],
+      },
+    },
     {
       name: 'show_widget',
       title: 'Show an interactive learning widget',
@@ -302,6 +343,39 @@ async function handle(message: RpcRequest, request: Request) {
           });
         } catch (error) {
           const text = error instanceof Error ? error.message : 'Scoring failed.';
+          return ok(message.id, { content: [{ type: 'text', text }], isError: true });
+        }
+      }
+
+      if (message.params?.name === 'find_activity') {
+        const args = (message.params?.arguments ?? {}) as {
+          topic?: string;
+          standardCode?: string;
+          gradeHint?: string;
+          need?: string;
+        };
+
+        try {
+          const found = await findActivities(args);
+
+          const header = found.standard
+            ? `${found.activities.length} activities for ${found.standard.code} — ${found.standard.description}` +
+              (found.standard.verified ? ' (verified)' : ' (unverified)')
+            : `No standard matched${found.rejectedCodes.length ? ` (tried ${found.rejectedCodes.join(', ')})` : ''}; ${found.activities.length} standard-agnostic activities.`;
+
+          const lines = found.activities
+            .slice(0, 8)
+            .map(
+              (activity) =>
+                `- ${activity.title}${activity.pedagogy.assesses ? ' (assesses)' : ''}: ${activity.summary}`,
+            );
+
+          return ok(message.id, {
+            content: [{ type: 'text', text: [header, ...lines].join('\n') }],
+            structuredContent: found,
+          });
+        } catch (error) {
+          const text = error instanceof Error ? error.message : 'Discovery failed.';
           return ok(message.id, { content: [{ type: 'text', text }], isError: true });
         }
       }
