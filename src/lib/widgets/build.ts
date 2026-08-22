@@ -76,7 +76,7 @@ function syntheticPlan(anchor: Anchor, kind: (typeof WIDGET_KINDS)[number]): Pat
  * Same shape as stage 1 of the pathway pipeline: guesses are cheap because the
  * graph rejects the ones that do not exist.
  */
-async function proposeFor(topic: string, gradeHint?: string) {
+export async function proposeFor(topic: string, gradeHint?: string) {
   const proposal = await generateStructured({
     schema: z.object({
       candidates: z
