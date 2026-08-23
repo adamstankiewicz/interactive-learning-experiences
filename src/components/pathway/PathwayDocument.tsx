@@ -701,7 +701,12 @@ const StepCard = memo(function StepCard({
     // Quiet on purpose: the waypoint dot and the pill below already say which
     // kind of step this is — a colored border on top of both just repeats
     // the same signal a third time and reads as noise, not information.
-    <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/10 transition-colors">
+    <div
+      className={cn(
+        'overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/10 transition-colors',
+        regenerating && 'shadow-[inset_3px_0_0_var(--brand-fill)]',
+      )}
+    >
       <div className="flex flex-col gap-1.5 px-4 py-3.5 sm:flex-row sm:gap-4">
         <span className="shrink-0">
           <span
@@ -767,6 +772,7 @@ const StepCard = memo(function StepCard({
             <ActivityFrame
               kind={widgetKindOfSpec(widget) ?? step?.widgetKind ?? 'activity'}
               title={
+                step?.title ??
                 (step?.widgetKind && WIDGET_KIND_LABEL[step.widgetKind]) ??
                 'Interactive activity'
               }
@@ -893,7 +899,7 @@ function EditableText({
         setEditing(true);
       }}
       className={cn(
-        'cursor-text rounded text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50',
+        'cursor-text border-b-2 border-dashed border-transparent text-left outline-none transition-colors hover:border-border focus-visible:ring-2 focus-visible:ring-ring/50',
         as === 'p' && 'block w-full',
         className,
       )}

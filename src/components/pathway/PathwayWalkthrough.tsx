@@ -63,6 +63,13 @@ function widgetKindOf(widget: unknown): string | null {
     : null;
 }
 
+/** An injected remediation widget carries its own "Let's revisit: …" title. */
+function widgetTitleOf(widget: unknown): string | null {
+  return widget && typeof widget === 'object' && 'title' in widget && typeof widget.title === 'string'
+    ? widget.title
+    : null;
+}
+
 function stepKey(sessionId: string) { return `pathway:step:${sessionId}`; }
 function doneKey(sessionId: string) { return `pathway:done:${sessionId}`; }
 
@@ -159,9 +166,19 @@ export function PathwayWalkthrough({
   const originalStepIndex = (index: number) =>
     index - injectedIndexList.filter((i) => i < index).length;
 
+  // Same ref idiom as currentStepRef: advanceStep runs from event handlers,
+  // so reading the latest injected slots through a ref keeps its identity
+  // stable without depending on a per-render derived array.
+  const injectedIndexRef = useRef(injectedIndexList);
+  useEffect(() => { injectedIndexRef.current = injectedIndexList; });
+
   const advanceStep = useCallback(() => {
     setViewingStep(null);
-    setStars((n) => n + 1);
+    // Injected remediation steps cost no star (design 1g) — help, not a
+    // penalty, and the star total still matches the pathway's own length.
+    if (!injectedIndexRef.current.includes(currentStepRef.current)) {
+      setStars((n) => n + 1);
+    }
     telemetry.flush();
     setCurrentStep((n) => {
       const next = n + 1;
@@ -346,7 +363,7 @@ export function PathwayWalkthrough({
                 kind={currentKind ?? 'activity'}
                 title={
                   isInjectedStep(displayStep)
-                    ? 'Extra practice'
+                    ? (widgetTitleOf(currentWidget) ?? 'Extra practice')
                     : (session.steps[originalStepIndex(displayStep)]?.title ?? `Activity ${displayStep + 1}`)
                 }
                 state={
@@ -373,6 +390,13 @@ export function PathwayWalkthrough({
                   />
                 </WidgetTelemetryProvider>
               </ActivityFrame>
+
+              {!isReviewing && isInjectedStep(displayStep) && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  This one doesn&rsquo;t cost you a star. Your pathway is waiting
+                  exactly where you left it.
+                </p>
+              )}
 
               {/* External button for widgets that fire onComplete silently (no internal CTA),
                   and for the three widgets that never fire onComplete at all. The reason a

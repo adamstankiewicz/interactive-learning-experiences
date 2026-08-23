@@ -41,7 +41,7 @@ export function SharedPathwayView({ session }: { session: WalkthroughSession }) 
 
   return (
     <div className="register-student min-h-dvh bg-background text-foreground">
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
+      <main className="mx-auto flex min-h-dvh max-w-235 flex-col items-center gap-6 px-5 py-10">
         <p className="text-center font-heading text-lg font-black text-balance">{session.topic}</p>
 
         <PathwayWalkthrough session={session} studentId={studentId} />
