@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { PathwayPreview, type PathwayPreviewData } from '@/components/pathways/PathwayPreview';
 import type { PathwayPlan } from '@/lib/pathway/schema';
 import { widgetSpec } from '@/lib/pathway/schema';
-import type { SessionStudentRow } from '@/lib/storage/types';
+import type { SessionStudentRow, StepOutcome } from '@/lib/storage/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +54,50 @@ function AccuracyBar({ correct, attempts }: { correct: number; attempts: number 
   );
 }
 
+/**
+ * The per-step evidence strip (design 1e): one cell per plan step. Verified
+ * fill = first try, warning edge = needed attempts, error = still wrong,
+ * sunk = not reached (which also covers events recorded before stepIndex was
+ * persisted — the strip never guesses). Each cell carries its word in the
+ * tooltip and for screen readers.
+ */
+const STRIP_CELL: Record<StepOutcome, { className: string; label: string }> = {
+  'first-try': { className: 'bg-verified', label: 'first try' },
+  attempts: { className: 'border border-warning-edge bg-warning-tint', label: 'needed attempts' },
+  wrong: { className: 'bg-destructive', label: 'still wrong' },
+  unreached: { className: 'bg-sunk', label: 'not reached' },
+};
+
+function StepStrip({ strip }: { strip: StepOutcome[] }) {
+  if (strip.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <span className="flex items-center gap-1">
+      {strip.map((outcome, index) => (
+        <span
+          key={`${index}-${outcome}`}
+          role="img"
+          aria-label={`Step ${index + 1}: ${STRIP_CELL[outcome].label}`}
+          title={`Step ${index + 1}: ${STRIP_CELL[outcome].label}`}
+          className={`h-3 w-4 ${STRIP_CELL[outcome].className}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function StepStripLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+      {(Object.keys(STRIP_CELL) as StepOutcome[]).map((outcome) => (
+        <span key={outcome} className="flex items-center gap-1.5">
+          <span aria-hidden="true" className={`h-2.5 w-3.5 ${STRIP_CELL[outcome].className}`} />
+          {STRIP_CELL[outcome].label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StatusBadge({ completed }: { completed: boolean }) {
   return (
     <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${completed
@@ -81,11 +125,15 @@ function PerformanceTable({ rows, children }: { rows: SessionStudentRow[]; child
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="border-b border-border px-4 py-2">
+        <StepStripLegend />
+      </div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-accent/50">
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Student</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Steps</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Accuracy</th>
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Attempts</th>
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Hints</th>
@@ -103,6 +151,7 @@ function PerformanceTable({ rows, children }: { rows: SessionStudentRow[]; child
                   : <span className="font-mono text-xs text-muted-foreground">{row.studentId.slice(0, 12)}…</span>}
               </td>
               <td className="px-4 py-3"><StatusBadge completed={row.completed} /></td>
+              <td className="px-4 py-3"><StepStrip strip={row.stepStrip} /></td>
               <td className="px-4 py-3"><AccuracyBar correct={row.correctCount} attempts={row.attempts} /></td>
               <td className="px-4 py-3 text-right tabular-nums">{row.attempts}</td>
               <td className="px-4 py-3 text-right tabular-nums">{row.hintsUsed || '—'}</td>

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { SEED_STUDENTS } from '@/lib/roster/seed';
 import type { Assignment, RosterStudent } from '@/lib/roster/types';
 import { EMPTY_PROFILE, type StudentProfile } from '@/lib/student/schema';
+import { buildStepStrip } from '@/lib/storage/types';
 import type {
   InteractionEvent,
   MasteryRollupRow,
@@ -326,14 +327,21 @@ export const memoryStorageAdapter: StorageAdapter = {
     const byStudent = new Map<string, {
       attempts: number; correctCount: number; hintsUsed: number;
       elapsedMs: number[]; lastSeenAt: string;
+      perStep: Map<number, { right: boolean; wrong: boolean }>;
     }>();
 
     for (const event of interactions) {
       if (!relevantSessionIds.has(event.sessionId)) continue;
-      const row = byStudent.get(event.studentId) ?? { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date(0).toISOString() };
+      const row = byStudent.get(event.studentId) ?? { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date(0).toISOString(), perStep: new Map<number, { right: boolean; wrong: boolean }>() };
       if (event.correct !== null) row.attempts += 1;
       if (event.correct === true) row.correctCount += 1;
       if (event.eventType === 'hint_requested') row.hintsUsed += 1;
+      if (event.eventType === 'widget_completed' && typeof event.payload?.stepIndex === 'number') {
+        const cell = row.perStep.get(event.payload.stepIndex) ?? { right: false, wrong: false };
+        if (event.correct === true) cell.right = true;
+        if (event.correct === false) cell.wrong = true;
+        row.perStep.set(event.payload.stepIndex, cell);
+      }
       row.elapsedMs.push(event.elapsedMs);
       row.lastSeenAt = new Date().toISOString();
       byStudent.set(event.studentId, row);
@@ -343,13 +351,13 @@ export const memoryStorageAdapter: StorageAdapter = {
     for (const a of childAssignments) {
       const childSession = sessions.get(a.sessionId);
       if (childSession && !byStudent.has(childSession.studentId)) {
-        byStudent.set(childSession.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: childSession.createdAt ?? new Date().toISOString() });
+        byStudent.set(childSession.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: childSession.createdAt ?? new Date().toISOString(), perStep: new Map<number, { right: boolean; wrong: boolean }>() });
       }
     }
 
     // Include the parent session's own anon student (the teacher who built it).
     if (sessionObj && !byStudent.has(sessionObj.studentId)) {
-      byStudent.set(sessionObj.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: sessionObj.createdAt ?? new Date().toISOString() });
+      byStudent.set(sessionObj.studentId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: sessionObj.createdAt ?? new Date().toISOString(), perStep: new Map<number, { right: boolean; wrong: boolean }>() });
     }
 
     return [...byStudent.entries()].map(([studentId, row]) => {
@@ -367,6 +375,7 @@ export const memoryStorageAdapter: StorageAdapter = {
         completed: row.attempts >= (sessionObj?.plan?.steps?.length ?? 0) && row.attempts > 0,
         medianElapsedMs: median,
         lastSeenAt: row.lastSeenAt,
+        stepStrip: buildStepStrip(sessionObj?.plan?.steps?.length ?? 0, row.perStep),
       };
     });
   },
