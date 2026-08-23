@@ -56,10 +56,10 @@ function AccuracyBar({ correct, attempts }: { correct: number; attempts: number 
 
 function StatusBadge({ completed }: { completed: boolean }) {
   return (
-    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${completed
-      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-      : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}`}>
-      {completed ? 'Completed' : 'In Progress'}
+    <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${completed
+      ? 'border-verified-edge bg-verified-tint text-verified'
+      : 'border-warning-edge bg-warning-tint text-warning'}`}>
+      {completed ? '✓ Completed' : 'In progress'}
     </span>
   );
 }
