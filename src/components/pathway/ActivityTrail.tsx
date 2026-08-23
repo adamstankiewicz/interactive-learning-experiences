@@ -19,7 +19,7 @@ import type { PathwayState, StageStatus } from '@/lib/pathway/use-pathway-stream
 export function ActivityTrail({ state }: { state: PathwayState }) {
   const streaming = state.status === 'streaming';
   const elapsed = useElapsed(state.startedAt, state.finishedAt);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const rejected = Object.values(state.verdicts).filter((ok) => !ok).length;
   const activeStage = STAGES.find((stage) => state.stages[stage.id].status === 'active');
@@ -84,7 +84,9 @@ export function ActivityTrail({ state }: { state: PathwayState }) {
         </AnimatePresence>
       </div>
 
-      <Collapsible open={open} onOpenChange={setOpen} className="mt-1.5">
+      {/* While streaming, the two-column BuildNarrative owns the stage rows
+          and verdicts; this disclosure is the after-the-fact provenance. */}
+      <Collapsible open={open && !streaming} onOpenChange={setOpen} className={streaming ? 'hidden' : 'mt-1.5'}>
         <CollapsibleTrigger className="group/why flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
           <ChevronDown className="size-3.5 transition-transform group-data-panel-open/why:rotate-180" />
           How this was built
@@ -200,6 +202,7 @@ function StatusMarker({ status }: { status: StageStatus }) {
     return (
       <span
         className={cn(base, 'animate-pulse border border-foreground bg-brand-fill motion-reduce:animate-none')}
+        role="img"
         aria-label="in progress"
       />
     );

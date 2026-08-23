@@ -5,12 +5,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { Plus } from "lucide-react";
 
 import { ActivityTrail } from "@/components/pathway/ActivityTrail";
+import { BuildNarrative } from "@/components/pathway/BuildNarrative";
 import {
   LessonPlanUpload,
   type LessonPlanPick,
 } from "@/components/pathway/LessonPlanUpload";
 import { PathwayCompletionStrip, PathwayDocument } from "@/components/pathway/PathwayDocument";
-import { AssignToStudents } from "@/components/roster/AssignToStudents";
+import { PlanRail } from "@/components/pathway/PlanRail";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -161,13 +162,13 @@ export function PathwayBuilder() {
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 pb-20">
         <form
           onSubmit={submit}
           className={
             started
-              ? "pt-8"
-              : "light-surface -mt-14 border border-[#1f1915] bg-card p-5 text-foreground shadow-[6px_6px_0_rgba(31,25,21,.22)]"
+              ? "mx-auto w-full max-w-3xl pt-8"
+              : "light-surface mx-auto -mt-14 w-full max-w-3xl border border-[#1f1915] bg-card p-5 text-foreground shadow-[6px_6px_0_rgba(31,25,21,.22)]"
           }
         >
           {/* One question first: what. Grade, the submit action, and every
@@ -337,6 +338,7 @@ export function PathwayBuilder() {
         </form>
 
         {started && <ActivityTrail state={state} />}
+        {started && <BuildNarrative state={state} />}
 
         {state.error && (
           <Alert variant="destructive" className="mt-6">
@@ -363,19 +365,18 @@ export function PathwayBuilder() {
 
         <PathwayCompletionStrip state={state} />
 
-        {state.status === "done" && (
-          <AssignToStudents
-            topic={state.topic}
-            gradeHint={gradeHint || undefined}
-            parentSessionId={state.sessionId ?? undefined}
+        {/* Design 1d: document + 316px rail. The rail carries assignment,
+            provenance, and coverage; the document stays the readable artifact. */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-8">
+          <PathwayDocument
+            state={state}
+            onRegenerateStep={regenerateStep}
+            onEditPlan={editPlan}
           />
-        )}
-
-        <PathwayDocument
-          state={state}
-          onRegenerateStep={regenerateStep}
-          onEditPlan={editPlan}
-        />
+          <div className="mt-8">
+            <PlanRail state={state} gradeHint={gradeHint || undefined} />
+          </div>
+        </div>
       </main>
     </div>
   );
