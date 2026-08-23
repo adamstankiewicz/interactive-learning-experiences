@@ -106,7 +106,8 @@ function QuickCreate({ recentTopics }: { recentTopics: string[] }) {
   );
 }
 
-const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_90px_100px_150px_20px] items-center gap-4';
+const ROW_GRID =
+  'grid grid-cols-[minmax(0,1fr)_122px_96px_108px_128px_20px] items-center gap-4';
 
 function SessionRow({ session }: { session: SessionSummary }) {
   const completion =
@@ -115,7 +116,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
   return (
     <Link
       href={`/pathways/${session.id}`}
-      className={`${ROW_GRID} border-b border-border bg-card px-3.5 py-2.5 transition-colors hover:bg-sunk`}
+      className={`${ROW_GRID} border-b border-border bg-card px-[15px] py-2 transition-colors hover:bg-sunk`}
     >
       <span className="min-w-0">
         <span className="block truncate font-heading text-[15px] font-semibold">{session.topic}</span>
@@ -124,9 +125,9 @@ function SessionRow({ session }: { session: SessionSummary }) {
           {session.gradeHint && (
             <span className="text-[11.5px] text-muted-foreground">Grade {session.gradeHint}</span>
           )}
-          <span className="text-[11.5px] text-muted-foreground">{formatDate(session.createdAt)}</span>
         </span>
       </span>
+      <span className="text-right text-[13.5px] text-ink-2">{formatDate(session.createdAt)}</span>
       <span className="text-right text-[13.5px] tabular-nums text-ink-2">{session.openCount}</span>
       <span className="text-right text-[13.5px] tabular-nums text-ink-2">
         {session.completionCount}
@@ -196,9 +197,10 @@ export function PathwaysDashboard() {
 
       <div className="mt-8">
         <div
-          className={`${ROW_GRID} border-b-2 border-border px-3.5 pb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground`}
+          className={`${ROW_GRID} border-b-2 border-border px-[15px] pb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground`}
         >
           <span>Pathway</span>
+          <span className="text-right">Built</span>
           <span className="text-right">Opens</span>
           <span className="text-right">Completed</span>
           <span className="text-right">Completion</span>

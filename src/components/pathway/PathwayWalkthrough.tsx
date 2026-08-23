@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 
 import { ActivityFrame } from '@/components/pathway/ActivityFrame';
 import { WidgetRenderer } from '@/components/widgets/registry';
@@ -251,91 +251,71 @@ export function PathwayWalkthrough({
           <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
 
           {totalSteps > 1 && (
-            <div className="flex w-full items-center gap-1.5 py-1" role="progressbar" aria-valuenow={currentStep} aria-valuemax={totalSteps}>
-              <AnimatePresence initial={false}>
-                {Array.from({ length: totalSteps }, (_, index) => {
-                  const isDone = index < currentStep;
-                  const isCurrent = index === currentStep;
-                  const isViewing = index === viewingStep;
-                  const isNewlyInjected = index === lastInjectedAt;
-                  // Map the absolute index back to an original step title, accounting
-                  // for injected slots shifting the originals forward.
-                  const injectedIndices = Object.keys(injectedWidgets).map(Number).sort((a, b) => a - b);
-                  const originalIndex = index - injectedIndices.filter((i) => i < index).length;
-                  const isInjected = injectedIndices.includes(index);
-                  const stepTitle = isInjected
-                    ? 'Extra practice'
-                    : (session.steps[originalIndex]?.title ?? `Activity ${index + 1}`);
-                  const tooltipText = (isDone || isCurrent) ? stepTitle : null;
-                  return (
-                    <div key={`step-${index}-of-${totalSteps}`} className="group relative min-w-0 flex-1 flex flex-col items-center">
-                      {tooltipText && (
-                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900/90 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-10">
-                          {tooltipText}
-                        </div>
-                      )}
-                    <motion.button
-                      type="button"
-                      aria-label={isDone ? `Review activity ${index + 1}` : `Activity ${index + 1}`}
-                      disabled={!isDone && !isCurrent}
-                      onClick={
-                        isDone ? () => setViewingStep(isViewing ? null : index)
-                        : isCurrent ? () => setViewingStep(null)
-                        : undefined
-                      }
-                      // Entry: new segments pop in from scale 0
-                      initial={{ scaleX: 0, opacity: 0 }}
-                      animate={{
-                        scaleX: 1,
-                        opacity: 1,
-                        // Newly injected segment gets an attention pulse
-                        scale: isNewlyInjected ? [1, 1.15, 0.95, 1.05, 1] : 1,
-                      }}
-                      transition={isNewlyInjected
-                        ? { duration: 0.5, ease: 'easeOut', scale: { duration: 0.6, delay: 0.15 } }
-                        : { type: 'spring', stiffness: 400, damping: 30 }
-                      }
-                      className={[
-                        'relative w-full rounded-full',
-                        isViewing
-                          ? 'h-3 bg-verified/70 shadow-[0_0_0_2px_var(--verified-edge)] cursor-pointer'
-                          : isCurrent
-                            ? isReviewing
-                              ? 'h-3 border border-foreground bg-brand-fill cursor-pointer'
-                              : 'h-3 border border-foreground bg-brand-fill shadow-[0_0_0_2px_var(--brand-press)] cursor-pointer'
-                            : isDone
-                              ? 'h-3 bg-verified/70 cursor-pointer hover:bg-verified'
-                              : 'h-3 bg-sunk cursor-default',
-                        isInjected && !isDone ? 'outline-2 outline-offset-1 outline-brand-press' : '',
-                        'transition-[height,background-color] duration-300',
-                      ].join(' ')}
-                    >
-                      {/* Completion sweep — fills left-to-right when a step is done */}
-                      {isDone && !isViewing && (
-                        <motion.span
-                          className="absolute inset-0 rounded-full bg-verified/70 origin-left"
-                          initial={{ scaleX: 0 }}
-                          animate={{ scaleX: 1 }}
-                          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-                        />
-                      )}
-                      {/* Dot on whichever step is currently displayed */}
-                      {index === displayStep && (
-                        <motion.span
-                          key={displayStep}
-                          className="absolute inset-0 flex items-center justify-center"
-                          initial={{ opacity: 0, scale: 0.4 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-                        >
-                          <span className={`h-2 w-2 rounded-full ${isViewing ? 'bg-verified' : 'bg-foreground'}`} />
-                        </motion.span>
-                      )}
-                    </motion.button>
-                    </div>
-                  );
-                })}
-              </AnimatePresence>
+            <div className="w-full">
+              {/* Design 1g: one continuous 14px bar. The fill tracks progress;
+                  invisible per-step buttons on top keep the tap-to-review
+                  behaviour. Injected steps notch the track in brand-press. */}
+              <div
+                className="relative h-3.5 w-full overflow-hidden rounded-full border border-border bg-sunk"
+                role="progressbar"
+                aria-valuenow={currentStep}
+                aria-valuemin={0}
+                aria-valuemax={totalSteps}
+                aria-label={`Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
+              >
+                <motion.span
+                  className="absolute inset-y-0 left-0 border-r border-foreground bg-brand-fill"
+                  initial={false}
+                  animate={{ width: `${(Math.min(currentStep, totalSteps) / totalSteps) * 100}%` }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+                />
+                {injectedIndexList.map((index) => (
+                  <span
+                    key={`notch-${index}`}
+                    aria-hidden="true"
+                    className={`absolute inset-y-0 w-1 bg-brand-press ${index === lastInjectedAt ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+                    style={{ left: `${(index / totalSteps) * 100}%` }}
+                  />
+                ))}
+                <span className="absolute inset-0 flex">
+                  {Array.from({ length: totalSteps }, (_, index) => {
+                    const isDone = index < currentStep;
+                    const isCurrent = index === currentStep;
+                    const isViewing = index === viewingStep;
+                    const stepTitle = isInjectedStep(index)
+                      ? 'Extra practice'
+                      : (session.steps[originalStepIndex(index)]?.title ?? `Activity ${index + 1}`);
+                    return (
+                      <button
+                        key={`step-${index}-of-${totalSteps}`}
+                        type="button"
+                        title={isDone || isCurrent ? stepTitle : undefined}
+                        aria-label={isDone ? `Review: ${stepTitle}` : stepTitle}
+                        disabled={!isDone && !isCurrent}
+                        onClick={
+                          isDone ? () => setViewingStep(isViewing ? null : index)
+                          : isCurrent ? () => setViewingStep(null)
+                          : undefined
+                        }
+                        className={`h-full min-w-0 flex-1 ${isDone || isCurrent ? 'cursor-pointer' : 'cursor-default'} ${isViewing ? 'bg-verified/30' : 'bg-transparent'}`}
+                      />
+                    );
+                  })}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-baseline justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {isReviewing
+                    ? 'Looking back at a finished activity'
+                    : isInjectedStep(currentStep)
+                      ? 'just added · extra practice'
+                      : `Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {session.topic}
+                  {session.standardCode ? ` · ${session.standardCode}` : ''}
+                </span>
+              </div>
             </div>
           )}
 
