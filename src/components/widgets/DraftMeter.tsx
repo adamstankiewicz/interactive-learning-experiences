@@ -283,7 +283,7 @@ export function DraftMeter({ spec }: { spec: DraftMeterSpec }) {
           aria-labelledby={questionId}
           placeholder={spec.placeholder}
           rows={3}
-          className="mt-4 block min-h-[92px] w-full resize-y rounded-lg border border-input bg-transparent p-3.5 text-sm leading-[1.6] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring"
+          className="mt-4 block min-h-[92px] w-full resize-y rounded-lg border border-input bg-transparent p-3.5 font-serif text-[15px] leading-[1.65] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring"
         />
 
         <div className="mt-5 flex items-center gap-3.5">
