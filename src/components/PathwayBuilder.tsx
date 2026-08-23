@@ -128,32 +128,48 @@ export function PathwayBuilder() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-gradient-to-br from-violet-100/80 via-pink-50/60 to-amber-50/70 dark:from-violet-950/50 dark:via-fuchsia-950/25 dark:to-amber-950/20">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
-        {!started && (
-          <div className="pt-14">
+    <div className="flex min-h-dvh flex-col bg-background">
+      {/* The ink plane: the hero is one input, floating on ink. Literal ink in
+          both themes — the plane is the same object day and night, which is
+          why the card inside scopes itself `.light-surface`. */}
+      {!started && (
+        <div className="bg-[#1f1915] pb-20">
+          <div className="mx-auto w-full max-w-3xl px-6 pt-12">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#98938d]"
+            >
+              New pathway
+            </motion.p>
             <motion.h1
-              initial={{ scale: 0.92, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="font-heading text-4xl font-black tracking-tight text-balance sm:text-5xl"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="mt-2 font-heading text-4xl font-black tracking-tight text-balance text-[#f5f3f1] sm:text-5xl"
             >
               Turn a topic into a lesson{" "}
-              <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent dark:from-violet-400 dark:to-pink-400">
-                students can do
-              </span>
-              .
+              <span className="text-brand-fill">students can do</span>.
             </motion.h1>
-            <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">
+            <p className="mt-3 max-w-xl text-base leading-relaxed text-[#bbb7b2]">
               Name what you&rsquo;re teaching. We find the standard it maps to
-              in the Learning Commons knowledge graph, then build a pathway from
-              its verified learning components — with interactive activities
-              your students work through.
+              in the standards graph, then build a pathway from its verified
+              learning components — with interactive activities your students
+              work through.
             </p>
           </div>
-        )}
+        </div>
+      )}
 
-        <form onSubmit={submit} className={started ? "pt-8" : "mt-8"}>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
+        <form
+          onSubmit={submit}
+          className={
+            started
+              ? "pt-8"
+              : "light-surface -mt-14 border border-[#1f1915] bg-card p-5 text-foreground shadow-[6px_6px_0_rgba(31,25,21,.22)]"
+          }
+        >
           {/* One question first: what. Grade, the submit action, and every
               optional field only earn space once there's a topic to hang
               them off — the opening moment is a single focused decision,
@@ -172,13 +188,13 @@ export function PathwayBuilder() {
             placeholder="What are you teaching?"
             aria-label="Topic"
             rows={1}
-            className="min-h-16 w-full resize-none rounded-2xl border-3 border-violet-200 bg-white/70 px-5 py-4 text-lg font-semibold placeholder:font-normal placeholder:text-violet-300 focus-visible:border-violet-400 focus-visible:ring-violet-300/50 dark:border-violet-800 dark:bg-white/5 dark:placeholder:text-violet-700 dark:focus-visible:border-violet-500"
+            className="min-h-16 w-full resize-none border-border bg-transparent px-4 py-3.5 text-[16.5px] font-semibold placeholder:font-normal placeholder:text-muted-foreground focus-visible:border-foreground"
           />
 
           {!engaged && (
             <div className="mt-4">
-              <p className="text-xs text-muted-foreground">
-                ✨ Or start from an example
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Or start from an example
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {EXAMPLES.map((example) => (
@@ -194,10 +210,10 @@ export function PathwayBuilder() {
                       // so building from one must not cite it.
                       setLessonPlan(null);
                     }}
-                    className="rounded-full border-2 border-violet-200 font-normal text-violet-600 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/40"
+                    className="border border-border font-normal text-ink-2 hover:border-foreground hover:bg-sunk hover:text-foreground"
                   >
                     {example.topic}
-                    <span className="text-violet-400 dark:text-violet-500">
+                    <span className="text-muted-foreground">
                       · Gr {example.grade}
                     </span>
                   </Button>
@@ -242,10 +258,8 @@ export function PathwayBuilder() {
                   >
                     <SelectTrigger
                       className={cn(
-                        "h-12! w-full rounded-xl border-2 border-violet-200 bg-white/70 px-4 text-sm font-semibold hover:bg-white/90 dark:border-violet-800 dark:bg-white/5 dark:hover:bg-white/10 sm:w-40",
-                        !gradeHint
-                          ? "text-muted-foreground"
-                          : "text-violet-700 dark:text-violet-300",
+                        "h-12! w-full border border-border bg-card px-4 text-sm font-semibold hover:border-foreground sm:w-40",
+                        !gradeHint ? "text-muted-foreground" : "text-foreground",
                       )}
                       aria-label="Grade level"
                     >
@@ -277,7 +291,7 @@ export function PathwayBuilder() {
                     <button
                       type="submit"
                       disabled={!topic.trim()}
-                      className="h-12 shrink-0 rounded-xl bg-emerald-500 px-6 text-sm font-black text-white shadow-[0_4px_0_0_#047857] transition-transform hover:bg-emerald-400 active:translate-y-1 active:shadow-[0_1px_0_0_#047857] disabled:pointer-events-none disabled:opacity-40"
+                      className="h-12 shrink-0 border border-foreground bg-brand-fill px-6 font-heading text-sm font-bold text-foreground transition-colors hover:bg-brand-fill-hover disabled:pointer-events-none disabled:opacity-40"
                     >
                       {started ? "Rebuild ↻" : "Build pathway →"}
                     </button>
@@ -328,6 +342,23 @@ export function PathwayBuilder() {
           <Alert variant="destructive" className="mt-6">
             <AlertDescription>{state.error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* The degraded run, stated plainly: nothing verified, so this is an
+            exploration pathway. The cost is named — no mastery rollup, no
+            standards alignment — and the pathway is still built and playable. */}
+        {state.anchor && !state.anchor.standard.verified && (
+          <div className="mt-6 border-l-[3px] border-warning bg-warning-tint p-3.5">
+            <p className="text-sm font-semibold text-warning">
+              ⚠ This is an exploration pathway. It is not standards-aligned.
+            </p>
+            <p className="mt-1 text-xs text-warning/90">
+              No proposed code survived the graph. The pathway is still built and
+              playable, but there is no mastery rollup, and students will see
+              &ldquo;exploring&rdquo; where a standard code would be. The rejected
+              codes stay on the session record.
+            </p>
+          </div>
         )}
 
         <PathwayCompletionStrip state={state} />
