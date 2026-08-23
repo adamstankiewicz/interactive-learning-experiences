@@ -71,7 +71,7 @@ export default function StepRevealDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Step Reveal</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Step reveal</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Walk through a worked example one step at a time. Each step stacks up so students can follow the full chain of reasoning.
         </p>

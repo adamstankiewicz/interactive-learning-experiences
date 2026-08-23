@@ -26,7 +26,7 @@ export default async function PathwayReportPage({
           ← All Pathways
         </Link>
         <h1 className="font-heading text-2xl font-bold mt-2">
-          {session?.topic ?? 'Pathway Report'}
+          {session?.topic ?? 'Pathway report'}
         </h1>
       </div>
 

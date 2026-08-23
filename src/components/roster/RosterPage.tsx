@@ -35,12 +35,12 @@ export function RosterPage() {
     <div className="flex-1 max-w-3xl mx-auto w-full px-6 pb-20 pt-8">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-foreground">Class Roster</h1>
+          <h1 className="text-xl font-semibold text-foreground">Class roster</h1>
           {!loading && (
             <Badge variant="secondary">{students.length} student{students.length !== 1 ? 's' : ''}</Badge>
           )}
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}>+ Add Student</Button>
+        <Button size="sm" onClick={() => setAddOpen(true)}>+ Add student</Button>
       </div>
 
       {loading ? (
@@ -55,7 +55,7 @@ export function RosterPage() {
           <p className="text-muted-foreground text-sm max-w-xs">
             No students yet. Add your first student to start building personalized pathways.
           </p>
-          <Button onClick={() => setAddOpen(true)}>Add First Student</Button>
+          <Button onClick={() => setAddOpen(true)}>Add first student</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

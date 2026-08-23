@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { RosterPage } from '@/components/roster/RosterPage';
 
-export const metadata = { title: 'Class Roster' };
+export const metadata = { title: 'Class roster' };
 
 export default function Page() {
   return (

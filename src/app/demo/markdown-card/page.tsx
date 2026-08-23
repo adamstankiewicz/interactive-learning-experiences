@@ -95,7 +95,7 @@ export default function MarkdownCardDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Markdown Card</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Markdown card</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Renders LLM-generated markdown as a reading card for reinforcement.
         </p>
