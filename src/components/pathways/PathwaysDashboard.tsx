@@ -1,75 +1,161 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import type { SessionSummary } from '@/lib/storage/types';
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function GradePill({ grade }: { grade: string | null }) {
-  if (!grade) return null;
+/**
+ * Verification chips carry an icon and a word — colour alone never conveys
+ * state. `EXPLORATION` is the pipeline's honest sentinel for "nothing
+ * verified"; it gets the warning treatment, stated plainly.
+ */
+function StandardChip({ code }: { code: string | null }) {
+  const unverified = !code || code === 'EXPLORATION';
+  if (unverified) {
+    return (
+      <span className="inline-flex items-center gap-1 border border-warning-edge bg-warning-tint px-1.5 py-px font-mono text-[10.5px] text-warning">
+        ⚠ no standard matched
+      </span>
+    );
+  }
   return (
-    <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
-      Grade {grade}
+    <span className="inline-flex items-center gap-1 border border-verified-edge bg-verified-tint px-1.5 py-px font-mono text-[10.5px] text-verified">
+      ✓ {code}
     </span>
   );
 }
 
-function StatBox({ label, value }: { label: string; value: number }) {
+const GRADES = ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+
+/**
+ * The quick-create bar: one ink-bordered strip whose primary is the
+ * highlighter with its mandatory ink border. Submitting hands off to the
+ * builder, which already accepts ?topic=&grade=.
+ */
+function QuickCreate({ recentTopics }: { recentTopics: string[] }) {
+  const router = useRouter();
+  const [topic, setTopic] = useState('');
+  const [grade, setGrade] = useState('');
+
+  function build() {
+    const params = new URLSearchParams();
+    if (topic.trim()) params.set('topic', topic.trim());
+    if (grade) params.set('grade', grade);
+    router.push(params.size ? `/?${params}` : '/');
+  }
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className="text-lg font-bold tabular-nums">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          build();
+        }}
+        className="flex items-stretch border border-foreground bg-card"
+      >
+        <input
+          value={topic}
+          onChange={(event) => setTopic(event.target.value)}
+          placeholder="What should your students learn next?"
+          aria-label="Pathway topic"
+          className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
+        />
+        <select
+          value={grade}
+          onChange={(event) => setGrade(event.target.value)}
+          aria-label="Grade"
+          className="border-l border-border bg-transparent px-2.5 text-[12.5px] text-ink-2 outline-none"
+        >
+          <option value="">Grade</option>
+          {GRADES.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="border-l border-foreground bg-brand-fill px-4 font-heading text-sm font-bold text-foreground transition-colors hover:bg-brand-fill-hover"
+        >
+          Build pathway →
+        </button>
+      </form>
+      {recentTopics.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Reuse
+          </span>
+          {recentTopics.map((t) => (
+            <Link
+              key={t}
+              href={`/?topic=${encodeURIComponent(t)}`}
+              className="max-w-56 truncate border border-border bg-card px-2 py-0.5 text-[12px] text-ink-2 transition-colors hover:border-foreground hover:text-foreground"
+            >
+              {t}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function SessionCard({ session }: { session: SessionSummary }) {
+const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_90px_100px_150px_20px] items-center gap-4';
+
+function SessionRow({ session }: { session: SessionSummary }) {
+  const completion =
+    session.openCount > 0 ? Math.round((session.completionCount / session.openCount) * 100) : null;
+
   return (
     <Link
       href={`/pathways/${session.id}`}
-      className="group block rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+      className={`${ROW_GRID} border-b border-border bg-card px-3.5 py-2.5 transition-colors hover:bg-sunk`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate font-semibold leading-snug group-hover:text-primary transition-colors">
-            {session.topic}
-          </h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            {session.standardCode && (
-              <span className="text-xs font-mono text-muted-foreground">{session.standardCode}</span>
-            )}
-            <GradePill grade={session.gradeHint} />
-            <span className="text-xs text-muted-foreground">{formatDate(session.createdAt)}</span>
-          </div>
-        </div>
-        <span className="shrink-0 text-muted-foreground text-sm group-hover:text-primary transition-colors">→</span>
-      </div>
-
-      <div className="mt-4 flex items-center gap-6 border-t border-border pt-4">
-        <StatBox label="opens" value={session.openCount} />
-        <StatBox label="completions" value={session.completionCount} />
-        {session.openCount > 0 && (
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-lg font-bold tabular-nums">
-              {Math.round((session.completionCount / session.openCount) * 100)}%
-            </span>
-            <span className="text-xs text-muted-foreground">completion</span>
-          </div>
-        )}
-      </div>
+      <span className="min-w-0">
+        <span className="block truncate font-heading text-[15px] font-semibold">{session.topic}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-2">
+          <StandardChip code={session.standardCode} />
+          {session.gradeHint && (
+            <span className="text-[11.5px] text-muted-foreground">Grade {session.gradeHint}</span>
+          )}
+          <span className="text-[11.5px] text-muted-foreground">{formatDate(session.createdAt)}</span>
+        </span>
+      </span>
+      <span className="text-right text-[13.5px] tabular-nums text-ink-2">{session.openCount}</span>
+      <span className="text-right text-[13.5px] tabular-nums text-ink-2">
+        {session.completionCount}
+      </span>
+      {completion === null ? (
+        <span className="text-right text-[12.5px] text-muted-foreground">Waiting for students</span>
+      ) : (
+        <span className="flex items-center justify-end gap-2">
+          <span className="font-heading text-base font-bold tabular-nums">{completion}%</span>
+          <span aria-hidden="true" className="h-1.5 w-14 bg-sunk">
+            <span
+              className="block h-full bg-foreground"
+              style={{ width: `${Math.min(completion, 100)}%` }}
+            />
+          </span>
+        </span>
+      )}
+      <span aria-hidden="true" className="text-right text-muted-foreground">
+        →
+      </span>
     </Link>
   );
 }
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-4">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="h-32 rounded-xl border border-border bg-card animate-pulse" />
+    <div className="border-t border-border">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-16 animate-pulse border-b border-border bg-sunk/60" />
       ))}
     </div>
   );
@@ -89,31 +175,54 @@ export function PathwaysDashboard() {
       .catch(() => setError('Failed to load pathways.'));
   }, []);
 
-  if (error) {
-    return <p className="text-destructive text-sm">{error}</p>;
-  }
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
 
-  if (!sessions) return <LoadingSkeleton />;
-
-  if (sessions.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border p-12 text-center">
-        <p className="text-muted-foreground">No pathways yet. Build one from the Pathway Builder.</p>
-        <Link
-          href="/"
-          className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Go to Pathway Builder
-        </Link>
-      </div>
-    );
-  }
+  const recentTopics = [...new Set((sessions ?? []).map((s) => s.topic))].slice(0, 3);
 
   return (
-    <div className="space-y-4">
-      {sessions.map((s) => (
-        <SessionCard key={s.id} session={s} />
-      ))}
+    <div>
+      <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
+        <h1 className="font-heading text-[25px] font-bold tracking-tight">Your pathways</h1>
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {today}
+        </span>
+      </div>
+
+      <QuickCreate recentTopics={recentTopics} />
+
+      <div className="mt-8">
+        <div
+          className={`${ROW_GRID} border-b-2 border-border px-3.5 pb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground`}
+        >
+          <span>Pathway</span>
+          <span className="text-right">Opens</span>
+          <span className="text-right">Completed</span>
+          <span className="text-right">Completion</span>
+          <span />
+        </div>
+
+        {error && (
+          <p className="border-b border-border bg-card px-3.5 py-4 text-sm text-destructive">
+            ⚠ {error}
+          </p>
+        )}
+
+        {!error && !sessions && <LoadingSkeleton />}
+
+        {sessions && sessions.length === 0 && (
+          <div className="border border-dashed border-border p-12 text-center">
+            <p className="text-muted-foreground">
+              No pathways yet — build the first one from the bar above.
+            </p>
+          </div>
+        )}
+
+        {sessions && sessions.map((s) => <SessionRow key={s.id} session={s} />)}
+      </div>
     </div>
   );
 }
