@@ -357,17 +357,22 @@ export function PathwayBuilder() {
         <PathwayCompletionStrip state={state} />
 
         {/* Design 1d: document + 316px rail. The rail carries assignment,
-            provenance, and coverage; the document stays the readable artifact. */}
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-8">
-          <PathwayDocument
-            state={state}
-            onRegenerateStep={regenerateStep}
-            onEditPlan={editPlan}
-          />
-          <div className="mt-8">
-            <PlanRail state={state} gradeHint={gradeHint || undefined} />
+            provenance, and coverage; the document stays the readable artifact.
+            While a run streams, the BuildNarrative's right column above is
+            where the pathway forms (design 1c) — the document only exists
+            once the run settles, never as a parallel copy below it. */}
+        {!streaming && (
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-8">
+            <PathwayDocument
+              state={state}
+              onRegenerateStep={regenerateStep}
+              onEditPlan={editPlan}
+            />
+            <div className="mt-8">
+              <PlanRail state={state} gradeHint={gradeHint || undefined} />
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

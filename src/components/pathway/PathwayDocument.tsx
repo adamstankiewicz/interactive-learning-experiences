@@ -452,6 +452,7 @@ export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
 
   const stepCount = state.plan?.steps?.length ?? 0;
   const code = state.anchor?.standard.verified ? state.anchor.standard.code : null;
+  const rejectedCount = Object.values(state.verdicts).filter((ok) => !ok).length;
   const elapsedMs = state.startedAt !== null && state.finishedAt !== null ? state.finishedAt - state.startedAt : null;
 
   const summary = [
@@ -488,6 +489,11 @@ export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
         <div className="min-w-0 flex-1">
           <p className="font-heading text-lg font-black text-balance">Your pathway is ready! 🎉</p>
           {summary && <p className="text-sm text-muted-foreground">{summary}</p>}
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Nothing is assigned yet.
+            {rejectedCount > 0 &&
+              ` ${rejectedCount} rejected code${rejectedCount === 1 ? ' is' : 's are'} kept on the session record.`}
+          </p>
         </div>
       </div>
 
