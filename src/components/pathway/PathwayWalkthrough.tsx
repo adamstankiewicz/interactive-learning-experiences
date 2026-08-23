@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'motion/react';
 
 import { ActivityFrame } from '@/components/pathway/ActivityFrame';
@@ -208,37 +209,116 @@ export function PathwayWalkthrough({
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
-      <div className="flex w-full items-center justify-between">
-        {session.standardCode ? (
-          <span className="rounded-full border border-verified-edge bg-verified-tint px-3 py-1 font-mono text-xs font-semibold text-verified">
-            ✓ {session.standardCode}
-          </span>
+      {/* Design 1g header: three things only — a 30px circular exit, one
+          continuous 14px progress bar, and the star count. State, topic, and
+          the standard live in the quiet line beneath. */}
+      <div className="flex w-full items-center gap-3">
+        <Link
+          href="/learn"
+          aria-label="Exit pathway"
+          className="flex size-[30px] shrink-0 items-center justify-center rounded-full border border-foreground bg-card text-sm font-bold text-foreground transition-colors hover:bg-sunk"
+        >
+          ✕
+        </Link>
+        {totalSteps > 1 ? (
+          <div
+            className="relative h-3.5 min-w-0 flex-1 overflow-hidden rounded-full border border-border bg-track"
+            role="progressbar"
+            aria-valuenow={currentStep}
+            aria-valuemin={0}
+            aria-valuemax={totalSteps}
+            aria-label={`Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
+          >
+            <motion.span
+              className="absolute inset-y-0 left-0 border-r border-foreground bg-brand-fill"
+              initial={false}
+              animate={{ width: `${(Math.min(currentStep, totalSteps) / totalSteps) * 100}%` }}
+              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+            />
+            {injectedIndexList.map((index) => (
+              <span
+                key={`notch-${index}`}
+                aria-hidden="true"
+                className={`absolute inset-y-0 w-1 bg-brand-press ${index === lastInjectedAt ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+                style={{ left: `${(index / totalSteps) * 100}%` }}
+              />
+            ))}
+            {/* Invisible per-step buttons keep tap-to-review under the
+                continuous bar. */}
+            <span className="absolute inset-0 flex">
+              {Array.from({ length: totalSteps }, (_, index) => {
+                const isDone = index < currentStep;
+                const isCurrent = index === currentStep;
+                const isViewing = index === viewingStep;
+                const stepTitle = isInjectedStep(index)
+                  ? 'Extra practice'
+                  : (session.steps[originalStepIndex(index)]?.title ?? `Activity ${index + 1}`);
+                return (
+                  <button
+                    key={`step-${index}-of-${totalSteps}`}
+                    type="button"
+                    title={isDone || isCurrent ? stepTitle : undefined}
+                    aria-label={isDone ? `Review: ${stepTitle}` : stepTitle}
+                    disabled={finished || (!isDone && !isCurrent)}
+                    onClick={
+                      isDone ? () => setViewingStep(isViewing ? null : index)
+                      : isCurrent ? () => setViewingStep(null)
+                      : undefined
+                    }
+                    className={`h-full min-w-0 flex-1 ${!finished && (isDone || isCurrent) ? 'cursor-pointer' : 'cursor-default'} ${isViewing ? 'bg-verified/30' : 'bg-transparent'}`}
+                  />
+                );
+              })}
+            </span>
+          </div>
         ) : (
-          <span className="rounded-full border border-warning-edge bg-warning-tint px-3 py-1 font-mono text-xs font-semibold text-warning">
-            exploring
-          </span>
+          <span className="min-w-0 flex-1" aria-hidden="true" />
         )}
-        <div className="flex items-center gap-2">
-          <a
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-foreground bg-card py-1 pr-3.5 pl-1.5">
+          <motion.span
+            key={stars}
+            initial={{ scale: 1.6, rotate: -16 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+            className="flex size-6 items-center justify-center rounded-full border border-foreground bg-brand-fill text-sm text-foreground motion-reduce:transition-none"
+            aria-hidden="true"
+          >
+            ★
+          </motion.span>
+          <span className="font-heading text-lg font-black tabular-nums">{stars}</span>
+        </span>
+      </div>
+
+      {/* The quiet line: state on the left; topic, standard, and the break
+          link on the right. */}
+      <div className="-mt-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="text-xs text-muted-foreground">
+          {finished
+            ? 'All done'
+            : isReviewing
+              ? 'Looking back at a finished activity'
+              : isInjectedStep(currentStep)
+                ? 'Just added · extra practice'
+                : `Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
+        </span>
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="max-w-56 truncate text-xs text-muted-foreground">{session.topic}</span>
+          {session.standardCode ? (
+            <span className="rounded-full border border-verified-edge bg-verified-tint px-2 py-px font-mono text-[10px] font-semibold text-verified">
+              ✓ {session.standardCode}
+            </span>
+          ) : (
+            <span className="rounded-full border border-warning-edge bg-warning-tint px-2 py-px font-mono text-[10px] font-semibold text-warning">
+              Exploring
+            </span>
+          )}
+          <Link
             href="/games"
-            className="rounded-full border border-border bg-card px-3 py-1 text-xs font-bold text-ink-2 transition-colors hover:border-foreground hover:text-foreground"
+            className="text-xs font-bold text-ink-2 underline-offset-2 transition-colors hover:text-foreground hover:underline"
           >
             Take a break
-          </a>
-          <span className="flex items-center gap-1.5 rounded-full border border-foreground bg-card py-1 pr-3.5 pl-1.5">
-            <motion.span
-              key={stars}
-              initial={{ scale: 1.6, rotate: -16 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-              className="flex size-6 items-center justify-center rounded-full border border-foreground bg-brand-fill text-sm text-foreground motion-reduce:transition-none"
-              aria-hidden="true"
-            >
-              ★
-            </motion.span>
-            <span className="font-heading text-lg font-black tabular-nums">{stars}</span>
-          </span>
-        </div>
+          </Link>
+        </span>
       </div>
 
       {!finished && (
@@ -249,75 +329,6 @@ export function PathwayWalkthrough({
           className="flex w-full flex-col items-center gap-5"
         >
           <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
-
-          {totalSteps > 1 && (
-            <div className="w-full">
-              {/* Design 1g: one continuous 14px bar. The fill tracks progress;
-                  invisible per-step buttons on top keep the tap-to-review
-                  behaviour. Injected steps notch the track in brand-press. */}
-              <div
-                className="relative h-3.5 w-full overflow-hidden rounded-full border border-border bg-sunk"
-                role="progressbar"
-                aria-valuenow={currentStep}
-                aria-valuemin={0}
-                aria-valuemax={totalSteps}
-                aria-label={`Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
-              >
-                <motion.span
-                  className="absolute inset-y-0 left-0 border-r border-foreground bg-brand-fill"
-                  initial={false}
-                  animate={{ width: `${(Math.min(currentStep, totalSteps) / totalSteps) * 100}%` }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-                />
-                {injectedIndexList.map((index) => (
-                  <span
-                    key={`notch-${index}`}
-                    aria-hidden="true"
-                    className={`absolute inset-y-0 w-1 bg-brand-press ${index === lastInjectedAt ? 'animate-pulse motion-reduce:animate-none' : ''}`}
-                    style={{ left: `${(index / totalSteps) * 100}%` }}
-                  />
-                ))}
-                <span className="absolute inset-0 flex">
-                  {Array.from({ length: totalSteps }, (_, index) => {
-                    const isDone = index < currentStep;
-                    const isCurrent = index === currentStep;
-                    const isViewing = index === viewingStep;
-                    const stepTitle = isInjectedStep(index)
-                      ? 'Extra practice'
-                      : (session.steps[originalStepIndex(index)]?.title ?? `Activity ${index + 1}`);
-                    return (
-                      <button
-                        key={`step-${index}-of-${totalSteps}`}
-                        type="button"
-                        title={isDone || isCurrent ? stepTitle : undefined}
-                        aria-label={isDone ? `Review: ${stepTitle}` : stepTitle}
-                        disabled={!isDone && !isCurrent}
-                        onClick={
-                          isDone ? () => setViewingStep(isViewing ? null : index)
-                          : isCurrent ? () => setViewingStep(null)
-                          : undefined
-                        }
-                        className={`h-full min-w-0 flex-1 ${isDone || isCurrent ? 'cursor-pointer' : 'cursor-default'} ${isViewing ? 'bg-verified/30' : 'bg-transparent'}`}
-                      />
-                    );
-                  })}
-                </span>
-              </div>
-              <div className="mt-1.5 flex items-baseline justify-between gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {isReviewing
-                    ? 'Looking back at a finished activity'
-                    : isInjectedStep(currentStep)
-                      ? 'just added · extra practice'
-                      : `Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {session.topic}
-                  {session.standardCode ? ` · ${session.standardCode}` : ''}
-                </span>
-              </div>
-            </div>
-          )}
 
           {isReviewing && (
             <button

@@ -35,6 +35,11 @@ const COMPLETION_COPY: Record<string, string> = {
   crossword: 'open-ended',
 };
 
+function humanName(kind: string): string {
+  const label = kindLabel(kind);
+  return label[0].toUpperCase() + label.slice(1);
+}
+
 function completionCopy(kind: string): string {
   return COMPLETION_COPY[kind] ?? 'signals done';
 }
@@ -235,7 +240,7 @@ export function BuildNarrative({ state }: { state: PathwayState }) {
                     {widget ? (
                       <>
                         <span className="truncate font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: 'var(--activity-text)' }}>
-                          {kindLabel(widgetKind || 'activity')}
+                          {humanName(widgetKind || 'activity')}
                         </span>
                         <span className="text-[11px] text-ink-2">{completionCopy(widgetKind)}</span>
                       </>

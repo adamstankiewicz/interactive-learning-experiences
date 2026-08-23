@@ -23,7 +23,7 @@ export default async function PathwayReportPage({
           href="/pathways"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          ← All Pathways
+          ← All pathways
         </Link>
         <h1 className="font-heading text-2xl font-bold mt-2">
           {session?.topic ?? 'Pathway report'}
@@ -32,7 +32,6 @@ export default async function PathwayReportPage({
 
       <SessionReportPage
         sessionId={sessionId}
-        topic={session?.topic ?? ''}
         parentPreview={parentPreview}
       />
     </main>

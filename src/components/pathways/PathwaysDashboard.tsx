@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Paperclip } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -42,6 +43,7 @@ function QuickCreate({ recentTopics }: { recentTopics: string[] }) {
   const router = useRouter();
   const [topic, setTopic] = useState('');
   const [grade, setGrade] = useState('');
+  const [focused, setFocused] = useState(false);
 
   function build() {
     const params = new URLSearchParams();
@@ -59,13 +61,33 @@ function QuickCreate({ recentTopics }: { recentTopics: string[] }) {
         }}
         className="flex items-stretch border border-foreground bg-card"
       >
-        <input
-          value={topic}
-          onChange={(event) => setTopic(event.target.value)}
-          placeholder="What should your students learn next?"
-          aria-label="Pathway topic"
-          className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
-        />
+        <span className="relative min-w-0 flex-1">
+          {/* The bar invites typing before it is touched: a blinking caret
+              sits ahead of the placeholder until focus brings the real one. */}
+          {!topic && !focused && (
+            <span
+              aria-hidden="true"
+              className="caret-blink pointer-events-none absolute top-1/2 left-3.5 h-[1.1em] w-px -translate-y-1/2 bg-foreground"
+            />
+          )}
+          <input
+            value={topic}
+            onChange={(event) => setTopic(event.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="What should your students learn next?"
+            aria-label="Pathway topic"
+            className="w-full bg-transparent px-3.5 py-2.5 pl-4.75 text-[15px] outline-none placeholder:text-muted-foreground"
+          />
+        </span>
+        <Link
+          href="/"
+          aria-label="Attach a lesson plan"
+          title="Attach a lesson plan"
+          className="flex items-center border-l border-border px-3 text-[15px] text-muted-foreground transition-colors hover:bg-sunk hover:text-foreground"
+        >
+          <Paperclip aria-hidden="true" className="size-4" />
+        </Link>
         <select
           value={grade}
           onChange={(event) => setGrade(event.target.value)}
@@ -139,7 +161,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
         {session.completionCount}
       </span>
       {completion === null ? (
-        <span className="text-right text-[12.5px] text-muted-foreground">Waiting for students</span>
+        <span className="text-right text-[12.5px] text-muted-foreground">Needs your review</span>
       ) : (
         <span className="flex items-center justify-end gap-2">
           <span className="font-heading text-base font-bold tabular-nums">{completion}%</span>

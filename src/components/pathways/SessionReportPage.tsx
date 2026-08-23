@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 
 import { PathwayPreview, type PathwayPreviewData } from '@/components/pathways/PathwayPreview';
 import type { PathwayPlan } from '@/lib/pathway/schema';
-import { widgetSpec } from '@/lib/pathway/schema';
 import type { SessionStudentRow, StepOutcome } from '@/lib/storage/types';
 
 // ---------------------------------------------------------------------------
@@ -93,6 +92,69 @@ export function StepStripLegend() {
           <span aria-hidden="true" className={`h-2.5 w-3.5 ${STRIP_CELL[outcome].className}`} />
           {STRIP_CELL[outcome].label}
         </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The report's four figures (design 1e): opens, completed, completion %, and
+ * remediations — the last in the warning colour, because it is the number
+ * that asks for the teacher's attention. Remediations are counted as widgets
+ * the server injected beyond the plan's own steps.
+ */
+function ReportFigures({
+  rows,
+  childSessions,
+}: {
+  rows: SessionStudentRow[] | null;
+  childSessions: ChildSession[] | null;
+}) {
+  const opens = rows?.length ?? null;
+  const completed = rows ? rows.filter((row) => row.completed).length : null;
+  const completion =
+    opens != null && completed != null && opens > 0
+      ? `${Math.round((completed / opens) * 100)}%`
+      : null;
+  const remediations = childSessions
+    ? childSessions.reduce(
+        (sum, child) =>
+          sum +
+          Math.max(0, Object.keys(child.stepWidgets).length - (child.plan?.steps.length ?? 0)),
+        0,
+      )
+    : null;
+
+  const figures: { label: string; value: string; warning?: boolean }[] = [
+    { label: 'Opens', value: opens != null ? String(opens) : '—' },
+    { label: 'Completed', value: completed != null ? String(completed) : '—' },
+    { label: 'Completion', value: completion ?? '—' },
+    {
+      label: 'Remediations',
+      value: remediations != null ? String(remediations) : '—',
+      warning: remediations != null && remediations > 0,
+    },
+  ];
+
+  return (
+    <div className="mb-6 grid grid-cols-2 border border-border bg-card sm:grid-cols-4">
+      {figures.map((figure) => (
+        <div
+          key={figure.label}
+          className="border-b border-r border-border p-3.5 last:border-r-0 sm:border-b-0 nth-2:border-r-0 sm:nth-2:border-r"
+        >
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {figure.label}
+          </p>
+          <p
+            className={`mt-1 font-heading text-[26px] font-bold tabular-nums ${
+              figure.warning ? 'text-warning' : 'text-foreground'
+            }`}
+          >
+            {figure.warning && <span aria-hidden>⚠ </span>}
+            {figure.value}
+          </p>
+        </div>
       ))}
     </div>
   );
@@ -245,11 +307,9 @@ function TabBar({ tabs, active, onChange }: { tabs: string[]; active: string; on
 
 export function SessionReportPage({
   sessionId,
-  topic,
   parentPreview,
 }: {
   sessionId: string;
-  topic: string;
   parentPreview: PathwayPreviewData | null;
 }) {
   const [tab, setTab] = useState<'Performance' | 'Students' | 'Preview'>('Performance');
@@ -286,6 +346,7 @@ export function SessionReportPage({
 
   return (
     <div>
+      <ReportFigures rows={reportRows} childSessions={children} />
       <TabBar tabs={tabs} active={tab} onChange={(t) => setTab(t as typeof tab)} />
 
       {tab === 'Performance' && (

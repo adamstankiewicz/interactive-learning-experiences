@@ -35,13 +35,13 @@ export function ActivityTrail({ state }: { state: PathwayState }) {
       <div className="flex items-center gap-2.5">
         <ol className="flex flex-1 gap-[5px]" aria-label="Build progress">
           {STAGES.map((stage) => (
-            <li key={stage.id} className="h-[7px] flex-1 overflow-hidden bg-sunk">
+            <li key={stage.id} className="h-[7px] flex-1 overflow-hidden bg-track">
               <span
                 className={cn(
                   'block h-full transition-[width] duration-100',
                   state.stages[stage.id].status === 'done' && 'w-full bg-verified',
                   state.stages[stage.id].status === 'active' &&
-                    'w-full animate-pulse bg-foreground motion-reduce:animate-none',
+                    'segment-grow bg-foreground',
                   state.stages[stage.id].status === 'skipped' && 'w-full bg-warning-edge',
                   state.stages[stage.id].status === 'pending' && 'w-0',
                 )}

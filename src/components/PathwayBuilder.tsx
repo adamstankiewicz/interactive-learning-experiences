@@ -93,11 +93,9 @@ export function PathwayBuilder() {
 
   const streaming = state.status === "streaming";
   const started = state.status !== "idle";
-  // Topic is the one thing this page asks first — it's the variable a
-  // teacher is actively deciding day to day; grade is usually a fixed fact
-  // about them, so it (and the submit action) only earns screen space once
-  // there's actually a topic to attach it to. Mirrors `/learn`'s one-question
-  // focus rather than presenting every field as equally important at once.
+  // The card shows everything it asks up front (design 1c): topic, grade,
+  // and the primary are always visible. `engaged` only decides when the
+  // example chips step aside for a topic the teacher is actually typing.
   const engaged = started || Boolean(topic.trim());
 
   function runSubmit() {
@@ -136,6 +134,8 @@ export function PathwayBuilder() {
       {!started && (
         <div className="bg-[#1f1915] pb-20">
           <div className="mx-auto w-full max-w-3xl px-6 pt-12">
+            {/* Quiet by design (1c): a mono overline and one grey sub-line —
+                no headline. The white card is the hero. */}
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -143,20 +143,10 @@ export function PathwayBuilder() {
             >
               New pathway
             </motion.p>
-            <motion.h1
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="mt-2 font-heading text-4xl font-black tracking-tight text-balance text-[#f5f3f1] sm:text-5xl"
-            >
-              Turn a topic into a lesson{" "}
-              <span className="text-brand-fill">students can do</span>.
-            </motion.h1>
-            <p className="mt-3 max-w-xl text-base leading-relaxed text-[#bbb7b2]">
+            <p className="mt-2 max-w-xl text-base leading-relaxed text-[#bbb7b2]">
               Name what you&rsquo;re teaching. We find the standard it maps to
               in the standards graph, then build a pathway from its verified
-              learning components — with interactive activities your students
-              work through.
+              learning components.
             </p>
           </div>
         </div>
@@ -192,51 +182,8 @@ export function PathwayBuilder() {
             className="min-h-16 w-full resize-none border-border bg-transparent px-4 py-3.5 text-[16.5px] font-semibold placeholder:font-normal placeholder:text-muted-foreground focus-visible:border-foreground"
           />
 
-          {!engaged && (
-            <div className="mt-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                Or start from an example
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {EXAMPLES.map((example) => (
-                  <Button
-                    key={example.topic}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setTopic(example.topic);
-                      setGradeHint(example.grade);
-                      // An example has nothing to do with the uploaded plan,
-                      // so building from one must not cite it.
-                      setLessonPlan(null);
-                    }}
-                    className="border border-border font-normal text-ink-2 hover:border-foreground hover:bg-sunk hover:text-foreground"
-                  >
-                    {example.topic}
-                    <span className="text-muted-foreground">
-                      · Gr {example.grade}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-              <LessonPlanUpload
-                disabled={streaming}
-                onPick={pickFromLessonPlan}
-                onClear={() => setLessonPlan(null)}
-              />
-              {lessonPlan && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Building with{" "}
-                  <span className="font-medium text-foreground">{lessonPlan.filename}</span>{" "}
-                  as context — the pathway follows how your plan teaches this.
-                </p>
-              )}
-            </div>
-          )}
-
           <AnimatePresence initial={false}>
-            {engaged && (
+            {(engaged || !started) && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -309,6 +256,50 @@ export function PathwayBuilder() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {!engaged && (
+            <div className="mt-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Or start from an example
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {EXAMPLES.map((example) => (
+                  <Button
+                    key={example.topic}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTopic(example.topic);
+                      setGradeHint(example.grade);
+                      // An example has nothing to do with the uploaded plan,
+                      // so building from one must not cite it.
+                      setLessonPlan(null);
+                    }}
+                    className="border border-border font-normal text-ink-2 hover:border-foreground hover:bg-sunk hover:text-foreground"
+                  >
+                    {example.topic}
+                    <span className="text-muted-foreground">
+                      · Gr {example.grade}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+              <LessonPlanUpload
+                disabled={streaming}
+                onPick={pickFromLessonPlan}
+                onClear={() => setLessonPlan(null)}
+              />
+              {lessonPlan && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Building with{" "}
+                  <span className="font-medium text-foreground">{lessonPlan.filename}</span>{" "}
+                  as context — the pathway follows how your plan teaches this.
+                </p>
+              )}
+            </div>
+          )}
+
 
           {!started && (
             <Collapsible className="mt-4">

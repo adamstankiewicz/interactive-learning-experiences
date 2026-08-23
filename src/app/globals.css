@@ -47,6 +47,7 @@
   --color-card: var(--card);
   /* Practice Pathways design tokens — the handoff palette, beyond shadcn's roles. */
   --color-sunk: var(--sunk);
+  --color-track: var(--track);
   --color-ink: var(--foreground);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--muted-foreground);
@@ -95,6 +96,7 @@
   --popover: #ffffff;
   --popover-foreground: #1f1915;
   --sunk: #f6f3ef;
+  --track: #e8e4dd; /* progress tracks — one step deeper than sunk */
   /* Primary action = the highlighter with ink text (12.33:1). The mandatory
      1px ink border is applied by the button styles, not the token. */
   --primary: #e3df41;
@@ -163,6 +165,7 @@
   --popover: #1f1b18;
   --popover-foreground: #f5f3f1;
   --sunk: #292623; /* card-2 */
+  --track: #393430;
   /* The highlighter is identical in both themes; its text flips to the dark
      ground (13.45:1) so "ink on the marker" stays true as a sibling rule. */
   --primary: #e3df41;
@@ -260,5 +263,24 @@
   }
   h1, h2, h3, h4 {
     font-family: var(--font-heading), var(--font-plex-sans), sans-serif;
+    font-stretch: 112%;
   }
+}
+
+@keyframes caret-blink {
+  0%, 45% { opacity: 1; }
+  50%, 95% { opacity: 0; }
+}
+.caret-blink { animation: caret-blink 1.1s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .caret-blink { animation: none; }
+}
+
+@keyframes segment-grow {
+  from { width: 4%; }
+  to { width: 92%; }
+}
+.segment-grow { animation: segment-grow 9s cubic-bezier(0.2, 0.6, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .segment-grow { animation: none; width: 100%; }
 }
