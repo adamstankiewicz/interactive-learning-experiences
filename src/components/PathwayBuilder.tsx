@@ -136,7 +136,7 @@ export function PathwayBuilder() {
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="font-(family-name:--font-lexend) text-4xl font-black tracking-tight text-balance sm:text-5xl"
+              className="font-heading text-4xl font-black tracking-tight text-balance sm:text-5xl"
             >
               Turn a topic into a lesson{" "}
               <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent dark:from-violet-400 dark:to-pink-400">

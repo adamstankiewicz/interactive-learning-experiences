@@ -1,45 +1,58 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Lexend } from "next/font/google";
+import { Archivo, IBM_Plex_Mono, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
 import { cn } from "@/lib/utils";
 import { THEME_SCRIPT } from "@/lib/theme";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 /**
- * Registered globally (fonts load once, here) but applied only locally on
- * the pathway builder's own headings via `font-[family-name:var(--font-lexend)]`
- * — not wired into the shared `--font-heading` token, which the Pathways
- * dashboard, Roster, Upload, Nav, and the Crossword widget all still use.
- * Lexend specifically: it's a typeface engineered and studied for reading
- * proficiency, including K-12 classroom trials — an unusually literal fit
- * for a tool that builds reading/learning pathways, not a default pick.
+ * The Practice Pathways type system, per the design handoff:
+ * Archivo carries headlines, UI labels and every numeral (its width axis is
+ * loaded so headlines can stretch 106–118%); IBM Plex Sans carries body copy
+ * and tables; IBM Plex Mono carries standard codes, timings and micro-labels;
+ * Source Serif 4 exists for student reading passages only — remediation
+ * prose, activity prompts, the student's own draft.
  */
-const lexend = Lexend({
-  variable: "--font-lexend",
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  axes: ["wdth"],
+});
+
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Topic to student pathway",
+  title: "Practice Pathways",
   description:
-    "Turn a topic into a standards-grounded learning pathway with an interactive widget.",
+    "Turn a topic into a standards-verified learning pathway of interactive activities.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={cn(geistSans.variable, geistMono.variable, lexend.variable, 'h-full antialiased')}
+      className={cn(
+        archivo.variable,
+        plexSans.variable,
+        plexMono.variable,
+        sourceSerif.variable,
+        'h-full antialiased',
+      )}
       suppressHydrationWarning
     >
       <head>
