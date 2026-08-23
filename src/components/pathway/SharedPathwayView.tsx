@@ -40,13 +40,13 @@ export function SharedPathwayView({ session }: { session: WalkthroughSession }) 
   }, [session.sessionId, studentId]);
 
   return (
-    <div className="light-surface min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
+    <div className="register-student min-h-dvh bg-background text-foreground">
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
-        <p className="text-center text-lg font-black text-balance">{session.topic}</p>
+        <p className="text-center font-heading text-lg font-black text-balance">{session.topic}</p>
 
         <PathwayWalkthrough session={session} studentId={studentId} />
 
-        <Link href="/learn" className="text-xs font-bold text-violet-500 underline underline-offset-2">
+        <Link href="/learn" className="text-xs font-bold text-brand-text underline underline-offset-2">
           Build your own pathway →
         </Link>
       </main>

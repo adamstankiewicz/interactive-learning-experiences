@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 
+import { ActivityFrame } from '@/components/pathway/ActivityFrame';
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { WidgetTelemetryProvider } from '@/components/widgets/telemetry-context';
 import { useTelemetry, type RemediationPayload } from '@/hooks/useTelemetry';
@@ -150,6 +151,13 @@ export function PathwayWalkthrough({
   // Total step count = original steps + one per injected widget.
   const totalSteps = session.steps.length + Object.keys(injectedWidgets).length;
 
+  // Absolute-index helpers over the injected slots — the same mapping the
+  // progress bar does inline, shared with the activity frame's header.
+  const injectedIndexList = Object.keys(injectedWidgets).map(Number).sort((a, b) => a - b);
+  const isInjectedStep = (index: number) => injectedIndexList.includes(index);
+  const originalStepIndex = (index: number) =>
+    index - injectedIndexList.filter((i) => i < index).length;
+
   const advanceStep = useCallback(() => {
     setViewingStep(null);
     setStars((n) => n + 1);
@@ -201,27 +209,34 @@ export function PathwayWalkthrough({
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <div className="flex w-full items-center justify-between">
-        <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 text-xs font-bold text-violet-600">
-          {session.standardCode ?? '✨ exploring'}
-        </span>
+        {session.standardCode ? (
+          <span className="rounded-full border border-verified-edge bg-verified-tint px-3 py-1 font-mono text-xs font-semibold text-verified">
+            ✓ {session.standardCode}
+          </span>
+        ) : (
+          <span className="rounded-full border border-warning-edge bg-warning-tint px-3 py-1 font-mono text-xs font-semibold text-warning">
+            exploring
+          </span>
+        )}
         <div className="flex items-center gap-2">
           <a
             href="/games"
-            className="rounded-full border-2 border-pink-200 bg-white/80 px-3 py-1 text-xs font-bold text-pink-600 hover:bg-pink-50 transition-colors"
+            className="rounded-full border border-border bg-card px-3 py-1 text-xs font-bold text-ink-2 transition-colors hover:border-foreground hover:text-foreground"
           >
-            🎮 Take a break
+            Take a break
           </a>
-          <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
+          <span className="flex items-center gap-1.5 rounded-full border border-foreground bg-card py-1 pr-3.5 pl-1.5">
             <motion.span
               key={stars}
-              initial={{ scale: 1.8, rotate: -20 }}
+              initial={{ scale: 1.6, rotate: -16 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-              className="text-xl"
+              className="flex size-6 items-center justify-center rounded-full border border-foreground bg-brand-fill text-sm text-foreground motion-reduce:transition-none"
+              aria-hidden="true"
             >
-              ⭐
+              ★
             </motion.span>
-            <span className="text-lg font-black text-amber-600">{stars}</span>
+            <span className="font-heading text-lg font-black tabular-nums">{stars}</span>
           </span>
         </div>
       </div>
@@ -281,24 +296,24 @@ export function PathwayWalkthrough({
                         : { type: 'spring', stiffness: 400, damping: 30 }
                       }
                       className={[
-                        'relative w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400',
+                        'relative w-full rounded-full',
                         isViewing
-                          ? 'h-3 bg-emerald-400/70 shadow-[0_0_0_3px_rgba(52,211,153,0.6)] cursor-pointer'
+                          ? 'h-3 bg-verified/70 shadow-[0_0_0_2px_var(--verified-edge)] cursor-pointer'
                           : isCurrent
                             ? isReviewing
-                              ? 'h-3 bg-violet-400 cursor-pointer'
-                              : 'h-3 bg-violet-400 shadow-[0_0_0_3px_rgba(139,92,246,0.5)] cursor-pointer'
+                              ? 'h-3 border border-foreground bg-brand-fill cursor-pointer'
+                              : 'h-3 border border-foreground bg-brand-fill shadow-[0_0_0_2px_var(--brand-press)] cursor-pointer'
                             : isDone
-                              ? 'h-3 bg-emerald-400/70 cursor-pointer hover:bg-emerald-400'
-                              : 'h-3 bg-white/25 cursor-default',
-                        '',
+                              ? 'h-3 bg-verified/70 cursor-pointer hover:bg-verified'
+                              : 'h-3 bg-sunk cursor-default',
+                        isInjected && !isDone ? 'outline-2 outline-offset-1 outline-brand-press' : '',
                         'transition-[height,background-color] duration-300',
                       ].join(' ')}
                     >
                       {/* Completion sweep — fills left-to-right when a step is done */}
                       {isDone && !isViewing && (
                         <motion.span
-                          className="absolute inset-0 rounded-full bg-emerald-400/70 origin-left"
+                          className="absolute inset-0 rounded-full bg-verified/70 origin-left"
                           initial={{ scaleX: 0 }}
                           animate={{ scaleX: 1 }}
                           transition={{ type: 'spring', stiffness: 260, damping: 24 }}
@@ -313,7 +328,7 @@ export function PathwayWalkthrough({
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 18 }}
                         >
-                          <span className={`h-2 w-2 rounded-full ${isViewing ? 'bg-emerald-500' : 'bg-violet-500'}`} />
+                          <span className={`h-2 w-2 rounded-full ${isViewing ? 'bg-verified' : 'bg-foreground'}`} />
                         </motion.span>
                       )}
                     </motion.button>
@@ -328,42 +343,72 @@ export function PathwayWalkthrough({
             <button
               type="button"
               onClick={() => setViewingStep(null)}
-              className="self-start rounded-xl border-2 border-violet-200 bg-white/80 px-3 py-1 text-sm font-bold text-violet-600 hover:bg-violet-50"
+              className="self-start rounded-xl border border-border bg-card px-3 py-1 text-sm font-bold text-ink-2 hover:border-foreground hover:text-foreground"
             >
               ← Back to current
             </button>
           )}
 
           {currentWidget ? (
-            <div className={`w-full rounded-3xl border-4 bg-white/80 p-4 ${isReviewing ? 'border-emerald-200 opacity-90' : 'border-violet-200'}`}>
-              <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode} stepIndex={currentStep}>
-                <WidgetRenderer
-                  key={displayStep}
-                  spec={currentWidget}
-                  onComplete={
-                    isReviewing ? undefined
-                    : HAS_OWN_CTA.has(currentKind ?? '') ? advanceStep
-                    : markWidgetDone
-                  }
-                />
-              </WidgetTelemetryProvider>
+            <div className="w-full">
+              <ActivityFrame
+                kind={currentKind ?? 'activity'}
+                title={
+                  isInjectedStep(displayStep)
+                    ? 'Extra practice'
+                    : (session.steps[originalStepIndex(displayStep)]?.title ?? `Activity ${displayStep + 1}`)
+                }
+                state={
+                  isReviewing ? (
+                    <span className="shrink-0 rounded-full border border-verified-edge bg-verified-tint px-2 py-px font-mono text-[10px] uppercase tracking-[0.12em] text-verified">
+                      ✓ done
+                    </span>
+                  ) : isInjectedStep(displayStep) ? (
+                    <span className="shrink-0 rounded-full border border-foreground bg-brand-fill px-2 py-px font-mono text-[10px] uppercase tracking-[0.12em] text-foreground">
+                      just added
+                    </span>
+                  ) : undefined
+                }
+              >
+                <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode} stepIndex={currentStep}>
+                  <WidgetRenderer
+                    key={displayStep}
+                    spec={currentWidget}
+                    onComplete={
+                      isReviewing ? undefined
+                      : HAS_OWN_CTA.has(currentKind ?? '') ? advanceStep
+                      : markWidgetDone
+                    }
+                  />
+                </WidgetTelemetryProvider>
+              </ActivityFrame>
 
               {/* External button for widgets that fire onComplete silently (no internal CTA),
-                  and for the three widgets that never fire onComplete at all. */}
+                  and for the three widgets that never fire onComplete at all. The reason a
+                  button is live or waiting is stated, not implied. */}
               {!isReviewing && !HAS_OWN_CTA.has(currentKind ?? '') && (
-                <button
-                  type="button"
-                  onClick={advanceStep}
-                  disabled={!widgetDone && !ALWAYS_ENABLED.has(currentKind ?? '')}
-                  className="mt-4 w-full rounded-2xl bg-emerald-500 py-3 font-black text-white shadow-[0_5px_0_0_#047857] transition-opacity active:translate-y-1 active:shadow-[0_2px_0_0_#047857] disabled:opacity-30 disabled:shadow-[0_5px_0_0_#047857] disabled:active:translate-y-0"
-                >
-                  {currentStep + 1 === totalSteps ? "I'm done! 🎉" : 'Next activity →'}
-                </button>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={advanceStep}
+                    disabled={!widgetDone && !ALWAYS_ENABLED.has(currentKind ?? '')}
+                    className="w-full rounded-2xl border border-foreground bg-brand-fill py-3 font-heading font-black text-foreground shadow-[0_5px_0_0_var(--brand-press)] transition-all hover:bg-brand-fill-hover active:translate-y-[2px] active:shadow-[0_2px_0_0_var(--brand-press)] disabled:opacity-40 disabled:shadow-[0_5px_0_0_var(--brand-press)] disabled:active:translate-y-0 motion-reduce:transition-none"
+                  >
+                    {currentStep + 1 === totalSteps ? "I'm done!" : 'Next activity →'}
+                  </button>
+                  <p className="mt-1.5 text-center text-xs text-muted-foreground">
+                    {ALWAYS_ENABLED.has(currentKind ?? '')
+                      ? 'No finish line on this one — move on whenever you want.'
+                      : widgetDone
+                        ? 'Nice — ready when you are.'
+                        : 'Finish the activity to keep going.'}
+                  </p>
+                </div>
               )}
             </div>
           ) : (
-            <p className="rounded-2xl border-4 border-violet-200 bg-white/80 p-4 text-center font-bold text-violet-500">
-              ✨ Building this activity…
+            <p className="w-full rounded-2xl border border-dashed border-border bg-card p-4 text-center font-bold text-muted-foreground">
+              Building this activity…
             </p>
           )}
         </motion.div>
@@ -376,8 +421,13 @@ export function PathwayWalkthrough({
           transition={{ type: 'spring', stiffness: 280, damping: 26 }}
           className="flex w-full flex-col items-center gap-5"
         >
-          <p className="text-center text-4xl">🎉</p>
-          <p className="text-center text-xl font-black text-balance">
+          <p
+            className="flex size-14 items-center justify-center rounded-full border border-foreground bg-brand-fill text-2xl text-foreground"
+            aria-hidden="true"
+          >
+            ★
+          </p>
+          <p className="text-center font-heading text-xl font-black text-balance">
             All done — {totalSteps} activities, {stars} stars!
           </p>
 
@@ -387,14 +437,14 @@ export function PathwayWalkthrough({
                 type="button"
                 onClick={onRestart.another}
                 disabled={onRestart.busy}
-                className="rounded-2xl bg-amber-400 px-7 py-3 font-black text-amber-950 shadow-[0_5px_0_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_0_#b45309] disabled:opacity-50"
+                className="rounded-2xl border border-foreground bg-brand-fill px-7 py-3 font-heading font-black text-foreground shadow-[0_5px_0_0_var(--brand-press)] transition-all hover:bg-brand-fill-hover active:translate-y-0.5 active:shadow-[0_2px_0_0_var(--brand-press)] disabled:opacity-50 motion-reduce:transition-none"
               >
-                {onRestart.busy ? 'Building…' : 'Another one! 🚀'}
+                {onRestart.busy ? 'Building…' : 'Another one!'}
               </button>
               <button
                 type="button"
                 onClick={onRestart.newTopic}
-                className="rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-black text-violet-600"
+                className="rounded-2xl border border-border bg-card px-5 py-3 font-heading font-black text-ink-2 hover:border-foreground hover:text-foreground"
               >
                 New topic
               </button>
