@@ -62,6 +62,10 @@ export type SessionSummary = {
   openCount: number;
   completionCount: number;
   createdAt: string;
+  /** Steps in the plan — 0 when the plan never finished. */
+  stepCount: number;
+  /** Distinct widget kinds across the plan's steps, for the dashboard's chip line. */
+  activityKinds: string[];
 };
 
 /** Per-student performance row for the session report view. */

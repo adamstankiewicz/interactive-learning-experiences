@@ -358,7 +358,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
 
     let query = supabaseAdmin()
       .from('pathway_sessions')
-      .select('id, topic, standard_code, grade_hint, completion_count, created_at, session_opens(count)')
+      .select('id, topic, standard_code, grade_hint, completion_count, created_at, steps:plan->steps, session_opens(count)')
       .order('created_at', { ascending: false })
       .limit(limit);
     const childIds = [...childIdSet];
@@ -395,6 +395,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
       const kids = childrenByParent.get(pid) ?? [];
       const childCompletionsTotal = kids.reduce((s, cid) => s + (childCompletionById.get(cid) ?? 0), 0);
       const childOpensTotal = kids.reduce((s, cid) => s + (childOpenCount.get(cid) ?? 0), 0);
+      const steps = (Array.isArray(row.steps) ? row.steps : []) as { widgetKind?: string }[];
       return {
         id: pid,
         topic: String(row.topic),
@@ -403,6 +404,8 @@ export const supabaseStorageAdapter: StorageAdapter = {
         openCount: Number((row.session_opens as unknown as { count: number }[])?.[0]?.count ?? 0) + childOpensTotal,
         completionCount: Number(row.completion_count ?? 0) + childCompletionsTotal,
         createdAt: String(row.created_at),
+        stepCount: steps.length,
+        activityKinds: [...new Set(steps.map((step) => step.widgetKind).filter((k): k is string => Boolean(k)))],
       };
     });
   },

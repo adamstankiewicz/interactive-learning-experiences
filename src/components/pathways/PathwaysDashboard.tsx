@@ -125,6 +125,12 @@ function SessionRow({ session }: { session: SessionSummary }) {
           {session.gradeHint && (
             <span className="text-[11.5px] text-muted-foreground">Grade {session.gradeHint}</span>
           )}
+          {session.stepCount > 0 && (
+            <span className="text-[11.5px] text-muted-foreground">
+              {session.stepCount} steps · {session.activityKinds.length} activity type
+              {session.activityKinds.length === 1 ? '' : 's'}
+            </span>
+          )}
         </span>
       </span>
       <span className="text-right text-[13.5px] text-ink-2">{formatDate(session.createdAt)}</span>

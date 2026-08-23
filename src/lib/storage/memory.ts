@@ -281,6 +281,8 @@ export const memoryStorageAdapter: StorageAdapter = {
         const childIds = childrenByParent.get(s.id) ?? [];
         const childCompletions = childIds.reduce((sum, cid) => sum + (sessions.get(cid)?.completionCount ?? 0), 0);
         const childOpens = childIds.reduce((sum, cid) => sum + [...sessionOpens].filter((k) => k.startsWith(`${cid}:`)).length, 0);
+        const steps =
+          ((s.plan as { steps?: { widgetKind?: string }[] } | null)?.steps ?? []).filter(Boolean);
         return {
           id: s.id,
           topic: s.topic,
@@ -289,6 +291,8 @@ export const memoryStorageAdapter: StorageAdapter = {
           openCount: [...sessionOpens].filter((k) => k.startsWith(`${s.id}:`)).length + childOpens,
           completionCount: s.completionCount + childCompletions,
           createdAt: s.createdAt ?? new Date().toISOString(),
+          stepCount: steps.length,
+          activityKinds: [...new Set(steps.map((step) => step.widgetKind).filter((k): k is string => Boolean(k)))],
         };
       });
   },
