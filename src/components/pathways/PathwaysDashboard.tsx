@@ -43,6 +43,12 @@ function SessionCard({ session }: { session: SessionSummary }) {
               <span className="text-xs font-mono text-muted-foreground">{session.standardCode}</span>
             )}
             <GradePill grade={session.gradeHint} />
+            {session.stepCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {session.stepCount} steps · {session.activityKinds.length} activity type
+                {session.activityKinds.length === 1 ? '' : 's'}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground">{formatDate(session.createdAt)}</span>
           </div>
         </div>

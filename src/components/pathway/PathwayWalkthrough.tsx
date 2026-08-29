@@ -150,9 +150,21 @@ export function PathwayWalkthrough({
   // Total step count = original steps + one per injected widget.
   const totalSteps = session.steps.length + Object.keys(injectedWidgets).length;
 
+  // Same ref idiom as currentStepRef: advanceStep fires from event handlers,
+  // so it reads the latest injected slots through a ref instead of depending
+  // on a per-render derived array.
+  const injectedIndexRef = useRef<number[]>([]);
+  useEffect(() => {
+    injectedIndexRef.current = Object.keys(injectedWidgets).map(Number);
+  }, [injectedWidgets]);
+
   const advanceStep = useCallback(() => {
     setViewingStep(null);
-    setStars((n) => n + 1);
+    // An injected remediation step costs no star — it's help, not a penalty,
+    // and the star total still matches the pathway's own length.
+    if (!injectedIndexRef.current.includes(currentStepRef.current)) {
+      setStars((n) => n + 1);
+    }
     telemetry.flush();
     setCurrentStep((n) => {
       const next = n + 1;

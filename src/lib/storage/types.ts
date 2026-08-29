@@ -62,7 +62,31 @@ export type SessionSummary = {
   openCount: number;
   completionCount: number;
   createdAt: string;
+  /** Steps in the plan — 0 when the plan never finished. */
+  stepCount: number;
+  /** Distinct widget kinds across the plan's steps, for the dashboard's chip line. */
+  activityKinds: string[];
 };
+
+/**
+ * One cell of the report's per-step evidence strip: what happened at that
+ * step, in one word. 'unreached' covers both "never got there" and events
+ * recorded before stepIndex was persisted — the strip never guesses.
+ */
+export type StepOutcome = 'first-try' | 'attempts' | 'wrong' | 'unreached';
+
+/** Fold per-step completion evidence into strip cells. Pure; shared by both adapters. */
+export function buildStepStrip(
+  stepCount: number,
+  perStep: Map<number, { right: boolean; wrong: boolean }>,
+): StepOutcome[] {
+  return Array.from({ length: stepCount }, (_, index) => {
+    const cell = perStep.get(index);
+    if (!cell) return 'unreached';
+    if (cell.right) return cell.wrong ? 'attempts' : 'first-try';
+    return 'wrong';
+  });
+}
 
 /** Per-student performance row for the session report view. */
 export type SessionStudentRow = {
@@ -76,6 +100,8 @@ export type SessionStudentRow = {
   completed: boolean;
   medianElapsedMs: number | null;
   lastSeenAt: string;
+  /** One outcome per plan step — the report's evidence strip. */
+  stepStrip: StepOutcome[];
 };
 
 export interface StorageAdapter {
