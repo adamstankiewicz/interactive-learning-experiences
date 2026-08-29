@@ -10,6 +10,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --font-serif: var(--font-source-serif);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -54,133 +55,110 @@
 }
 
 /*
- * `.light-surface` re-declares this same palette for one subtree. The student
- * surfaces (/learn and a shared pathway) hard-code pastel light chrome — a
- * violet/pink gradient and white cards, with no dark variants — but the widgets
- * they host are token-themed. Without this, a student in dark mode gets
- * `--foreground` near-white on those hard-coded white cards, i.e. invisible
- * feedback text, and `bg-card` chips render near-black.
+ * "Verified plain, warm" — the whole theme in three rules:
+ *
+ * 1. Neutrals are warm-biased (hue ~75-85, chroma 0.004-0.014): paper, not
+ *    laboratory white. Everything structural — buttons, links, chrome — is
+ *    drawn in these neutrals.
+ * 2. Chromatic tokens are semantic and only semantic. --success is the
+ *    product's one signature color (verification: "✓ checked against the
+ *    graph"); --warning, --destructive, and --selected exist for widget
+ *    feedback and manipulative fills. None of them decorate.
+ * 3. Near-stock shadcn otherwise (default 10px radius, standard roles), so
+ *    re-theming the app doubles as the documentation for the theming seam.
+ *
+ * Every chromatic value is carried over from the previous system unchanged —
+ * their WCAG AA ratios against --card were already verified there and warm
+ * neutrals at these lightness values do not move those ratios meaningfully.
+ *
+ * `.light-surface` re-declares the light palette for the student subtree
+ * (/learn and shared pathways), whose chrome opts out of dark mode.
  */
 :root,
 .light-surface {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.983 0.005 84); /* warm paper */
+  --foreground: oklch(0.19 0.012 75); /* warm ink */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.19 0.012 75);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /*
-   * The one confident brand hue. The base shadcn theme this builds on ships
-   * pure greyscale; this app has two faces — a teacher-facing builder and a
-   * student-facing /learn — and they need to read as the same product.
-   * /learn already has a violet identity (its gradient background, its mic
-   * button), so primary is built around that hue rather than introducing a
-   * third color language. Chosen for contrast, not just vibe: 6.31:1 against
-   * --primary-foreground, comfortably past the 4.5:1 text floor everything
-   * else in this file holds to.
-   */
-  --primary: oklch(0.5 0.2 292);
-  --primary-foreground: oklch(0.985 0 0);
-  /* For brand-hued text sitting on a light primary-tinted surface (a badge,
-     not a solid button) — identical to --primary in light mode, where it
-     already clears 4.5:1; dark mode needs its own lighter value below. */
-  --primary-tint-foreground: var(--primary);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.19 0.012 75);
+  /* Primary is ink: actions are drawn in the neutral ramp, so the page's
+     only saturated voices are the semantic tokens below. */
+  --primary: oklch(0.24 0.012 75);
+  --primary-foreground: oklch(0.985 0.005 84);
+  --primary-tint-foreground: oklch(0.35 0.012 75);
+  --secondary: oklch(0.962 0.007 80);
+  --secondary-foreground: oklch(0.24 0.012 75);
+  --muted: oklch(0.962 0.007 80);
+  --muted-foreground: oklch(0.55 0.012 78);
+  --accent: oklch(0.962 0.007 80);
+  --accent-foreground: oklch(0.24 0.012 75);
   --destructive: oklch(0.577 0.245 27.325);
-  /* Widget feedback and manipulative fills. The base theme's palette is
-     greyscale, so these are the only chromatic tokens: correct,
-     needs-another-look, and the "student selected this part" fill shared
-     by every manipulative. */
-  /* Lightness is set so feedback text clears WCAG AA (4.5:1) against --card,
-     matching the shipped --destructive. The obvious emerald/amber sit at
-     ~3.5:1 and fail — this is student-facing copy, so it has to hold. */
+  /* The signature: verification green. Never on a button, never decorative. */
   --success: oklch(0.528 0.145 163.225);
   --warning: oklch(0.56 0.153 70.08);
-  /* Selected vs unselected parts differ only by fill, so the pair has to clear
-     the 3:1 non-text contrast bar (WCAG 1.4.11) on its own. */
+  /* Selected vs unselected manipulative parts differ only by fill, so the
+     pair has to clear WCAG 1.4.11's 3:1 non-text bar on its own. */
   --selected: oklch(0.639 0.169 237.323);
   --selected-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  /* Focus rings pick up the brand hue too, at low chroma — a warm glow
-     instead of a flat grey outline, without competing with --primary itself. */
-  --ring: oklch(0.708 0.08 292);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  /* Rounder than the base theme's default (10px), short of /learn's explicit
-     rounded-2xl/3xl treatments on its own bespoke elements — the "same
-     warmth, calmer register" the builder and /learn are meant to share.
-     Radius alone never affects text contrast, so this is safe to raise
-     without re-checking any of the ratios documented above. */
-  --radius: 0.875rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: oklch(0.915 0.008 80);
+  --input: oklch(0.915 0.008 80);
+  --ring: oklch(0.32 0.012 75);
+  --chart-1: oklch(0.87 0.006 80);
+  --chart-2: oklch(0.556 0.01 78);
+  --chart-3: oklch(0.439 0.01 76);
+  --chart-4: oklch(0.371 0.01 76);
+  --chart-5: oklch(0.269 0.01 75);
+  /* Stock shadcn radius — part of the "near-stock is the demo" stance. */
+  --radius: 0.625rem;
+  --sidebar: oklch(0.983 0.005 84);
+  --sidebar-foreground: oklch(0.19 0.012 75);
+  --sidebar-primary: oklch(0.24 0.012 75);
+  --sidebar-primary-foreground: oklch(0.985 0.005 84);
+  --sidebar-accent: oklch(0.962 0.007 80);
+  --sidebar-accent-foreground: oklch(0.24 0.012 75);
+  --sidebar-border: oklch(0.915 0.008 80);
+  --sidebar-ring: oklch(0.32 0.012 75);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /*
-   * The base theme's dark mode default inverts to a near-white button with
-   * dark text — a convention for a *monochrome* primary. A hued one reads
-   * better the conventional way: a rich, visible fill with light text on
-   * top. Lightened
-   * from the light-mode value to stay legible against a near-black page
-   * (3.63:1 against --card) while still clearing 4.5:1 against its own
-   * --primary-foreground text.
-   */
-  --primary: oklch(0.565 0.19 292);
-  --primary-foreground: oklch(0.985 0 0);
-  /* --primary itself is tuned to sit under light text as a button fill
-     (3.63:1 against --card is fine for a large filled area, but text this
-     small needs 4.5:1) — too dark to also work as small text on a dark,
-     lightly-tinted card. Lightened until it clears 4.5:1 in that role. */
-  --primary-tint-foreground: oklch(0.65 0.16 292);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.155 0.006 75); /* warm charcoal, not inverted paper */
+  --foreground: oklch(0.975 0.004 84);
+  --card: oklch(0.205 0.007 75);
+  --card-foreground: oklch(0.975 0.004 84);
+  --popover: oklch(0.205 0.007 75);
+  --popover-foreground: oklch(0.975 0.004 84);
+  /* Monochrome primary inverts the conventional way: light button, ink text. */
+  --primary: oklch(0.93 0.005 84);
+  --primary-foreground: oklch(0.19 0.012 75);
+  --primary-tint-foreground: oklch(0.85 0.006 80);
+  --secondary: oklch(0.265 0.008 75);
+  --secondary-foreground: oklch(0.975 0.004 84);
+  --muted: oklch(0.265 0.008 75);
+  --muted-foreground: oklch(0.71 0.008 78);
+  --accent: oklch(0.265 0.008 75);
+  --accent-foreground: oklch(0.975 0.004 84);
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.765 0.177 163.223);
   --warning: oklch(0.828 0.189 84.429);
   --selected: oklch(0.746 0.16 232.661);
-  --selected-foreground: oklch(0.205 0 0);
+  --selected-foreground: oklch(0.205 0.007 75);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0.08 292);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.72 0.008 78);
+  --chart-1: oklch(0.87 0.006 80);
+  --chart-2: oklch(0.556 0.01 78);
+  --chart-3: oklch(0.439 0.01 76);
+  --chart-4: oklch(0.371 0.01 76);
+  --chart-5: oklch(0.269 0.01 75);
+  --sidebar: oklch(0.205 0.007 75);
+  --sidebar-foreground: oklch(0.975 0.004 84);
+  --sidebar-primary: oklch(0.93 0.005 84);
+  --sidebar-primary-foreground: oklch(0.19 0.012 75);
+  --sidebar-accent: oklch(0.265 0.008 75);
+  --sidebar-accent-foreground: oklch(0.975 0.004 84);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.72 0.008 78);
 }
 
 @layer base {
