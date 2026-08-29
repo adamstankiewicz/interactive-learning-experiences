@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>a2learn — the open activity server for teaching agents</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+  :root {
+    --paper: #FAF9F4; --card: #FFFFFF; --sunk: #F3F1EA;
+    --ink: #231E18; --muted: #6F685F; --line: #E6E2DA;
+    --verified: #067D57; --verified-tint: #E4F2EC; --verified-edge: #BCE0D0;
+    --terminal: #1C1813; --terminal-text: #E9E5DE; --terminal-muted: #928A7D; --terminal-green: #3FCF8E;
+    --sans: "Geist", -apple-system, "Segoe UI", sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --serif: "Source Serif 4", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #16130F; --card: #201C17; --sunk: #262119;
+      --ink: #F5F3F0; --muted: #A49D93; --line: #383329;
+      --verified: #34D399; --verified-tint: #123324; --verified-edge: #1E4A34;
+      --terminal: #100E0B; --terminal-text: #E9E5DE; --terminal-muted: #8F887C; --terminal-green: #3FCF8E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #16130F; --card: #201C17; --sunk: #262119;
+    --ink: #F5F3F0; --muted: #A49D93; --line: #383329;
+    --verified: #34D399; --verified-tint: #123324; --verified-edge: #1E4A34;
+    --terminal: #100E0B; --terminal-text: #E9E5DE; --terminal-muted: #8F887C; --terminal-green: #3FCF8E;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper); color: var(--ink); margin: 0;
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 3.4rem 1.4rem 4.5rem; }
+
+  /* ---- masthead ---- */
+  .mast {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+    padding-bottom: 2.6rem;
+  }
+  .mast .name { font-family: var(--mono); font-size: 0.95rem; font-weight: 500; letter-spacing: 0.02em; }
+  .mast .lic { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+
+  /* ---- hero ---- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 0.9rem;
+  }
+  .hero h1 {
+    font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em;
+    line-height: 1.06; margin: 0 0 1.1rem; text-wrap: balance;
+  }
+  .hero .sub { font-size: 1.1rem; color: var(--muted); line-height: 1.65; margin: 0 0 1.1rem; max-width: 56ch; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin: 0 0 2rem; padding: 0;
+    list-style: none; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  /* ---- the one dark object: an agent session ---- */
+  .terminal {
+    background: var(--terminal); color: var(--terminal-text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 1.05rem 1.2rem; margin: 0 0 1.1rem;
+    font-family: var(--mono); font-size: 0.8rem; line-height: 1.75; overflow-x: auto;
+  }
+  .terminal .t-label {
+    display: block; color: var(--terminal-muted); font-size: 0.65rem;
+    letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.55rem;
+  }
+  .terminal pre { margin: 0; font: inherit; white-space: pre; }
+  .terminal .g { color: var(--terminal-green); }
+  .terminal .q { color: var(--terminal-muted); }
+
+  /* ---- live demo ---- */
+  .demo {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 1.1rem 1.3rem 1.2rem; margin: 0 0 2.4rem;
+  }
+  .demo-label {
+    font-family: var(--mono); font-size: 0.65rem; font-weight: 500; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 0.9rem;
+  }
+  .demo-q { font-size: 0.95rem; font-weight: 600; margin: 0 0 0.6rem; }
+  .demo-line { position: relative; height: 2px; background: var(--line); margin: 1.6rem 0.5rem 1.7rem; }
+  .demo-line span {
+    position: absolute; top: -0.66rem; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 0.72rem; font-weight: 500; color: var(--ink);
+    background: var(--card); padding: 0 0.3rem;
+  }
+  .demo-opts { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.4rem; }
+  .demo-opts button {
+    font-family: var(--sans); font-size: 0.88rem; font-weight: 500; color: var(--ink);
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.4rem 0.9rem; cursor: pointer;
+  }
+  .demo-opts button:hover:enabled { border-color: var(--ink); }
+  .demo-opts button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .demo-opts button:disabled { cursor: default; opacity: 0.5; }
+  .demo-opts button.picked { border-color: var(--ink); background: var(--sunk); opacity: 1; }
+  .demo-result { margin-top: 0.7rem; }
+  .demo-result pre {
+    margin: 0.3rem 0 0.6rem; background: var(--terminal); color: var(--terminal-text);
+    border-radius: 6px; padding: 0.7rem 0.9rem; font-family: var(--mono);
+    font-size: 0.73rem; line-height: 1.55; overflow-x: auto;
+  }
+  .demo-result pre code { font: inherit; background: none; border-radius: 0; padding: 0; }
+  .demo-evidence-label {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted); margin: 0;
+  }
+  .demo-agent {
+    font-size: 0.92rem; margin: 0; padding: 0.6rem 0.85rem;
+    background: var(--verified-tint); border: 1px solid var(--verified-edge); border-radius: 6px;
+  }
+  .demo-agent::before { content: "agent → "; font-family: var(--mono); font-size: 0.78rem; font-weight: 500; color: var(--verified); }
+  #q2wrap { border-top: 1px dashed var(--line); margin-top: 1.1rem; padding-top: 1.1rem; }
+
+  /* ---- prose ---- */
+  h2 {
+    font-size: 0.72rem; font-family: var(--mono); font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 3.2rem 0 1rem; padding-top: 1.4rem; border-top: 1px solid var(--line);
+  }
+  .prose p {
+    font-family: var(--serif); font-size: 1.06rem; line-height: 1.72; margin: 0 0 1rem;
+  }
+  p, li { margin: 0 0 0.9rem; }
+  ul { margin: 0 0 0.9rem; padding-left: 1.15rem; }
+  li { margin-bottom: 0.55rem; }
+  li::marker { color: var(--muted); }
+  strong { font-weight: 600; }
+  code {
+    font-family: var(--mono); font-size: 0.84em;
+    background: var(--sunk); border-radius: 4px; padding: 0.1em 0.35em;
+  }
+  a { color: var(--ink); text-underline-offset: 3px; }
+  .v { color: var(--verified); font-weight: 600; }
+
+  pre.block {
+    background: var(--terminal); color: var(--terminal-text); border-radius: 8px;
+    padding: 0.9rem 1.1rem; overflow-x: auto; font-family: var(--mono);
+    font-size: 0.78rem; line-height: 1.6; margin: 0.4rem 0 1.1rem;
+  }
+  pre.block code { background: none; padding: 0; font: inherit; white-space: pre; }
+
+  /* ---- creed: principles, not a sequence ---- */
+  .creed { margin: 1.2rem 0 0; }
+  .creed .item { padding: 1.05rem 0; border-bottom: 1px solid var(--line); }
+  .creed .item:last-child { border-bottom: none; }
+  .creed h3 { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
+  .creed p { margin: 0; font-family: var(--serif); font-size: 0.98rem; line-height: 1.65; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; margin: 0.5rem 0 1rem; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 0.65rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); font-weight: 500;
+    padding: 0.45rem 0.9rem 0.45rem 0; border-bottom: 1px solid var(--ink);
+    white-space: nowrap; vertical-align: top;
+  }
+  td { padding: 0.6rem 0.9rem 0.6rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
+  .kinds { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.2rem 0 1rem; padding: 0; list-style: none; }
+  .kinds li {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--ink);
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.22rem 0.55rem; margin: 0;
+  }
+  .lineage { margin: 1rem 0; }
+  .lineage .row { padding: 0.85rem 0; border-bottom: 1px solid var(--line); }
+  .lineage .row:last-child { border-bottom: none; }
+  .lineage h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; }
+  .lineage h3 span { font-family: var(--mono); font-size: 0.7rem; font-weight: 500; color: var(--muted); margin-left: 0.5rem; }
+  .lineage p { margin: 0; font-size: 0.94rem; line-height: 1.6; color: var(--ink); }
+
+  .wont { border: 1px solid var(--line); border-radius: 8px; padding: 1.15rem 1.35rem; margin: 1rem 0; background: var(--card); }
+  .wont p { font-family: var(--serif); font-size: 1rem; line-height: 1.7; margin: 0; }
+
+  .status {
+    background: var(--verified-tint); border: 1px solid var(--verified-edge);
+    border-radius: 8px; padding: 0.95rem 1.2rem; font-size: 0.94rem; margin: 1.1rem 0;
+  }
+  .status strong { color: var(--verified); }
+  .status p { margin: 0; }
+
+  .foot {
+    font-size: 0.78rem; color: var(--muted); margin-top: 3.2rem;
+    border-top: 1px solid var(--line); padding-top: 1rem;
+  }
+
+  @media (max-width: 560px) {
+    .hero h1 { font-size: 1.9rem; }
+  }
+</style>
+</head>
+<body>
+<script>
+  document.addEventListener('click', function (event) {
+    const button = event.target.closest('.demo-opts button');
+    if (!button || button.disabled) return;
+    const q = button.dataset.q, opt = button.dataset.opt;
+    button.parentElement.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    button.classList.add('picked');
+
+    if (q === '1') {
+      const correct = opt === 'B';
+      document.getElementById('payload1').textContent = JSON.stringify({
+        type: 'widget_result', componentId: 'numberline-1',
+        result: { status: 'complete', correct: correct, attempts: 1,
+                  detail: { picked: opt, struggledWith: correct ? null : 'thirds vs ' + (opt === 'C' ? 'halves' : 'fourths') } }
+      }, null, 1);
+      document.getElementById('agent1').textContent = correct
+        ? 'Nailed it. Unlocking a comparison to stretch the same idea.'
+        : 'Close — you landed on ' + (opt === 'C' ? 'a half' : 'a fourth') + '. Let\'s check how thirds compare.';
+      document.getElementById('result1').hidden = false;
+      document.getElementById('q2wrap').hidden = false;
+    } else {
+      const correct = opt === 'half';
+      document.getElementById('payload2').textContent = JSON.stringify({
+        type: 'widget_result', componentId: 'compare-1',
+        result: { status: 'complete', correct: correct, attempts: 1 }
+      }, null, 1);
+      document.getElementById('agent2').textContent = correct
+        ? 'Two for two. In the real thing, I\'d call find_activity for the next step up.'
+        : 'A common one: more pieces means smaller pieces. 1/2 is bigger — want an activity on exactly this?';
+      document.getElementById('result2').hidden = false;
+    }
+  });
+</script>
+
+<div class="wrap">
+  <div class="mast">
+    <span class="name">a2learn</span>
+    <span class="lic"><a href="https://github.com/adamstankiewicz/interactive-learning-experiences/tree/main/docs" style="color:inherit">docs</a> · Apache-2.0</span>
+  </div>
+
+  <div class="hero">
+    <p class="eyebrow">The open activity server for teaching agents</p>
+    <h1>AI tutors can talk.<br>This makes them able to teach.</h1>
+    <p class="sub">An open-source activity server and SDK that gives teaching agents an action space:
+    real interactive practice, verified against real learning standards, with evidence of what the
+    student did flowing back to the agent.</p>
+    <ul class="meta">
+      <li>self-hostable</li>
+      <li>stores nothing about students</li>
+      <li>MCP + REST</li>
+      <li>16 activity types</li>
+    </ul>
+  </div>
+
+  <div class="terminal" role="img" aria-label="An agent session: find_activity verifies a standard, show_widget runs the activity, structured evidence returns, the agent adapts.">
+    <span class="t-label">One turn of the loop</span>
+    <pre><span class="q">›</span> find_activity  topic: "fractions on a number line"  grade: 3
+  <span class="g">✓ CCSS.MATH.3.NF.A.2 · verified against the graph</span>
+  4 options · number-line plot, drag-sort, flashcards, quick check
+
+<span class="q">›</span> show_widget  number-line-plot
+  student works · 1 attempt
+  <span class="g">← { correct: true, attempts: 1, struggledWith: null }</span>
+
+<span class="q">›</span> agent adapts · next: comparing fractions</pre>
+  </div>
+
+  <div class="demo" id="demo">
+    <p class="demo-label">Or take a turn yourself (simulated — the real thing runs on the server)</p>
+    <div class="demo-activity">
+      <p class="demo-q">Which point shows <strong>1/3</strong> on the number line?</p>
+      <div class="demo-line" aria-hidden="true">
+        <span style="left:0%">0</span><span style="left:25%">A</span><span style="left:33.3%">B</span><span style="left:50%">C</span><span style="left:100%">1</span>
+      </div>
+      <div class="demo-opts" id="q1">
+        <button type="button" data-q="1" data-opt="A">Point A</button>
+        <button type="button" data-q="1" data-opt="B">Point B</button>
+        <button type="button" data-q="1" data-opt="C">Point C</button>
+      </div>
+    </div>
+    <div class="demo-result" id="result1" hidden>
+      <p class="demo-evidence-label">What flows back to the agent</p>
+      <pre><code id="payload1"></code></pre>
+      <p class="demo-agent" id="agent1"></p>
+    </div>
+    <div class="demo-activity" id="q2wrap" hidden>
+      <p class="demo-q">Unlocked by your result — which is <strong>bigger</strong>?</p>
+      <div class="demo-opts" id="q2">
+        <button type="button" data-q="2" data-opt="third">1/3</button>
+        <button type="button" data-q="2" data-opt="half">1/2</button>
+      </div>
+      <div class="demo-result" id="result2" hidden>
+        <pre><code id="payload2"></code></pre>
+        <p class="demo-agent" id="agent2"></p>
+      </div>
+    </div>
+  </div>
+
+  <h2>Why this exists</h2>
+  <div class="prose">
+    <p>Thousands of teams are building AI tutors, and nearly all of them have built the same half of one.
+    Their tutors explain, encourage, and answer questions. Then the student says "got it," and the tutor has
+    no way to find out whether that's true.</p>
+    <p>The research on this is blunt. In a 2025 randomized trial published in PNAS, students given unguided
+    ChatGPT for math practice solved 48% more practice problems and then scored 17% worse on the exam,
+    while reporting they felt more prepared. Talk alone doesn't just fail to teach. It can convince
+    everyone in the room that teaching happened. Meanwhile the same literature shows what works: AI tutoring
+    built around real practice reached an effect size near 1.0 in a Harvard randomized trial, and formative
+    feedback triples its effect when performance data actually drives the next decision.</p>
+    <p>So the missing piece isn't a better chat prompt. It's the loop: assign something worth doing, watch
+    it get done, and act on what happened. Every tutor needs that loop. No tutor company differentiates on
+    it. That's the definition of infrastructure that should be open, built once, and shared by everyone,
+    including companies that compete with each other. This project is that layer.</p>
+  </div>
+
+  <h2>What we believe</h2>
+  <div class="creed">
+    <div class="item">
+      <h3>Students learn by doing.</h3>
+      <p>Retrieval practice, worked examples, and mastery loops carry some of the largest effect sizes in
+      education research. A tutor's job is to cause doing, and then respond to it.</p>
+    </div>
+    <div class="item">
+      <h3>Practice must be worth trusting.</h3>
+      <p>Every activity here is checked against a real standards graph before it's built. A code that
+      doesn't exist gets an error naming the problem. When nothing verifies, the activity says so plainly
+      instead of dressing up. A teacher should be able to file what comes out of this without
+      fact-checking the citation.</p>
+    </div>
+    <div class="item">
+      <h3>The tutor should see what happened.</h3>
+      <p>Every activity reports a structured result: correct or not, attempts, where the struggle was.
+      Correctness alone isn't enough; students reach right answers through wrong reasoning, and a tutor
+      that only sees a green checkmark misses it. Evidence is the product, and it also happens to be what
+      real efficacy research is made of.</p>
+    </div>
+    <div class="item">
+      <h3>Teachers approve what students see.</h3>
+      <p>Generated content gets previewed by an adult, and assignment freezes the exact reviewed instance.
+      Students never meet an unreviewed roll of the dice. The research is unambiguous that generated
+      content needs expert review; we made the review step structural instead of optional.</p>
+    </div>
+    <div class="item">
+      <h3>Student data stays home.</h3>
+      <p>The server stores nothing about students. Scoring calls run under your keys, inside your
+      deployment. In the year of COPPA opt-in defaults and consent lawsuits, this is not a feature flag.
+      It's the architecture.</p>
+    </div>
+    <div class="item">
+      <h3>The model never writes code that runs.</h3>
+      <p>Generated output fills schemas that render against components humans wrote and reviewed. Activity
+      instances are data, open to share. New activity types are code, and travel a curated, signed path.
+      That line is the security model, and we will not blur it.</p>
+    </div>
+    <div class="item">
+      <h3>Open beats owned for this layer.</h3>
+      <p>An activity corpus done well takes a year of rare, unglamorous work: interaction design, prompt
+      tuning past real failure modes, keyboard accessibility, pedagogy. Every tutor needs it and none is
+      differentiated by it. Building it once, in the open, under Apache-2.0, is the only version of this
+      that serves schools instead of a cap table.</p>
+    </div>
+  </div>
+
+  <h2>What it is</h2>
+  <ul>
+    <li><strong>An activity server.</strong> An MCP server with two tools: <code>find_activity</code>
+    answers a learning need with ranked, standards-verified options; <code>show_widget</code> builds one
+    and renders it in Claude or any MCP host. The registry is generative: it lists capabilities that
+    manufacture activities on demand, not a shelf of files. Sixteen today:</li>
+  </ul>
+  <ul class="kinds">
+    <li>flashcards</li><li>swipe cards</li><li>drag-to-order</li><li>sort into groups</li>
+    <li>timeline builder</li><li>crossword</li><li>fraction area model</li><li>reading card</li>
+    <li>step-by-step reveal</li><li>narrated walkthrough</li><li>spot the mistake</li><li>draw the curve</li>
+    <li>defend the claim</li><li>live-scored draft</li><li>writing workshop</li><li>debate an AI</li>
+  </ul>
+  <ul>
+    <li><strong>An SDK.</strong> For products with their own tutor:</li>
+  </ul>
+  <pre class="block"><code>const options  = await findActivities({ topic: "fractions on a number line", grade: 3 });
+const activity = await createActivity(options[0]);
+
+&lt;ActivityFrame activity={activity} onResult={(r) =&gt; agent.observe(r)} /&gt;</code></pre>
+  <ul>
+    <li><strong>A document format.</strong> Activities are data: a surface (a profile of Google's A2UI,
+    flat components and shared state wired by plain references) plus a manifest (verified standards,
+    pedagogy, accessibility and language declarations, provenance). Drafted openly with conformance
+    classes and a changelog. We call it a format, not a specification; it earns the second word when a
+    second implementation exists.</li>
+    <li><strong>A reference app.</strong> A full teacher-and-student application built on the same
+    registry: pathway builder, student walkthrough, rosters, reports. It's how we test everything and
+    what you can build; it isn't the thing you have to adopt.</li>
+  </ul>
+
+  <h2>How the pieces work</h2>
+  <ul>
+    <li><strong>The registry.</strong> Each activity type is a React component plus a generator prompt,
+    registered with its pedagogy metadata: whether completing it measures correctness, how it completes,
+    which standards it fits. Adding a type is one file and one import. The planner, previews, and
+    discovery all read the same entry.</li>
+    <li><strong>The standards layer.</strong> A source implements three functions: does this code exist,
+    what components make it up, what comes before it. Learning Commons is the default. A built-in,
+    keyless example source exists to be copied for a state framework, IB, or a district's own curriculum
+    map. Nothing downstream assumes US notation, or English.</li>
+    <li><strong>The evidence contract.</strong> One result shape from interaction to data model to agent
+    to report. Adopters get research-grade interaction data from day one, which matters in a market where
+    only 12% of AI education products have published efficacy evidence.</li>
+  </ul>
+
+  <h2>Standing on prior art</h2>
+  <div class="prose">
+    <p>Open-source education did not start here, and the projects that came before shape what this one
+    is. The open LMS ecosystem serves hundreds of millions of learners; what it lacks is a practice layer
+    an agent can drive. If a shorthand helps: H5P for the agent era.</p>
+  </div>
+  <div class="lineage">
+    <div class="row">
+      <h3>H5P <span>interactive content types</span></h3>
+      <p>Proved that a shared, reusable library of interaction types beats every platform building its
+      own. The difference here: H5P's registry is a shelf of authored files; ours lists generative
+      capabilities, adds standards verification, and reports evidence to an agent instead of a gradebook
+      alone.</p>
+    </div>
+    <div class="row">
+      <h3>xAPI &amp; Caliper <span>learning analytics</span></h3>
+      <p>Established that interaction evidence deserves a standard shape. Our result contract is narrower
+      on purpose — typed per activity, consumed in-loop by the agent that assigned it. An xAPI export for
+      LRS pipelines is a mapping, not a rewrite, and belongs on the roadmap.</p>
+    </div>
+    <div class="row">
+      <h3>LTI <span>tool embedding</span></h3>
+      <p>The door every LMS already has. MCP is this project's first transport because agents are the
+      first consumer; LTI Advantage lands at the gate where organizations embed activities in their own
+      platforms, so results can reach real gradebooks.</p>
+    </div>
+    <div class="row">
+      <h3>Open edX, Moodle, Kolibri <span>open platforms</span></h3>
+      <p>Demonstrated the governance path this project intends: real security policy, neutral stewardship
+      when more than one organization depends on it, and architecture that carries values — Kolibri made
+      offline-first an equity position; we make store-nothing-about-students one.</p>
+    </div>
+  </div>
+
+  <h2>Get started</h2>
+  <table>
+    <tr><th>Try it</th><td>Add the server to Claude as a custom connector and ask for "a quick
+    activity on the water cycle for a 5th grader." Zero code.</td></tr>
+    <tr><th>Run it</th><td>One Vercel deploy or <code>pnpm dev</code>. One required secret (an LLM key).
+    No database. Set <code>MCP_ACCESS_TOKEN</code> on public instances, or anyone with your URL spends
+    your money.</td></tr>
+    <tr><th>Build on it</th><td>The SDK above, for tutors that need an action space and eyes on the
+    results.</td></tr>
+    <tr><th>Extend it</th><td>Add an activity type (one file), plug in your standards graph (copy the
+    example source), swap storage. If you need to fork to extend, we consider that a bug.</td></tr>
+  </table>
+  <pre class="block"><code>{ "mcpServers": { "a2learn": { "url": "https://your-instance.example/api/mcp" } } }</code></pre>
+
+  <h2>What we won't claim</h2>
+  <div class="wont">
+    <p>Education marketing has an honesty problem, so here is what you will not read from us. We won't
+    claim AI tutors outperform teachers; the evidence is conditional on design, and null results exist.
+    We won't claim generated content is classroom-ready without review; it isn't, and our own workflow
+    assumes it isn't. We won't cite the folklore formative-assessment effect sizes; real effects range
+    widely with implementation. And we won't call this a marketplace or a standard while there's one
+    publisher and one implementation. Ambition is cheap. Labels are earned.</p>
+  </div>
+
+  <h2>Where it's going</h2>
+  <p>The roadmap advances on pull, not dates. When an organization embeds activities in its own product,
+  we build the saved-activity shelf, the embeddable player, and identity forwarding, so results can land
+  in real gradebooks. When someone wants native rendering in their own design system, the headless widget
+  hooks and packages ship. When a second independent implementation exists, the format goes 1.0 with
+  schemas and conformance fixtures, the project moves to a neutral organization, and federated registries
+  with independent content review become the long-term shape: many servers, shared format, trust attached
+  by people qualified to attach it.</p>
+
+  <div class="status">
+    <p><strong>Status: v0.1, young, honest about it.</strong> One primary maintainer, a growing test
+    suite, security policy that tells you plainly what not to do yet. The most useful contributions right
+    now: a new activity type, a second standards source, or pointing your tutor at it and telling us what
+    broke. Born at the CodeAI education hackathon, built by people from several education companies, and
+    licensed Apache-2.0 so it stays consumable by all of them, including the ones that compete.</p>
+  </div>
+
+  <p class="foot">Format draft, conformance classes, and security/privacy considerations live in
+  <code>docs/a2learn/</code>. Governance, code of conduct, and contribution guides ship with the repo.
+  Research citations: Bastani et al., PNAS 2025; Kestin et al., Nature Scientific Reports 2025; and the
+  formative-assessment and retrieval-practice meta-analytic literature.</p>
+</div>
+
+</body>
+</html>
