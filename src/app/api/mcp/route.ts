@@ -188,7 +188,10 @@ function tools(origin: string) {
             type: 'string',
             description: 'Optional. A Common Core or NGSS code if known; verified against the standards graph.',
           },
-          gradeHint: { type: 'string', description: 'Optional, e.g. "4th grade".' },
+          audience: {
+            type: 'string',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". Steers standard selection; a hint, not a verified claim.',
+          },
           need: {
             type: 'string',
             description: 'Optional preference in plain words — "a game", "something they write", "a quick check".',
@@ -208,7 +211,14 @@ function tools(origin: string) {
             type: 'string',
             description: 'What the activity should be about, in plain words — "the Industrial Revolution", "comparing fractions". Enough on its own.',
           },
-          gradeHint: { type: 'string', description: 'Optional, e.g. "8th grade", "high school".' },
+          audience: {
+            type: 'string',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". Steers standard selection; a hint, not a verified claim.',
+          },
+          gradeHint: {
+            type: 'string',
+            description: 'Deprecated alias for `audience`, still accepted so callers written against the shipped tool keep working.',
+          },
           standardCode: {
             type: 'string',
             description: 'Optional. A Common Core or NGSS code, if you already know which one you want.',
@@ -244,7 +254,10 @@ function tools(origin: string) {
             type: 'string',
             description: 'What the pathway teaches, in plain words — "comparing fractions", "the water cycle".',
           },
-          gradeHint: { type: 'string', description: 'Optional, e.g. "5th grade".' },
+          audience: {
+            type: 'string',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". Steers standard selection; a hint, not a verified claim.',
+          },
         },
         required: ['topic'],
       },
@@ -388,12 +401,20 @@ async function handle(message: RpcRequest, request: Request) {
         const args = (message.params?.arguments ?? {}) as {
           topic?: string;
           standardCode?: string;
-          gradeHint?: string;
+          audience?: string;
           need?: string;
         };
 
         try {
-          const found = await findActivities(args);
+          // `audience` is free text at this boundary — a hint that steers
+          // standard selection. The scheme-scoped `audience` on the emitted
+          // manifest comes from the graph, never from this string.
+          const found = await findActivities({
+            topic: args.topic,
+            standardCode: args.standardCode,
+            need: args.need,
+            gradeHint: args.audience,
+          });
 
           const header = found.standard
             ? `${found.activities.length} activities for ${found.standard.code} — ${found.standard.description}` +
@@ -418,14 +439,14 @@ async function handle(message: RpcRequest, request: Request) {
       }
 
       if (message.params?.name === 'build_pathway') {
-        const args = (message.params?.arguments ?? {}) as { topic?: string; gradeHint?: string };
+        const args = (message.params?.arguments ?? {}) as { topic?: string; audience?: string };
         const topic = typeof args.topic === 'string' ? args.topic.trim() : '';
         if (!topic) {
           return ok(message.id, { content: [{ type: 'text', text: 'A topic is required.' }], isError: true });
         }
 
         try {
-          const run = await runPathway(topic, args.gradeHint?.trim() || undefined);
+          const run = await runPathway(topic, args.audience?.trim() || undefined);
 
           // Persistence is best-effort and separately guarded: a storage
           // failure must not discard a pathway that took five model calls to
@@ -447,7 +468,7 @@ async function handle(message: RpcRequest, request: Request) {
               sessionId = await adapter.persistSession({
                 studentId: ownerId,
                 topic,
-                gradeHint: args.gradeHint?.trim() || null,
+                gradeHint: args.audience?.trim() || null,
                 anchor: run.anchor,
                 plan: run.plan,
                 stepWidgets: run.stepWidgets,
@@ -520,15 +541,18 @@ async function handle(message: RpcRequest, request: Request) {
 
       const args = (message.params?.arguments ?? {}) as {
         topic?: string;
+        audience?: string;
+        /** Deprecated alias for `audience`; this tool shipped with it. */
         gradeHint?: string;
         standardCode?: string;
         kind?: string;
       };
+      const audience = args.audience ?? args.gradeHint;
 
       try {
         const built = await buildWidget({
           topic: args.topic,
-          gradeHint: args.gradeHint,
+          gradeHint: audience,
           standardCode: args.standardCode,
           kind: args.kind,
         });
@@ -559,7 +583,7 @@ async function handle(message: RpcRequest, request: Request) {
 
         if (topic && (args.standardCode || args.kind)) {
           try {
-            const retry = await buildWidget({ topic, gradeHint: args.gradeHint });
+            const retry = await buildWidget({ topic, gradeHint: audience });
             return ok(message.id, {
               content: [
                 {

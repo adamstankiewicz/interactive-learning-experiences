@@ -39,6 +39,28 @@ describe('/api/mcp protocol surface', () => {
     expect(show._meta.ui.resourceUri).toMatch(/^ui:\/\//);
   });
 
+  it('takes audience, not a grade, and keeps the alias show_widget shipped with', async () => {
+    const res = await rpc({ jsonrpc: '2.0', id: 21, method: 'tools/list' });
+    const { result } = await res.json();
+    const props = (name: string) =>
+      result.tools.find((tool: { name: string }) => tool.name === name).inputSchema.properties;
+
+    // Segment-neutral by name: nothing in the surface presumes the learner
+    // is in a grade, so a higher-ed or workplace deployment has an honest
+    // argument to pass instead of one that lies.
+    for (const name of ['show_widget', 'find_activity', 'build_pathway']) {
+      expect(props(name).audience?.type).toBe('string');
+    }
+
+    // These two are new here, so they never carried the old name.
+    expect(props('find_activity')).not.toHaveProperty('gradeHint');
+    expect(props('build_pathway')).not.toHaveProperty('gradeHint');
+
+    // show_widget shipped with `gradeHint`; removing it would break callers
+    // written against the deployed tool, so it stays accepted.
+    expect(props('show_widget')).toHaveProperty('gradeHint');
+  });
+
   it('serves the shell resource listing', async () => {
     const res = await rpc({ jsonrpc: '2.0', id: 3, method: 'resources/list' });
     const { result } = await res.json();
