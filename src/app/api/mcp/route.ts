@@ -151,7 +151,7 @@ const FIND_DESCRIPTION = [
   'and the exact `show_widget` arguments that build it.',
   '',
   'Listings are GENERATIVE: this registry lists capabilities that manufacture a standards-verified',
-  'activity on demand, not a shelf of files. Discovery is fast and model-free — call it whenever',
+  'activity on demand, not a shelf of files. Discovery is fast — one small embedding call at most,\nnever a generation — so call it whenever',
   'there is a real choice to make or to offer: "what could my student do for X", comparing options,',
   'or letting a teacher pick. When the user just wants an activity NOW, skip this and call',
   '`show_widget` directly.',
