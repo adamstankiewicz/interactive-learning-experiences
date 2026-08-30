@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@ag-ui/core':
+        specifier: ^0.0.58
+        version: 0.0.58
       '@ai-sdk/amazon-bedrock':
         specifier: ^5.0.66
         version: 5.0.66(zod@4.4.3)
@@ -102,6 +105,12 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.2.5(@types/react@19.2.18)
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.20.0)
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -125,6 +134,9 @@ importers:
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0))
 
 packages:
+
+  '@ag-ui/core@0.0.58':
+    resolution: {integrity: sha512-XgGb7YmhV+yMBaEmlrpsd5S+nUxq0JgSegss2t4gIFR1j7w3w0ibtKfRgcQHWeMvwZxcT5S28VEEarqtgxYYHw==}
 
   '@ai-sdk/amazon-bedrock@5.0.66':
     resolution: {integrity: sha512-QyXME04hUaufpXh/lqt4/c8NH1rEtWLr5hDoMMJenJUh4ORJ9epdgqBQ0lC/qFh0GvqpAZKo+doBw05PJBiLnQ==}
@@ -4171,6 +4183,10 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
+
+  '@ag-ui/core@0.0.58':
+    dependencies:
+      zod: 3.25.76
 
   '@ai-sdk/amazon-bedrock@5.0.66(zod@4.4.3)':
     dependencies:
