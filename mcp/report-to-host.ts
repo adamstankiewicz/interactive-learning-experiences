@@ -46,19 +46,62 @@ function describe(event: Event, attempts: number): string {
   return `The student worked through the ${kind}${standard} ${outcome}.${struggle}${score}`;
 }
 
+/** How many failed checks before the conversation hears about it early. */
+const STRUGGLE_AFTER_ATTEMPTS = 3;
+
 export function reportCompletionToHost(bridge: HostBridge) {
   let attempts = 0;
+  let hints = 0;
   let reported = false;
+  let struggleReported = false;
 
   return {
     track(event: Event) {
       // Every attempt at an answer counts, whatever the widget calls it.
       if (event.eventType === 'answer_checked' || event.eventType === 'attempt') attempts += 1;
+      if (event.eventType === 'hint_requested') hints += 1;
+
+      // One early signal, before the finish line: an agent that only hears
+      // about completed work can never help with stuck work. Sent once, only
+      // for repeated *wrong* checks — a slow careful student is not stuck.
+      if (
+        !reported &&
+        !struggleReported &&
+        event.eventType === 'answer_checked' &&
+        event.correct === false &&
+        attempts >= STRUGGLE_AFTER_ATTEMPTS
+      ) {
+        struggleReported = true;
+        void bridge.updateModelContext(
+          `The student is still working through the ${event.widgetKind ?? 'activity'} and has checked ${attempts} answers without getting it yet. They have not asked for help.`,
+          {
+            type: 'widget_progress',
+            kind: event.widgetKind ?? null,
+            standardCode: event.standardCode ?? null,
+            attempts,
+            hintsUsed: hints,
+            completed: false,
+          },
+        );
+      }
 
       if (event.eventType !== 'widget_completed' || reported) return;
       reported = true;
 
-      void bridge.updateModelContext(describe(event, attempts));
+      // Prose for the model to respond to, plus the structured result — the
+      // same shape the SDK's universal WidgetResult is converging on — so
+      // exact fields survive without parsing English.
+      void bridge.updateModelContext(describe(event, attempts), {
+        type: 'widget_result',
+        kind: event.widgetKind ?? null,
+        standardCode: event.standardCode ?? null,
+        completed: true,
+        correct: event.correct ?? null,
+        attempts,
+        hintsUsed: hints,
+        score: typeof event.payload?.score === 'number' ? event.payload.score : undefined,
+        detail: event.payload ?? undefined,
+      });
     },
     trackHesitation() {},
     flush() {},

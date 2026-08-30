@@ -1,9 +1,13 @@
 import { findActivities } from '@/lib/activities/find';
 import { scoreDraft } from '@/lib/draft-meter/score';
 import { scoreRequest } from '@/lib/draft-meter/schema';
+import { runPathway } from '@/lib/pathway/run';
+import { storageAdapter } from '@/lib/storage';
 import { buildWidget, WidgetBuildError, WIDGET_KINDS } from '@/lib/widgets/build';
 
-export const maxDuration = 60;
+// Long enough for `build_pathway` (~30s across five model calls), not just
+// the single-call `show_widget`.
+export const maxDuration = 120;
 
 /**
  * The MCP server, deployed with the app.
@@ -112,6 +116,13 @@ const INSTRUCTIONS = [
   'The widget renders itself — do not describe it in detail or restate its contents. Say what it',
   'is in a line, and let the student use it. When they finish, the widget tells you what they did,',
   'and that is the moment to respond to their work or offer the next thing.',
+  '',
+  'Two ways to teach a sequence. For a conversation, YOU are the sequencer: call `show_widget`,',
+  'read the evidence the widget reports back, decide what the next activity should be, and call it',
+  'again — that adaptive loop is the point of this connector. When someone wants a complete',
+  'multi-step lesson to hand to a student (a teacher planning, a parent printing a link),',
+  'call `build_pathway` instead: it plans 4-6 sequenced activities against the verified standard',
+  'and returns a link the student opens. It takes about half a minute; say so, then call it.',
 ].join('\n');
 
 const TOOL_DESCRIPTION = [
@@ -211,6 +222,32 @@ function tools(origin: string) {
         required: [],
       },
       _meta: uiMeta(origin),
+    },
+    {
+      name: 'build_pathway',
+      title: 'Build a complete multi-step learning pathway',
+      description: [
+        'Plan and build a complete multi-step lesson — 4-6 sequenced activities against one',
+        'verified standard, with a share link a student opens to work through it (progress,',
+        'per-step evidence back to the teacher, automatic re-teach steps on struggle).',
+        '',
+        'Use this when someone wants a whole lesson or something to assign; use `show_widget`',
+        'when the student is here in the conversation and you will sequence activities yourself.',
+        '',
+        'This is the slow tool: about half a minute across several model calls. Tell the user',
+        'it is being built, then call it. The result includes the link and the plan summary.',
+      ].join('\n'),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            description: 'What the pathway teaches, in plain words — "comparing fractions", "the water cycle".',
+          },
+          gradeHint: { type: 'string', description: 'Optional, e.g. "5th grade".' },
+        },
+        required: ['topic'],
+      },
     },
     {
       name: 'score_draft',
@@ -376,6 +413,63 @@ async function handle(message: RpcRequest, request: Request) {
           });
         } catch (error) {
           const text = error instanceof Error ? error.message : 'Discovery failed.';
+          return ok(message.id, { content: [{ type: 'text', text }], isError: true });
+        }
+      }
+
+      if (message.params?.name === 'build_pathway') {
+        const args = (message.params?.arguments ?? {}) as { topic?: string; gradeHint?: string };
+        const topic = typeof args.topic === 'string' ? args.topic.trim() : '';
+        if (!topic) {
+          return ok(message.id, { content: [{ type: 'text', text: 'A topic is required.' }], isError: true });
+        }
+
+        try {
+          const run = await runPathway(topic, args.gradeHint?.trim() || undefined);
+
+          // The session needs an owner the storage layer knows. MCP callers
+          // have no browser learner id, so one is minted per pathway — the
+          // share link is the artifact; the id is bookkeeping.
+          const studentId = await storageAdapter().createStudent();
+          const sessionId = studentId
+            ? await storageAdapter().persistSession({
+                studentId,
+                topic,
+                gradeHint: args.gradeHint?.trim() || null,
+                anchor: run.anchor,
+                plan: run.plan,
+                stepWidgets: run.stepWidgets,
+                rejectedCodes: run.rejected,
+              })
+            : null;
+
+          const steps = run.plan.steps.map((step, i) => `${i + 1}. [${step.purpose}] ${step.title}`);
+          const verified = run.anchor.standard.verified
+            ? `verified against ${run.anchor.standard.sourceLabel}`
+            : 'no standard verified — this is an exploration pathway';
+          const summary = [
+            `Built "${run.plan.bigIdea}" — ${run.plan.steps.length} steps for ${run.anchor.standard.code} (${verified}).`,
+            ...steps,
+            sessionId
+              ? `Student link: ${origin}/learn/${sessionId}`
+              : 'Not saved — this instance has no persistent storage, so there is no share link. The pathway can still be rebuilt any time.',
+            run.rejected.length > 0 ? `Rejected codes kept on record: ${run.rejected.join(', ')}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n');
+
+          return ok(message.id, {
+            content: [{ type: 'text', text: summary }],
+            structuredContent: {
+              sessionId,
+              url: sessionId ? `${origin}/learn/${sessionId}` : null,
+              standard: { code: run.anchor.standard.code, verified: run.anchor.standard.verified },
+              steps: run.plan.steps.map((step) => ({ title: step.title, purpose: step.purpose, widgetKind: step.widgetKind ?? null })),
+              rejectedCodes: run.rejected,
+            },
+          });
+        } catch (error) {
+          const text = error instanceof Error ? error.message : 'Pathway generation failed.';
           return ok(message.id, { content: [{ type: 'text', text }], isError: true });
         }
       }

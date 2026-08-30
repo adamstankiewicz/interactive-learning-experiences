@@ -133,7 +133,12 @@ export class HostBridge {
   }
 
   /** Say something back into the conversation the widget is sitting in. */
-  updateModelContext(text: string) {
-    return this.request('ui/update-model-context', { content: [{ type: 'text', text }] });
+  updateModelContext(text: string, detail?: Record<string, unknown>) {
+    // Prose first — hosts feed this to a model, and the sentence is the
+    // message. The structured block rides along so the model (or the host's
+    // tooling) can read exact fields instead of parsing English.
+    const content: { type: 'text'; text: string }[] = [{ type: 'text', text }];
+    if (detail) content.push({ type: 'text', text: '```json\n' + JSON.stringify(detail) + '\n```' });
+    return this.request('ui/update-model-context', { content });
   }
 }

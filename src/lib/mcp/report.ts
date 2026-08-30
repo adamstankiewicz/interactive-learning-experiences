@@ -47,18 +47,24 @@ function isEmbedded(): boolean {
  * Repeats are dropped: a widget that re-renders, or a student who checks the
  * same answer twice, should not narrate itself twice into the transcript.
  */
-export function reportToConversation(text: string): void {
+export function reportToConversation(text: string, detail?: Record<string, unknown>): void {
   const message = text.trim();
   if (!message || message === lastSent || !isEmbedded()) return;
 
   lastSent = message;
+
+  // Prose leads — it is what the model responds to. The optional structured
+  // block rides along for exact fields (the same convention the shell's
+  // completion reporter uses), so richer widget reports can carry both.
+  const content: { type: 'text'; text: string }[] = [{ type: 'text', text: message }];
+  if (detail) content.push({ type: 'text', text: '```json\n' + JSON.stringify(detail) + '\n```' });
 
   window.parent?.postMessage(
     {
       jsonrpc: '2.0',
       id: nextId++,
       method: 'ui/update-model-context',
-      params: { content: [{ type: 'text', text: message }] },
+      params: { content },
     },
     '*',
   );
