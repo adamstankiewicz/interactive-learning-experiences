@@ -26,7 +26,7 @@ verification pipeline *(Shipped)*).
   "standards": [
     { "code": "5-ESS2-1", "source": "learning-commons", "verified": true }
   ],
-  "gradeBand": { "min": 4, "max": 6 },
+  "audience": [{ "scheme": "k12-us", "values": ["4", "5", "6"] }],
 
   "pedagogy": {
     "assesses": true,
@@ -62,10 +62,15 @@ verification pipeline *(Shipped)*).
   means the code resolved against a real standards graph (the reference
   implementation verifies against Learning Commons). Unverified claims are
   legal but rank differently; an index MUST NOT present them as verified.
+  Who the activity is *for* is `audience`, specified below — separately,
+  because alignment and audience answer different questions and not every
+  standards graph carries both.
 - **Pedagogy** — `assesses` (does completing it measure correctness — a
   "check" step may only use assessing activities), `completion`
   (`internal-cta` | `signal` | `none`), `mechanics`, `purposes`
-  (activate | model | practice | check).
+  (`activate` | `model` | `practice` | `check`) — an open vocabulary, not a
+  closed enum: a consumer MUST ignore a purpose it does not recognize rather
+  than reject the listing.
 - **Delivery** — where the surface lives and how to invoke it. An activity
   is invokable if the consuming host can satisfy `catalogRequires` (native
   rendering) *or* via the listed MCP server (zero-catalog rendering in any
@@ -76,6 +81,39 @@ verification pipeline *(Shipped)*).
   and `reviewed[]`: attestations by named reviewers/organizations. The
   trust layer is *structurally* part of the manifest but *institutionally*
   separate — a registry records attestations; it does not grant them.
+
+## Audience *(normative)*
+
+`audience` names who an activity is for, as scheme-scoped labels:
+
+```json
+"audience": [{ "scheme": "k12-us", "values": ["4", "5", "6"] }]
+```
+
+A bare label cannot carry this on its own — `"4"` is grade 4 in one
+education system and year 4 or level 4 in another — so the naming authority
+travels with the value, exactly as `standards[]` carries `source` alongside
+`code`.
+
+- A producer MUST emit `scheme` on every entry, and MUST NOT emit values for
+  a scheme it does not own.
+- A consumer MUST treat an unrecognized `scheme` as opaque: filter on it,
+  never parse it. A listing whose every entry is unrecognized is still valid.
+- An activity MAY carry several entries when it genuinely serves more than
+  one audience.
+- `audience` MAY be absent. Absent means *unstated*, not *universal*; a
+  consumer MUST NOT read a missing `audience` as "suitable for anyone".
+
+One scheme is registered in v0:
+
+| Scheme | Values | Meaning |
+| --- | --- | --- |
+| `k12-us` | `"K"`, `"1"`–`"12"` | US K-12 grade levels |
+
+Higher education, professional and workplace training are structurally
+supported and deliberately unregistered: this format documents what a
+producer emits today, and none emits them yet. They join under the
+[extension rule](./conformance.md#extension-rule) until one does.
 
 ## Two tiers *(normative)*
 
@@ -88,7 +126,7 @@ verification pipeline *(Shipped)*).
 ## Discovery *(sketch)*
 
 The query surface is deliberately specified as MCP tools rather than a new
-API style — e.g. `find_activity({ standard, gradeBand, mechanics, lang,
+API style — e.g. `find_activity({ standard, audience, mechanics, lang,
 assesses })` returning ranked manifests. The reference implementation's
 existing `show_widget(standardCode, kind)` *(Shipped)* is the invocation
 half; `find_activity` over a manifest index is the MVP of the discovery
