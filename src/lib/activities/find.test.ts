@@ -33,9 +33,18 @@ describe('findActivities', () => {
     }
   });
 
-  it('floats assessing kinds when the need sounds like checking', async () => {
-    const result = await findActivities({ standardCode: 'MATH.4.NF.EQUIV', need: 'a quick check for a grade' });
-    expect(result.activities[0].pedagogy.assesses).toBe(true);
+  it('floats assessing kinds when the need sounds like assessment — stems included', async () => {
+    for (const need of ['a quick check', 'a formative assessment', 'two short quizzes', 'graded practice']) {
+      const result = await findActivities({ standardCode: 'MATH.4.NF.EQUIV', need });
+      expect(result.activities[0].pedagogy.assesses).toBe(true);
+    }
+  });
+
+  it("'grade 4' in a topic is a grade level, not an intent to assess", async () => {
+    const withGrade = await findActivities({ standardCode: 'MATH.4.NF.EQUIV', topic: 'fractions for grade 4' });
+    const without = await findActivities({ standardCode: 'MATH.4.NF.EQUIV', topic: 'fractions for year four' });
+    // Same ordering either way — the word "grade" alone moves nothing.
+    expect(withGrade.activities.map((a) => a.id)).toEqual(without.activities.map((a) => a.id));
   });
 
   it('keeps a hallucinated code on the record and degrades to standard-agnostic listings', async () => {

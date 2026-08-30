@@ -32,10 +32,33 @@ function titleCase(kind: string): string {
 }
 
 /**
- * Deterministic fit score. Coverage eligibility is the gate; `need` words
- * matching the planner description are the tiebreaker; assessing activities
- * float when the need sounds like checking.
+ * Deterministic default ordering — not semantics. The caller is a model and
+ * holds the real ranking judgment; every signal it needs travels on the
+ * listing (`summary`, `pedagogy.assesses`, `mechanics`). This score only
+ * keeps the default order sensible and stable, and it is deliberately
+ * model-free: fast and free, or agents skip discovery and guess.
  */
+
+/**
+ * Words that signal the need is *assessment*, with provenance rather than
+ * gut feel: the "evaluate" category verbs of the revised Bloom taxonomy
+ * (Anderson & Krathwohl, 2001) plus standing classroom-assessment
+ * vocabulary (formative/summative practice — Black & Wiliam's literature).
+ * Stems, matched as word prefixes, so "assessment", "quizzes", "grading"
+ * all hit. Bare "grade" is deliberately absent: topics legitimately contain
+ * "grade 4", and that must not read as an intent to assess — only the
+ * activity word "graded"/"grading" does.
+ */
+const ASSESSMENT_INTENT_STEMS = [
+  'assess', 'quiz', 'test', 'exam', 'measur', 'evaluat', 'apprais', 'judg',
+  'critiqu', 'check', 'verif', 'master', 'formativ', 'summativ', 'graded', 'grading',
+];
+
+function wantsAssessment(need: string): boolean {
+  const words = need.toLowerCase().split(/[^a-z]+/);
+  return words.some((word) => ASSESSMENT_INTENT_STEMS.some((stem) => word.startsWith(stem)));
+}
+
 function scoreEntry(
   entry: { assesses: boolean; plannerDescription: string },
   need: string,
@@ -47,7 +70,7 @@ function scoreEntry(
     .split(/[^a-z]+/)
     .filter((word) => word.length > 3);
   for (const word of words) if (description.includes(word)) score += 2;
-  if (/\b(check|assess|quiz|test|grade|measure)\b/i.test(need) && entry.assesses) score += 3;
+  if (entry.assesses && wantsAssessment(need)) score += 3;
   return score;
 }
 
