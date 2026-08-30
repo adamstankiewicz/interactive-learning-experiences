@@ -61,16 +61,17 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
             </div>
           );
         }
-        // A horizontal list pages like a deck: full-width snap targets, one
-        // in view at a time, swipe or scroll to move through.
+        // A horizontal list pages like a deck: swipe, or use the paging
+        // controls — position affordances are presentation, not state the
+        // surface didn't model.
         return (
-          <div key={id} className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
-            {childIds(component).map((childId) => (
-              <div key={childId} className="w-full shrink-0 snap-center">
-                {render(childId, path)}
-              </div>
-            ))}
-          </div>
+          <DeckView
+            key={id}
+            items={childIds(component).map((childId) => ({
+              id: childId,
+              node: render(childId, path),
+            }))}
+          />
         );
       }
       case 'Card': {
@@ -160,6 +161,80 @@ function childIds(component: A2UIComponent): string[] {
     for (const ref of component.children) if (typeof ref === 'string') ids.push(ref);
   }
   return ids;
+}
+
+/**
+ * A horizontal List as a paged deck: snap-scroll stays (swipe works), and
+ * Back/Next plus position dots ride along as renderer affordances. Scrolling
+ * and the buttons stay in sync by reading the scroll position back.
+ */
+function DeckView({ items }: { items: { id: string; node: React.ReactNode }[] }) {
+  const [index, setIndex] = useState(0);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  const go = (next: number) => {
+    const el = scroller.current;
+    const clamped = Math.max(0, Math.min(items.length - 1, next));
+    const target = el?.children[clamped] as HTMLElement | undefined;
+    if (el && target) el.scrollTo({ left: target.offsetLeft - el.offsetLeft, behavior: 'smooth' });
+    setIndex(clamped);
+  };
+
+  const onScroll = () => {
+    const el = scroller.current;
+    if (!el || el.clientWidth === 0) return;
+    setIndex(Math.max(0, Math.min(items.length - 1, Math.round(el.scrollLeft / el.clientWidth))));
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
+      >
+        {items.map((item) => (
+          <div key={item.id} className="w-full shrink-0 snap-center">
+            {item.node}
+          </div>
+        ))}
+      </div>
+      {items.length > 1 && (
+        <>
+          <div className="flex justify-center gap-1.5" aria-hidden>
+            {items.map((item, i) => (
+              <span
+                key={item.id}
+                className={
+                  i === index
+                    ? 'h-2 w-4 rounded-full bg-primary transition-all'
+                    : 'h-2 w-2 rounded-full bg-muted-foreground/30 transition-all'
+                }
+              />
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              disabled={index === 0}
+              onClick={() => go(index - 1)}
+              className="flex-1 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              disabled={index === items.length - 1}
+              onClick={() => go(index + 1)}
+              className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 type FlipFace = { title: string; child: string | null };
