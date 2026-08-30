@@ -1,10 +1,12 @@
 # The evidence contract
 
-The reason this project exists: when a student works through an activity,
-what happened flows back in a structured shape a program can act on — the
-agent that assigned it, the teacher's report, the remediation loop. Chat
-alone can't see whether teaching happened; this contract is how the loop
-closes.
+The project exists so students *do* — think critically, practice, produce —
+instead of passively consuming AI output. The extensible widgets and the
+standards-verified loop are that commitment made structural. The evidence
+contract is how the loop closes: when a student works through an activity,
+what happened flows back in a shape a program can act on — the agent that
+assigned it, the teacher's report, the remediation loop. Chat alone can't
+see whether the doing happened; this contract is what makes it visible.
 
 ## The interaction event
 
