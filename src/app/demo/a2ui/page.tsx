@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { A2UIComparison } from '@/components/a2ui/A2UIComparison';
 import { toA2UISurface, A2UI_SUPPORTED_KINDS } from '@/lib/a2learn/a2ui';
+import { toA2LearnSurface } from '@/lib/a2learn/catalog';
 
 /**
  * The A2UI boundary, functional: the same fixture specs the conformance
@@ -30,6 +31,7 @@ export default function A2UIDemoPage() {
   const pairs = fixtureSpecs().map(({ name, spec }) => ({
     name,
     spec,
+    a2learnSurface: toA2LearnSurface(spec, `demo-a2learn-${name}`),
     surface: toA2UISurface(spec, `demo-${name}`),
   }));
 
@@ -51,16 +53,17 @@ export default function A2UIDemoPage() {
         component types the mapper emits.
       </p>
       <p className="mb-8 text-sm text-muted-foreground">
-        The columns are deliberately different — that difference is the exhibit. The native widget
-        has its full mechanics; the projection is what survives translation into a catalog any
-        A2UI renderer can draw: no tap-to-flip (the basic catalog models no local state), markdown
-        as literal text, front and back stacked in the open. What the projection buys is
-        portability; what it costs is shown, not hidden. Mapped kinds today:{' '}
-        {A2UI_SUPPORTED_KINDS.join(', ')}.
+        Both columns are A2UI surfaces — the two tiers of the same spec. The left is the a2learn
+        catalog (draft): its component is the widget kind itself, the registry is the renderer, so
+        it is the exact native experience — flip animation, completion reporting, the same loop
+        the MCP Apps shell speaks. The right is the basic-catalog projection any generic A2UI
+        renderer can draw: the reveal survives as tabs, markdown as literal text. The remaining
+        gap between the columns is what the versioned a2learn catalog (#98) closes for hosts
+        beyond this app. Basic-mapped kinds today: {A2UI_SUPPORTED_KINDS.join(', ')}.
       </p>
 
       <div className="flex flex-col gap-10">
-        {pairs.map(({ name, spec, surface }) => (
+        {pairs.map(({ name, spec, a2learnSurface, surface }) => (
           <section key={name}>
             <h2 className="mb-1 text-lg font-medium">{name}</h2>
             <p className="mb-3 text-sm text-muted-foreground">
@@ -68,9 +71,9 @@ export default function A2UIDemoPage() {
                 full demo of this kind →
               </Link>
             </p>
-            {surface ? (
+            {surface && a2learnSurface ? (
               <>
-                <A2UIComparison spec={spec} surface={surface} />
+                <A2UIComparison a2learnSurface={a2learnSurface} basicSurface={surface} />
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm text-muted-foreground">
                     widget spec (input)
@@ -81,7 +84,15 @@ export default function A2UIDemoPage() {
                 </details>
                 <details className="mt-2">
                   <summary className="cursor-pointer text-sm text-muted-foreground">
-                    A2UI createSurface message (output)
+                    a2learn-catalog createSurface message (full fidelity)
+                  </summary>
+                  <pre className="mt-2 overflow-x-auto rounded-md bg-muted/40 p-3 text-xs">
+                    {JSON.stringify(a2learnSurface, null, 2)}
+                  </pre>
+                </details>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-sm text-muted-foreground">
+                    basic-catalog createSurface message (fallback)
                   </summary>
                   <pre className="mt-2 overflow-x-auto rounded-md bg-muted/40 p-3 text-xs">
                     {JSON.stringify(surface, null, 2)}

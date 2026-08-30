@@ -17,11 +17,12 @@ import { A2LEARN_EVENT_PREFIX } from '@/lib/a2learn/manifest';
  * is derived from that map, so the list and the dispatch cannot drift, and
  * the conformance suite requires a fixture per supported kind. The first two
  * kinds are the reading shapes. Known fidelity limits, stated rather than
- * papered over: flashcard's tap-to-flip is degraded to front/back stacked
- * (the basic catalog models no local state — an a2learn catalog extension
- * will), and a markdown body using links or tables renders them as literal
- * Markdown in strict renderers (the catalog's `Text` scopes itself to simple
- * Markdown). The durable home for this mapping is an optional field on the
+ * papered over: flashcard's flip becomes front/back Tabs — the reveal
+ * survives as renderer-local tab switching, the animation does not — and a
+ * markdown body using links or tables renders them as literal Markdown in
+ * strict renderers (the catalog's `Text` scopes itself to simple Markdown).
+ * Full mechanics for every kind is the a2learn catalog's job (#98), not
+ * this projection's. The durable home for this mapping is an optional field on the
  * widget registry entry — tracked with the registry-owned-semantics
  * refactor — so adding a kind stays one file.
  */
@@ -137,15 +138,22 @@ function flashcardSurface(spec: FlashcardSpec, surfaceId: string): A2UISurfaceMe
     const front = sideComponents(`card-${i}-front`, card.front);
     const back = sideComponents(`card-${i}-back`, card.back);
     cardIds.push(`card-${i}`);
+    // Tabs, not a flat stack: the basic catalog cannot express a flip
+    // animation, but tab switching is renderer-local, so front/back stays a
+    // deliberate reveal instead of both sides lying in the open.
     cardComponents.push(
-      { id: `card-${i}`, component: 'Card', child: `card-${i}-col` },
+      { id: `card-${i}`, component: 'Card', child: `card-${i}-tabs` },
       {
-        id: `card-${i}-col`,
-        component: 'Column',
-        children: [...front.ids, `card-${i}-divider`, ...back.ids],
+        id: `card-${i}-tabs`,
+        component: 'Tabs',
+        tabs: [
+          { title: 'Front', child: `card-${i}-front-col` },
+          { title: 'Back', child: `card-${i}-back-col` },
+        ],
       },
+      { id: `card-${i}-front-col`, component: 'Column', children: front.ids },
+      { id: `card-${i}-back-col`, component: 'Column', children: back.ids },
       ...front.components,
-      { id: `card-${i}-divider`, component: 'Divider' },
       ...back.components,
     );
   });

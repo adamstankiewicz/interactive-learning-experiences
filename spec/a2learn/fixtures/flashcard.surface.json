@@ -24,14 +24,33 @@
       {
         "id": "card-0",
         "component": "Card",
-        "child": "card-0-col"
+        "child": "card-0-tabs"
       },
       {
-        "id": "card-0-col",
+        "id": "card-0-tabs",
+        "component": "Tabs",
+        "tabs": [
+          {
+            "title": "Front",
+            "child": "card-0-front-col"
+          },
+          {
+            "title": "Back",
+            "child": "card-0-back-col"
+          }
+        ]
+      },
+      {
+        "id": "card-0-front-col",
         "component": "Column",
         "children": [
-          "card-0-front-text",
-          "card-0-divider",
+          "card-0-front-text"
+        ]
+      },
+      {
+        "id": "card-0-back-col",
+        "component": "Column",
+        "children": [
           "card-0-back-text"
         ]
       },
@@ -41,10 +60,6 @@
         "text": "numerator"
       },
       {
-        "id": "card-0-divider",
-        "component": "Divider"
-      },
-      {
         "id": "card-0-back-text",
         "component": "Text",
         "text": "how many parts you have"
@@ -52,14 +67,33 @@
       {
         "id": "card-1",
         "component": "Card",
-        "child": "card-1-col"
+        "child": "card-1-tabs"
       },
       {
-        "id": "card-1-col",
+        "id": "card-1-tabs",
+        "component": "Tabs",
+        "tabs": [
+          {
+            "title": "Front",
+            "child": "card-1-front-col"
+          },
+          {
+            "title": "Back",
+            "child": "card-1-back-col"
+          }
+        ]
+      },
+      {
+        "id": "card-1-front-col",
         "component": "Column",
         "children": [
-          "card-1-front-text",
-          "card-1-divider",
+          "card-1-front-text"
+        ]
+      },
+      {
+        "id": "card-1-back-col",
+        "component": "Column",
+        "children": [
           "card-1-back-text",
           "card-1-back-md"
         ]
@@ -68,10 +102,6 @@
         "id": "card-1-front-text",
         "component": "Text",
         "text": "denominator"
-      },
-      {
-        "id": "card-1-divider",
-        "component": "Divider"
       },
       {
         "id": "card-1-back-text",
@@ -86,14 +116,33 @@
       {
         "id": "card-2",
         "component": "Card",
-        "child": "card-2-col"
+        "child": "card-2-tabs"
       },
       {
-        "id": "card-2-col",
+        "id": "card-2-tabs",
+        "component": "Tabs",
+        "tabs": [
+          {
+            "title": "Front",
+            "child": "card-2-front-col"
+          },
+          {
+            "title": "Back",
+            "child": "card-2-back-col"
+          }
+        ]
+      },
+      {
+        "id": "card-2-front-col",
         "component": "Column",
         "children": [
-          "card-2-front-image",
-          "card-2-divider",
+          "card-2-front-image"
+        ]
+      },
+      {
+        "id": "card-2-back-col",
+        "component": "Column",
+        "children": [
           "card-2-back-text"
         ]
       },
@@ -103,10 +152,6 @@
         "url": "https://example.org/fraction-bar.png",
         "description": "a bar split into three equal parts",
         "fit": "contain"
-      },
-      {
-        "id": "card-2-divider",
-        "component": "Divider"
       },
       {
         "id": "card-2-back-text",

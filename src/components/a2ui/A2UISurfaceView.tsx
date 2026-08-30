@@ -56,6 +56,19 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
       }
       case 'Divider':
         return <hr key={id} className="border-border" />;
+      case 'Tabs': {
+        const tabs = Array.isArray(component.tabs) ? (component.tabs as { title?: unknown; child?: unknown }[]) : [];
+        return (
+          <TabsView
+            key={id}
+            tabs={tabs.map((tab) => ({
+              title: String(tab.title ?? ''),
+              child: typeof tab.child === 'string' ? tab.child : null,
+            }))}
+            render={(childId) => render(childId, path)}
+          />
+        );
+      }
       case 'Image':
         // The catalog's accessibility field is `description`, not `alt`.
         return (
@@ -92,6 +105,42 @@ function childIds(component: A2UIComponent): string[] {
     for (const ref of component.children) if (typeof ref === 'string') ids.push(ref);
   }
   return ids;
+}
+
+/** Tab switching is renderer-local state — the one interaction the basic
+ *  catalog gives back (this is how the flashcard reveal survives projection). */
+function TabsView({
+  tabs,
+  render,
+}: {
+  tabs: { title: string; child: string | null }[];
+  render: (childId: string) => React.ReactNode;
+}) {
+  const [active, setActive] = useState(0);
+  const current = tabs[active];
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-1 border-b border-border" role="tablist">
+        {tabs.map((tab, i) => (
+          <button
+            key={i}
+            type="button"
+            role="tab"
+            aria-selected={i === active}
+            className={
+              i === active
+                ? 'rounded-t-md border-b-2 border-primary px-3 py-1.5 text-sm font-medium'
+                : 'px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground'
+            }
+            onClick={() => setActive(i)}
+          >
+            {tab.title}
+          </button>
+        ))}
+      </div>
+      {current?.child ? render(current.child) : null}
+    </div>
+  );
 }
 
 /** A broken image collapses to nothing; the alt text is the honest fallback. */
