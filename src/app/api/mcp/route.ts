@@ -146,7 +146,7 @@ const TOOL_DESCRIPTION = [
 
 const FIND_DESCRIPTION = [
   'Browse the activity registry: which interactive learning activities fit a learning need, before',
-  'building one. Returns ranked activity listings (a2learn manifests) for a verified standard —',
+  'building one. Returns ranked activity listings for a verified standard —',
   'each names the standard it teaches, whether completing it measures correctness (`assesses`),',
   'and the exact `show_widget` arguments that build it.',
   '',

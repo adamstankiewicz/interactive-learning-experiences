@@ -20,7 +20,13 @@ import { listWidgetCatalogEntries } from '@/lib/widgets/types';
  * fast and free or agents will skip it and guess.
  */
 
-/** An a2learn-shaped listing (docs/a2learn/manifest.md), compact form. */
+/**
+ * A compact activity listing: what it teaches, whether it measures, and the
+ * exact call that builds it. The `a2learn: 0` field marks the draft lineage —
+ * this shape converges on the a2learn manifest format when those docs ship
+ * with their producer; until then, this file is the only normative source
+ * for what a listing contains.
+ */
 export type ActivityManifest = {
   a2learn: 0;
   id: string;
