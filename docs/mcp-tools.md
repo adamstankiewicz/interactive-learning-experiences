@@ -13,7 +13,8 @@ Builds one standards-verified activity and renders it in the host.
 |---|---|---|
 | `topic` | no* | What the activity is about, in plain words — "comparing fractions". Enough on its own. |
 | `standardCode` | no* | A Common Core or NGSS code, if the caller already knows which one it wants. |
-| `gradeHint` | no | e.g. `"8th grade"` — narrows proposal and generation. |
+| `audience` | no | Who it is for, in plain words — `"8th grade"`, `"undergraduate intro stats"`, `"new hires"`. Narrows proposal and generation. A hint, not a verified claim. |
+| `gradeHint` | no | Deprecated alias for `audience`, still accepted: this tool shipped with it. |
 | `kind` | no | One of the registry's kinds. Leave it out and the best interaction for the standard is chosen via `coverageRule` + planner metadata. |
 
 *At least one of `topic` / `standardCode` in practice — a bare call has
