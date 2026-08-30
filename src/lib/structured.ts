@@ -1,4 +1,4 @@
-import { generateText, streamText, Output } from 'ai';
+import { asSchema, generateText, streamText, Output } from 'ai';
 import type { FlexibleSchema, LanguageModel } from 'ai';
 
 import { fallbackModel, pathwayModel } from '@/lib/model';
@@ -60,11 +60,41 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
   try {
     return (await callModel(primary, options)).output;
   } catch (error) {
+    // Long structured outputs sometimes arrive wrapped in a markdown fence —
+    // valid JSON the SDK refuses to parse. Salvaging deterministically beats
+    // burning a cross-vendor retry on formatting.
+    const salvaged = await salvageFencedOutput(options.schema, error);
+    if (salvaged !== null) return salvaged;
+
     const fallback = fallbackModel();
     if (!fallback) throw error;
 
     console.error('[model] primary provider failed, retrying once on the OpenAI fallback:', error);
-    return (await callModel(fallback, options)).output;
+    try {
+      return (await callModel(fallback, options)).output;
+    } catch (fallbackError) {
+      const salvagedFallback = await salvageFencedOutput(options.schema, fallbackError);
+      if (salvagedFallback !== null) return salvagedFallback;
+      throw fallbackError;
+    }
+  }
+}
+
+/**
+ * The raw text of a failed parse, unfenced and re-validated against the real
+ * schema. Returns null unless the result is exactly a valid instance — this
+ * never loosens what counts as acceptable output, only where the JSON sits.
+ */
+export async function salvageFencedOutput<T>(schema: FlexibleSchema<T>, error: unknown): Promise<T | null> {
+  const text = (error as { text?: unknown })?.text;
+  if (typeof text !== 'string') return null;
+  const match = text.match(/^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/);
+  if (!match) return null;
+  try {
+    const result = await asSchema(schema).validate?.(JSON.parse(match[1]));
+    return result?.success ? result.value : null;
+  } catch {
+    return null;
   }
 }
 
