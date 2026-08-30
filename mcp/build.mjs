@@ -72,7 +72,25 @@ const js = result.outputFiles[0].text;
 const cssDir = join(root, '.next', 'static', 'chunks');
 const cssFiles = readdirSync(cssDir).filter((f) => f.endsWith('.css'));
 if (!cssFiles.length) throw new Error('No compiled CSS found — run `pnpm build` first.');
-const css = cssFiles.map((f) => readFileSync(join(cssDir, f), 'utf8')).join('\n');
+
+/**
+ * `@font-face` rules are stripped, for two reasons that happen to agree:
+ *
+ * - They cannot work here. `next/font` writes `url(../media/<hash>.woff2)`,
+ *   and this file is a single standalone HTML document — there is no
+ *   `../media/`, so the fonts never loaded and every widget already renders
+ *   in the fallback stack.
+ * - They are the one nondeterministic part of the build. The media hashes
+ *   change across build environments (next/font fetches the font files at
+ *   build time), which made CI's rebuild-and-diff guard fail on font churn
+ *   rather than real staleness.
+ *
+ * `@font-face` bodies contain no nested braces, so the regex is safe.
+ */
+const css = cssFiles
+  .map((f) => readFileSync(join(cssDir, f), 'utf8'))
+  .join('\n')
+  .replace(/@font-face\{[^}]*\}/g, '');
 
 /** Renders standalone in a browser; an MCP host will supply the spec instead. */
 const DEMO_SPEC = {
