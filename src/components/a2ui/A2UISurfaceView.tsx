@@ -164,41 +164,30 @@ function childIds(component: A2UIComponent): string[] {
 }
 
 /**
- * A horizontal List as a paged deck: snap-scroll stays (swipe works), and
- * Back/Next plus position dots ride along as renderer affordances. Scrolling
- * and the buttons stay in sync by reading the scroll position back.
+ * A horizontal List as a paged deck: one item in view, Back/Next and
+ * position dots as renderer affordances, and page changes slide in place —
+ * the same 320ms slide-and-fade the native widgets use, not a scroll.
  */
 function DeckView({ items }: { items: { id: string; node: React.ReactNode }[] }) {
   const [index, setIndex] = useState(0);
-  const scroller = useRef<HTMLDivElement>(null);
+  const [direction, setDirection] = useState(0);
 
   const go = (next: number) => {
-    const el = scroller.current;
     const clamped = Math.max(0, Math.min(items.length - 1, next));
-    const target = el?.children[clamped] as HTMLElement | undefined;
-    if (el && target) el.scrollTo({ left: target.offsetLeft - el.offsetLeft, behavior: 'smooth' });
+    setDirection(Math.sign(clamped - index));
     setIndex(clamped);
-  };
-
-  const onScroll = () => {
-    const el = scroller.current;
-    if (!el || el.clientWidth === 0) return;
-    setIndex(Math.max(0, Math.min(items.length - 1, Math.round(el.scrollLeft / el.clientWidth))));
   };
 
   return (
     <div className="flex flex-col gap-3">
-      <div
-        ref={scroller}
-        onScroll={onScroll}
-        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
+      <motion.div
+        key={items[index]?.id}
+        initial={direction === 0 ? false : { x: direction * 100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
-        {items.map((item) => (
-          <div key={item.id} className="w-full shrink-0 snap-center">
-            {item.node}
-          </div>
-        ))}
-      </div>
+        {items[index]?.node}
+      </motion.div>
       {items.length > 1 && (
         <>
           <div className="flex justify-center gap-1.5" aria-hidden>
