@@ -9,6 +9,7 @@ key); everything else has a working default — no database, no accounts.
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | — | The key for the chosen provider |
 | `AWS_REGION`, `AWS_BEARER_TOKEN_BEDROCK` | `us-west-2`, — | Bedrock configuration when `LLM_PROVIDER=bedrock` |
 | `OPENAI_FALLBACK_API_KEY`, `OPENAI_FALLBACK_MODEL_ID` | —, `gpt-4o-mini` | Optional second provider used when the primary fails |
+| `OPENROUTER_EMBED_MODEL_ID` / `BEDROCK_EMBED_MODEL_ID` | `openai/text-embedding-3-small` / `amazon.titan-embed-text-v2:0` | Embedding model for semantic activity discovery. Discovery ranks semantically when the provider can embed (OpenRouter, Bedrock, or an armed OpenAI fallback key) and falls back to lexical ranking otherwise — the result says which ran |
 | `STANDARDS_SOURCE` | `learning-commons` | Which standards graph verifies codes; `example` is the built-in keyless source |
 | `LEARNING_COMMONS_API_KEY`, `LEARNING_COMMONS_MCP_URL` | — | Credentials for the default standards source |
 | `STORAGE_ADAPTER` | auto | `memory` (nothing persists across restarts) or `supabase`; unset picks Supabase only when its vars are configured |
