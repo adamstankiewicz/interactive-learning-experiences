@@ -1,3 +1,5 @@
+import { fencedDetailBlock } from '@/lib/mcp/fence';
+
 /**
  * What the widget says back into the conversation it is sitting in.
  *
@@ -56,15 +58,8 @@ export function reportToConversation(text: string, detail?: Record<string, unkno
   // completion reporter uses; the cap and over-long fence are mirrored there
   // too, since the two files deliberately share a wire format, not code).
   const content: { type: 'text'; text: string }[] = [{ type: 'text', text: message }];
-  let detailBlock: string | null = null;
-  if (detail) {
-    let json = JSON.stringify(detail);
-    if (json.length > 4000) json = `${json.slice(0, 4000)}… (truncated)`;
-    const longestRun = json.match(/`+/g)?.reduce((max, run) => Math.max(max, run.length), 0) ?? 0;
-    const fence = '`'.repeat(Math.max(3, longestRun + 1));
-    detailBlock = `${fence}json\n${json}\n${fence}`;
-    content.push({ type: 'text', text: detailBlock });
-  }
+  const detailBlock = detail ? fencedDetailBlock(detail) : null;
+  if (detailBlock) content.push({ type: 'text', text: detailBlock });
 
   // Dedupe on everything sent, not just the prose — identical sentences with
   // different structured detail are different reports.

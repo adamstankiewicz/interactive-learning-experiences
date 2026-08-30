@@ -1,3 +1,5 @@
+import { fencedDetailBlock } from '../src/lib/mcp/fence';
+
 /**
  * JSON-RPC over postMessage, the way an MCP App talks to its host.
  *
@@ -141,13 +143,7 @@ export class HostBridge {
     // fenced with more backticks than the content contains, so a payload
     // string with ``` in it cannot break out of the fence into prose.
     const content: { type: 'text'; text: string }[] = [{ type: 'text', text }];
-    if (detail) {
-      let json = JSON.stringify(detail);
-      if (json.length > 4000) json = `${json.slice(0, 4000)}… (truncated)`;
-      const longestRun = json.match(/`+/g)?.reduce((max, run) => Math.max(max, run.length), 0) ?? 0;
-      const fence = '`'.repeat(Math.max(3, longestRun + 1));
-      content.push({ type: 'text', text: `${fence}json\n${json}\n${fence}` });
-    }
+    if (detail) content.push({ type: 'text', text: fencedDetailBlock(detail) });
     return this.request('ui/update-model-context', { content });
   }
 }
