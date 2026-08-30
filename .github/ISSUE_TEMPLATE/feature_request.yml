@@ -1,0 +1,27 @@
+name: Feature request
+description: Something the project should do that it doesn't
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the teacher/student/developer situation before the feature, not just the feature.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: dropdown
+    id: contract
+    attributes:
+      label: Does this change a contract?
+      description: Widget spec schemas, the catalog entry shape, API routes, or persisted formats — per GOVERNANCE.md these need discussion before a PR.
+      options:
+        - "No / not sure"
+        - "Yes — this touches a contract"
+    validations:
+      required: true

@@ -1,0 +1,50 @@
+name: Bug report
+description: Something broke — a crash, a wrong render, a generation that failed
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what you got instead.
+      placeholder: Generated a pathway on "photosynthesis" for grade 4; the crossword step rendered blank.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How can we reproduce it?
+      description: Steps, the topic/grade you used, and the route you were on. Screenshots welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it break?
+      options:
+        - The app (builder / walkthrough / reports)
+        - An MCP host (Claude or another connector client)
+        - REST API
+        - Generation pipeline (any surface)
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: storage
+    attributes:
+      label: Storage adapter
+      options:
+        - memory (default)
+        - supabase
+        - not sure
+  - type: input
+    id: provider
+    attributes:
+      label: Model provider
+      description: Which LLM_PROVIDER you run (anthropic / openai / bedrock / openrouter) — generation bugs are often provider-specific.
+      placeholder: anthropic
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Node version, and whether you run Supabase or memory storage.

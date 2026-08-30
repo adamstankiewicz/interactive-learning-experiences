@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/adamstankiewicz/interactive-learning-experiences/security/advisories/new
+    about: Report privately via GitHub advisories — never in a public issue (see SECURITY.md).
+  - name: Docs
+    url: https://github.com/adamstankiewicz/interactive-learning-experiences/tree/main/docs
+    about: Quickstart, the registry API, the evidence contract, architecture.
