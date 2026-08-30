@@ -1,0 +1,19 @@
+{
+  "source": "https://github.com/google/A2UI",
+  "commit": "abcff1515fad",
+  "license": "Apache-2.0",
+  "files": {
+    "agent_to_renderer.json": {
+      "upstream": "specification/v1_0/json/agent_to_renderer.json",
+      "sha256": "468c8e544dbe0b02d5d5586ebcdca399ecfa6d07a7b875d887089ce3bd2df160"
+    },
+    "common_types.json": {
+      "upstream": "specification/v1_0/json/common_types.json",
+      "sha256": "169ff987a7f8fb93a040ca33352ae4aeb684ff9742bff8cf5925b5cd2612e7d8"
+    },
+    "catalogs/basic/catalog.json": {
+      "upstream": "specification/v1_0/catalogs/basic/catalog.json",
+      "sha256": "29e01ac2cf69dc5860ad060f5a60c67fa5cdaa8a78ecab1018f531b178fa5c00"
+    }
+  }
+}

@@ -52,3 +52,6 @@ mcp/dist/
 
 # Built by mcp/build.mjs (predev/prebuild) — never committed.
 public/widget-shell.html
+
+# Fetched A2UI spec files — pinned by spec/a2ui/manifest.json, never committed
+spec/a2ui/v1_0/

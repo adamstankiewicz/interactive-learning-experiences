@@ -27,6 +27,11 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// The spec files are fetched and checksum-pinned, not committed — see
+// spec/a2ui/manifest.json. Materialize them before anything reads them.
+const { ensureA2UISpec } = await import('./fetch-a2ui-spec.mjs');
+await ensureA2UISpec();
 const specDir = join(root, 'spec', 'a2ui', 'v1_0');
 const fixtureDir = join(root, 'spec', 'a2learn', 'fixtures');
 const update = process.argv.includes('--update');
