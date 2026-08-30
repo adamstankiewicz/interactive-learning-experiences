@@ -5,7 +5,7 @@
   "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node mcp/build.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
