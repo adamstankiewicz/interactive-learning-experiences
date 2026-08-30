@@ -32,4 +32,10 @@ This is an open prototype, and honesty beats reassurance:
 ## Scope
 
 Self-hosted deployments run entirely on your own keys and infrastructure; the
-project ships no telemetry back to anyone.
+project ships no telemetry back to anyone, and intends to keep it that way —
+adoption is measured from public proxy signals (package downloads, GitHub
+dependents, directory listings) and the project's own hosted instance, never
+by instrumenting yours. One dependency nuance worth knowing: an instance
+using the default standards source calls Learning Commons with your key, so
+that service sees your verification volume even though this project sees
+nothing; the built-in keyless example source is invisible to everyone.
