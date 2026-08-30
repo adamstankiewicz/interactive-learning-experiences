@@ -18,6 +18,14 @@ export type StandardRef = {
   id: string;
   description: string;
   jurisdiction: string;
+  /**
+   * Grade levels as this source labels them — a K-12 source emits "K" and
+   * "1"-"12". A source whose learners are not in grades (higher education,
+   * professional or workplace training) leaves this empty and expresses
+   * audience through `tags` instead; `reachesGrade` is deliberately written
+   * to let unlabelled standards through rather than gate them out on
+   * missing data, so such a source loses no widget coverage.
+   */
   gradeLevels: string[];
   subject: string;
   /**
