@@ -56,6 +56,13 @@ export type ActivityManifest = {
 
 export type FindResult = {
   standard: StandardRef | null;
+  /**
+   * Which ranker ordered the listings: 'semantic' (embeddings + cosine, when
+   * the deployment has an embedding-capable provider) or 'lexical' (the
+   * deterministic fallback). Stated so no deployment silently pretends to a
+   * capability it lacks — and so callers know whether re-ranking is worth it.
+   */
+  ranking: 'semantic' | 'lexical';
   rejectedCodes: string[];
   activities: ActivityManifest[];
 };

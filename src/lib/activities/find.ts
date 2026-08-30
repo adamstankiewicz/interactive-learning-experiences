@@ -3,6 +3,7 @@ import { verifyAcrossSources } from '@/lib/standards';
 import type { StandardRef } from '@/lib/standards/types';
 
 import type { ActivityManifest, FindResult } from '@/lib/activities/types';
+import { getEmbedder, rankSemantically } from '@/lib/activities/semantic';
 import '@/lib/widgets/builtins';
 import { listWidgetCatalogEntries } from '@/lib/widgets/types';
 
@@ -32,11 +33,10 @@ function titleCase(kind: string): string {
 }
 
 /**
- * Deterministic default ordering — not semantics. The caller is a model and
- * holds the real ranking judgment; every signal it needs travels on the
- * listing (`summary`, `pedagogy.assesses`, `mechanics`). This score only
- * keeps the default order sensible and stable, and it is deliberately
- * model-free: fast and free, or agents skip discovery and guess.
+ * Lexical fallback ordering, used when the deployment has no
+ * embedding-capable provider (`semantic.ts` is the primary ranker). Kept
+ * deterministic and dependency-free so discovery always answers; the result
+ * says which ranker ran.
  */
 
 /**
@@ -100,13 +100,31 @@ export async function findActivities(input: {
 
   const need = [input.need, input.topic].filter(Boolean).join(' ');
 
-  const activities = listWidgetCatalogEntries()
+  const eligible = listWidgetCatalogEntries()
     // No verified standard → no tags → tag-gated coverage rules correctly
     // exclude themselves; the survivors are the standard-agnostic kinds.
-    .filter((entry) => !standard || !entry.coverageRule || entry.coverageRule(standard))
+    .filter((entry) => !standard || !entry.coverageRule || entry.coverageRule(standard));
+
+  // Semantic ranking when the deployment can embed; lexical otherwise — and
+  // an embedding failure degrades to lexical rather than failing discovery.
+  let ranking: FindResult['ranking'] = 'lexical';
+  let ordered = eligible
     .map((entry) => ({ entry, score: scoreEntry(entry, need) }))
     .sort((a, b) => b.score - a.score)
-    .map(({ entry }): ActivityManifest => {
+    .map(({ entry }) => entry);
+
+  const embedder = getEmbedder();
+  if (embedder && need.trim()) {
+    try {
+      const rankedIndices = await rankSemantically(need, eligible, embedder);
+      ordered = rankedIndices.map(({ index }) => eligible[index]);
+      ranking = 'semantic';
+    } catch {
+      // Lexical order already computed; the result says which ranker ran.
+    }
+  }
+
+  const activities = ordered.map((entry): ActivityManifest => {
       const invokeArgs: Record<string, string> = { kind: entry.kind };
       if (standard) invokeArgs.standardCode = standard.code;
       else if (input.topic) invokeArgs.topic = input.topic;
@@ -128,5 +146,5 @@ export async function findActivities(input: {
       };
     });
 
-  return { standard, rejectedCodes, activities };
+  return { standard, ranking, rejectedCodes, activities };
 }

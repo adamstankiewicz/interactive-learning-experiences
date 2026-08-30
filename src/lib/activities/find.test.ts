@@ -12,6 +12,10 @@ let findActivities: typeof import('@/lib/activities/find').findActivities;
 
 beforeAll(async () => {
   process.env.STANDARDS_SOURCE = 'example';
+  // No embedding-capable provider in tests → the lexical fallback runs, and
+  // the result must say so. The semantic ranker has its own suite.
+  delete process.env.OPENAI_FALLBACK_API_KEY;
+  process.env.LLM_PROVIDER = 'anthropic';
   ({ findActivities } = await import('@/lib/activities/find'));
 });
 
@@ -20,6 +24,7 @@ describe('findActivities', () => {
     const result = await findActivities({ standardCode: 'MATH.4.NF.EQUIV' });
 
     expect(result.standard?.code).toBe('MATH.4.NF.EQUIV');
+    expect(result.ranking).toBe('lexical'); // honest: this deployment cannot embed
     expect(result.rejectedCodes).toEqual([]);
     expect(result.activities.length).toBeGreaterThan(0);
 
