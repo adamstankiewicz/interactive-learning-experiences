@@ -13,8 +13,8 @@ Builds one standards-verified activity and renders it in the host.
 |---|---|---|
 | `topic` | no* | What the activity is about, in plain words — "comparing fractions". Enough on its own. |
 | `standardCode` | no* | A Common Core or NGSS code, if the caller already knows which one it wants. |
-| `audience` | no | Who it is for, in plain words — `"8th grade"`, `"undergraduate intro stats"`, `"new hires"`. Narrows proposal and generation. A hint, not a verified claim. |
-| `gradeHint` | no | Deprecated alias for `audience`, still accepted: this tool shipped with it. |
+| `audienceHint` | no | Who it is for, in plain words — `"8th grade"`, `"undergraduate intro stats"`, `"new hires"`. Narrows proposal and generation. The suffix is the contract: `audience` names the scheme-scoped, graph-verified field on emitted manifests, and this unverified steer never borrows that name. |
+| `gradeHint` | no | Deprecated alias for `audienceHint`, still accepted: this tool shipped with it. |
 | `kind` | no | One of the registry's kinds. Leave it out and the best interaction for the standard is chosen via `coverageRule` + planner metadata. |
 
 *At least one of `topic` / `standardCode` in practice — a bare call has
@@ -26,6 +26,26 @@ not a quietly wrong activity) → pick a kind → run that kind's
 [generator](./registry.md) → validate the spec → return the rendered widget
 via the MCP Apps shell. When no code survives verification, the result says
 so plainly and renders as an exploration activity.
+
+## `find_activity`
+
+Browses the registry before building: ranked, standards-verified activity
+listings for a learning need, each carrying the exact `show_widget`
+arguments that build it. Listings are generative — capabilities that
+manufacture an activity on demand, not a shelf of files.
+
+| Input | Required | Meaning |
+|---|---|---|
+| `topic` | no* | The learning need in plain words — "comparing fractions". |
+| `standardCode` | no* | A known code, verified against the standards graph before anything is listed. |
+| `audienceHint` | no | Who it is for, free text. Same contract as on `show_widget`. |
+| `need` | no | A preference in plain words — "a game", "something they write", "a quick check". Steers ranking. |
+
+*At least one of `topic` / `standardCode`.
+
+The result names its ranker honestly: `ranking: "semantic"` when the
+deployment can embed (see [configuration](./configuration.md)),
+`"lexical"` otherwise — discovery always answers, and never pretends.
 
 ## `build_pathway`
 
@@ -85,10 +105,6 @@ hardening branch set).
 
 ## Planned surface (v0.1)
 
-- **`find_activity`** — answers a learning need with ranked,
-  standards-verified listings derived from registry metadata; each listing
-  carries the exact `show_widget` arguments that build it. Implemented on
-  `feat/find-activity-mvp`, merging as part of v0.1.
 - **`MCP_ACCESS_TOKEN`** — bearer auth for public instances, with a rate
   cap.
 - **`/api/v0/activities`** — a small, OpenAPI-documented REST facade
