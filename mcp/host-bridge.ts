@@ -136,9 +136,18 @@ export class HostBridge {
   updateModelContext(text: string, detail?: Record<string, unknown>) {
     // Prose first — hosts feed this to a model, and the sentence is the
     // message. The structured block rides along so the model (or the host's
-    // tooling) can read exact fields instead of parsing English.
+    // tooling) can read exact fields instead of parsing English. The block
+    // is capped (payloads carry model-generated text of unbounded size) and
+    // fenced with more backticks than the content contains, so a payload
+    // string with ``` in it cannot break out of the fence into prose.
     const content: { type: 'text'; text: string }[] = [{ type: 'text', text }];
-    if (detail) content.push({ type: 'text', text: '```json\n' + JSON.stringify(detail) + '\n```' });
+    if (detail) {
+      let json = JSON.stringify(detail);
+      if (json.length > 4000) json = `${json.slice(0, 4000)}… (truncated)`;
+      const longestRun = json.match(/`+/g)?.reduce((max, run) => Math.max(max, run.length), 0) ?? 0;
+      const fence = '`'.repeat(Math.max(3, longestRun + 1));
+      content.push({ type: 'text', text: `${fence}json\n${json}\n${fence}` });
+    }
     return this.request('ui/update-model-context', { content });
   }
 }

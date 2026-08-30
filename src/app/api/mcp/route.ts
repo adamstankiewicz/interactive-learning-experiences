@@ -427,23 +427,47 @@ async function handle(message: RpcRequest, request: Request) {
         try {
           const run = await runPathway(topic, args.gradeHint?.trim() || undefined);
 
-          // The session needs an owner the storage layer knows. MCP callers
-          // have no browser learner id, so one is minted per pathway — the
-          // share link is the artifact; the id is bookkeeping.
-          const studentId = await storageAdapter().createStudent();
-          const sessionId = studentId
-            ? await storageAdapter().persistSession({
-                studentId,
+          // Persistence is best-effort and separately guarded: a storage
+          // failure must not discard a pathway that took five model calls to
+          // build — the plan summary is still the answer, minus the link,
+          // with the real reason stated instead of a guess.
+          const adapter = storageAdapter();
+          let ownerId: string | null = null;
+          let sessionId: string | null = null;
+          let saveReason: string | null = null;
+          try {
+            // The session needs an owner the storage layer knows. MCP callers
+            // have no browser learner id, so one is minted per pathway; it is
+            // returned as ownerId because the edit endpoint gates on it — a
+            // caller that discards it can share the pathway but never edit it.
+            ownerId = await adapter.createStudent();
+            if (!ownerId) {
+              saveReason = 'storage declined to create an owner id';
+            } else {
+              sessionId = await adapter.persistSession({
+                studentId: ownerId,
                 topic,
                 gradeHint: args.gradeHint?.trim() || null,
                 anchor: run.anchor,
                 plan: run.plan,
                 stepWidgets: run.stepWidgets,
                 rejectedCodes: run.rejected,
-              })
-            : null;
+              });
+              if (!sessionId) saveReason = 'storage is not accepting writes';
+            }
+          } catch (saveError) {
+            saveReason = saveError instanceof Error ? saveError.message : 'unknown storage error';
+          }
 
-          const steps = run.plan.steps.map((step, i) => `${i + 1}. [${step.purpose}] ${step.title}`);
+          const kindOf = (widget: unknown): string | null =>
+            widget && typeof widget === 'object' && 'kind' in widget && typeof widget.kind === 'string'
+              ? widget.kind
+              : null;
+
+          const steps = run.plan.steps.map((step, i) => {
+            const note = run.stepWidgetNotes[i];
+            return `${i + 1}. [${step.purpose}] ${step.title}${note ? ` — note: ${note}` : ''}`;
+          });
           const verified = run.anchor.standard.verified
             ? `verified against ${run.anchor.standard.sourceLabel}`
             : 'no standard verified — this is an exploration pathway';
@@ -452,7 +476,7 @@ async function handle(message: RpcRequest, request: Request) {
             ...steps,
             sessionId
               ? `Student link: ${origin}/learn/${sessionId}`
-              : 'Not saved — this instance has no persistent storage, so there is no share link. The pathway can still be rebuilt any time.',
+              : `Not saved — ${saveReason ?? 'no reason recorded'}. The pathway above is complete; rebuilding is one call.`,
             run.rejected.length > 0 ? `Rejected codes kept on record: ${run.rejected.join(', ')}` : null,
           ]
             .filter(Boolean)
@@ -463,8 +487,24 @@ async function handle(message: RpcRequest, request: Request) {
             structuredContent: {
               sessionId,
               url: sessionId ? `${origin}/learn/${sessionId}` : null,
+              /** Keep this to edit the pathway later — the edit API gates on it. */
+              ownerId,
               standard: { code: run.anchor.standard.code, verified: run.anchor.standard.verified },
-              steps: run.plan.steps.map((step) => ({ title: step.title, purpose: step.purpose, widgetKind: step.widgetKind ?? null })),
+              // The kind actually built per step — generation can substitute a
+              // fallback kind, and the plan's ask is reported only when it
+              // differs, so the caller never describes widgets that aren't there.
+              steps: run.plan.steps.map((step, i) => {
+                const builtKind = kindOf(run.stepWidgets[i]);
+                return {
+                  title: step.title,
+                  purpose: step.purpose,
+                  widgetKind: builtKind ?? step.widgetKind ?? null,
+                  ...(builtKind && step.widgetKind && builtKind !== step.widgetKind
+                    ? { plannedWidgetKind: step.widgetKind }
+                    : {}),
+                  ...(run.stepWidgetNotes[i] ? { note: run.stepWidgetNotes[i] } : {}),
+                };
+              }),
               rejectedCodes: run.rejected,
             },
           });

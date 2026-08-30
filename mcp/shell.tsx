@@ -174,6 +174,15 @@ function Shell() {
 
   const spec = hostSpec ?? window.__WIDGET_SPEC__;
 
+  // A host can re-use this frame for a second tool result. The completion
+  // tracker's counters describe one activity — reset them whenever the spec
+  // object changes so widget B doesn't inherit widget A's attempt count or
+  // its already-reported silence. (A re-delivered identical spec also resets:
+  // over-counting a restart beats permanently silencing the frame.)
+  useEffect(() => {
+    telemetry.reset();
+  }, [spec]);
+
   if (!spec) {
     return (
       <p className="p-6 text-sm text-muted-foreground">

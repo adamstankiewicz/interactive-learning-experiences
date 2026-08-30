@@ -49,15 +49,28 @@ function isEmbedded(): boolean {
  */
 export function reportToConversation(text: string, detail?: Record<string, unknown>): void {
   const message = text.trim();
-  if (!message || message === lastSent || !isEmbedded()) return;
-
-  lastSent = message;
+  if (!message || !isEmbedded()) return;
 
   // Prose leads — it is what the model responds to. The optional structured
   // block rides along for exact fields (the same convention the shell's
-  // completion reporter uses), so richer widget reports can carry both.
+  // completion reporter uses; the cap and over-long fence are mirrored there
+  // too, since the two files deliberately share a wire format, not code).
   const content: { type: 'text'; text: string }[] = [{ type: 'text', text: message }];
-  if (detail) content.push({ type: 'text', text: '```json\n' + JSON.stringify(detail) + '\n```' });
+  let detailBlock: string | null = null;
+  if (detail) {
+    let json = JSON.stringify(detail);
+    if (json.length > 4000) json = `${json.slice(0, 4000)}… (truncated)`;
+    const longestRun = json.match(/`+/g)?.reduce((max, run) => Math.max(max, run.length), 0) ?? 0;
+    const fence = '`'.repeat(Math.max(3, longestRun + 1));
+    detailBlock = `${fence}json\n${json}\n${fence}`;
+    content.push({ type: 'text', text: detailBlock });
+  }
+
+  // Dedupe on everything sent, not just the prose — identical sentences with
+  // different structured detail are different reports.
+  const dedupeKey = detailBlock ? `${message}\n${detailBlock}` : message;
+  if (dedupeKey === lastSent) return;
+  lastSent = dedupeKey;
 
   window.parent?.postMessage(
     {
