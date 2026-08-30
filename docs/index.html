@@ -170,6 +170,7 @@
     background: var(--sunk); border: 1px solid var(--line); border-radius: 5px;
     padding: 0.22rem 0.55rem; margin: 0;
   }
+  .kinds li.yours { background: transparent; border-style: dashed; color: var(--muted); }
   .lineage { margin: 1rem 0; }
   .lineage .row { padding: 0.85rem 0; border-bottom: 1px solid var(--line); }
   .lineage .row:last-child { border-bottom: none; }
@@ -248,7 +249,7 @@
       <li>self-hostable</li>
       <li>stores nothing about students</li>
       <li>MCP + REST</li>
-      <li>16 activity types</li>
+      <li>extensible activity registry</li>
     </ul>
   </div>
 
@@ -368,13 +369,16 @@
     <li><strong>An activity server.</strong> An MCP server with two tools: <code>find_activity</code>
     answers a learning need with ranked, standards-verified options; <code>show_widget</code> builds one
     and renders it in Claude or any MCP host. The registry is generative: it lists capabilities that
-    manufacture activities on demand, not a shelf of files. Sixteen today:</li>
+    manufacture activities on demand, not a shelf of files.</li>
+    <li><strong>An extension API, before it is a widget collection.</strong> A registry entry is a
+    schema, a component, a generator, and declared pedagogy (<code>assesses</code>, coverage) — adding a
+    kind is one file, and nothing in the planner, previews, or MCP surface needs to learn it exists.
+    Sixteen built-in kinds ship as the seed, from flashcards to a live-scored writing workshop and a
+    debate against an AI; the point is what you build against the same contract:</li>
   </ul>
   <ul class="kinds">
-    <li>flashcards</li><li>swipe cards</li><li>drag-to-order</li><li>sort into groups</li>
-    <li>timeline builder</li><li>crossword</li><li>fraction area model</li><li>reading card</li>
-    <li>step-by-step reveal</li><li>narrated walkthrough</li><li>spot the mistake</li><li>draw the curve</li>
-    <li>defend the claim</li><li>live-scored draft</li><li>writing workshop</li><li>debate an AI</li>
+    <li>drag-to-order</li><li>fraction area model</li><li>writing workshop</li><li>debate an AI</li>
+    <li class="yours">+ your kind · one file</li>
   </ul>
   <ul>
     <li><strong>An SDK.</strong> For products with their own tutor:</li>
