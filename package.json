@@ -5,7 +5,7 @@
   "description": "AI-authored, standards-grounded interactive learning pathways — self-hostable, with pluggable standards sources and an open widget registry.",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node mcp/build.mjs",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -15,8 +15,10 @@
     "db:status": "supabase status",
     "db:reset": "supabase db reset",
     "db:migrate": "supabase migration up",
-    "mcp:build": "next build && node mcp/build.mjs",
-    "mcp:serve": "node mcp/server-http.mjs"
+    "mcp:build": "node mcp/build.mjs",
+    "mcp:serve": "node mcp/server-http.mjs",
+    "predev": "node mcp/build.mjs",
+    "prebuild": "node mcp/build.mjs"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.55",
@@ -47,6 +49,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -4,14 +4,18 @@
  * That file is what an MCP host renders: a sandboxed iframe has no access to
  * our stylesheet or our JS chunks, so everything has to be inlined.
  *
- * The CSS is lifted from the Next production build rather than compiled by a
- * second Tailwind pipeline. It carries some classes the widgets never use,
- * which costs a few KB and saves an entire build setup.
+ * The CSS is compiled standalone from `mcp/shell.css`, which imports the
+ * app's own globals.css — one theme source, no dependency on a finished
+ * `next build`, and no @font-face to strip because next/font never runs
+ * here. That independence is what lets this run as a `prebuild` step: the
+ * shell is a build product now, not a committed artifact anyone can forget
+ * to regenerate.
  *
- *   pnpm build && node mcp/build.mjs
+ *   node mcp/build.mjs   (runs automatically before `pnpm dev` / `pnpm build`)
  */
+import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,11 +72,15 @@ const result = await build({
 
 const js = result.outputFiles[0].text;
 
-// Turbopack emits app CSS under static/chunks, not static/css.
-const cssDir = join(root, '.next', 'static', 'chunks');
-const cssFiles = readdirSync(cssDir).filter((f) => f.endsWith('.css'));
-if (!cssFiles.length) throw new Error('No compiled CSS found — run `pnpm build` first.');
-const css = cssFiles.map((f) => readFileSync(join(cssDir, f), 'utf8')).join('\n');
+// Compile the shell's stylesheet with the Tailwind CLI. Deterministic by
+// construction: same sources in, same bytes out, on any machine — and no
+// dependency on a finished `next build`.
+const cssOut = join(outDir, 'shell.css');
+execFileSync('pnpm', ['exec', 'tailwindcss', '-i', join(root, 'mcp', 'shell.css'), '-o', cssOut, '--minify'], {
+  cwd: root,
+  stdio: ['ignore', 'ignore', 'inherit'],
+});
+const css = readFileSync(cssOut, 'utf8');
 
 /** Renders standalone in a browser; an MCP host will supply the spec instead. */
 const DEMO_SPEC = {
@@ -102,20 +110,8 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Widget shell</title>
-<style>
-  /*
-   * The app gets its font from next/font, which is not in this bundle — so
-   * the font variable resolves to nothing and every widget falls back to
-   * serif. A system stack is closer to what a chat host uses anyway.
-   */
-  :root {
-    --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  /* Let the host's own surface show through instead of painting a white slab
-     inside its container. */
-  html, body { background: transparent; margin: 0; }
-</style>
+<!-- Fonts, transparency, and every theme token come from mcp/shell.css —
+     one stylesheet owns the shell's presentation. -->
 <style>${css}</style>
 </head>
 <body>
