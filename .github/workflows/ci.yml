@@ -35,6 +35,10 @@ jobs:
 
       - run: pnpm test
 
+      # A2UI conformance: the boundary mapper's surfaces must validate against
+      # the vendored Google A2UI v1.0 schemas and match their committed goldens.
+      - run: pnpm conformance
+
       # `next build` typechecks too, and it needs no secrets — verified by
       # building with no .env file present.
       - run: pnpm build
