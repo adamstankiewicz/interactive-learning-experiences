@@ -127,6 +127,22 @@ const html = `<!doctype html>
 </html>
 `;
 
+// The CLI transports (stdio, local HTTP) consume the same server definition
+// as the deployed route. Bundled here because they run as plain node — no
+// TS, no path aliases — and a stale bundle should say so rather than drift.
+const core = await build({
+  entryPoints: [join(root, 'src', 'lib', 'mcp', 'server.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  write: false,
+  tsconfig: join(root, 'tsconfig.json'),
+  alias: { 'server-only': join(root, 'test', 'stubs', 'server-only.ts') },
+  external: ['@modelcontextprotocol/sdk*', '@ai-sdk/*', '@openrouter/*', '@supabase/*', 'ai', 'zod', 'react', 'node:*'],
+  logLevel: 'error',
+});
+writeFileSync(join(outDir, 'server-core.mjs'), core.outputFiles[0].text);
+
 const out = join(outDir, 'widget-shell.html');
 writeFileSync(out, html);
 
