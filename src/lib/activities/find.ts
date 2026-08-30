@@ -22,13 +22,11 @@ import { listWidgetCatalogEntries } from '@/lib/widgets/types';
 
 /**
  * A compact activity listing: what it teaches, whether it measures, and the
- * exact call that builds it. The `a2learn: 0` field marks the draft lineage —
- * this shape converges on the a2learn manifest format when those docs ship
- * with their producer; until then, this file is the only normative source
- * for what a listing contains.
+ * exact call that builds it. This file is the only normative source for the
+ * shape; it converges on the a2learn manifest format when those docs ship
+ * with their producer.
  */
 export type ActivityManifest = {
-  a2learn: 0;
   id: string;
   kind: 'activity';
   title: string;
@@ -113,7 +111,6 @@ export async function findActivities(input: {
       else if (input.topic) invokeArgs.topic = input.topic;
 
       return {
-        a2learn: 0,
         id: standard ? `${entry.kind}@${standard.code}` : entry.kind,
         kind: 'activity',
         title: titleCase(entry.kind),
