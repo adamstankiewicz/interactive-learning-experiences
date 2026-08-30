@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import Link from 'next/link';
 
-import { A2UISurfaceDemo } from '@/components/a2ui/A2UISurfaceView';
+import { A2UIComparison } from '@/components/a2ui/A2UIComparison';
 import { toA2UISurface, A2UI_SUPPORTED_KINDS } from '@/lib/a2learn/a2ui';
 
 /**
@@ -51,12 +51,11 @@ export default function A2UIDemoPage() {
         component types the mapper emits.
       </p>
       <p className="mb-8 text-sm text-muted-foreground">
-        Fidelity is deliberately strict-renderer: no tap-to-flip, markdown drawn as literal text.
-        The full interactions live in the{' '}
-        <Link href="/demo" className="underline">
-          native widget demos
-        </Link>
-        ; this page shows the honest portable projection. Mapped kinds today:{' '}
+        The columns are deliberately different — that difference is the exhibit. The native widget
+        has its full mechanics; the projection is what survives translation into a catalog any
+        A2UI renderer can draw: no tap-to-flip (the basic catalog models no local state), markdown
+        as literal text, front and back stacked in the open. What the projection buys is
+        portability; what it costs is shown, not hidden. Mapped kinds today:{' '}
         {A2UI_SUPPORTED_KINDS.join(', ')}.
       </p>
 
@@ -66,12 +65,12 @@ export default function A2UIDemoPage() {
             <h2 className="mb-1 text-lg font-medium">{name}</h2>
             <p className="mb-3 text-sm text-muted-foreground">
               <Link href={`/demo/${String(spec.kind)}`} className="underline">
-                native rendering of this kind →
+                full demo of this kind →
               </Link>
             </p>
             {surface ? (
               <>
-                <A2UISurfaceDemo surface={surface} />
+                <A2UIComparison spec={spec} surface={surface} />
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm text-muted-foreground">
                     widget spec (input)

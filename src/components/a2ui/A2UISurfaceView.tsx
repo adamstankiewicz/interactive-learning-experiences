@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { A2UIComponent, A2UISurfaceMessage } from '@/lib/a2learn/a2ui';
 
@@ -57,14 +57,9 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
       case 'Divider':
         return <hr key={id} className="border-border" />;
       case 'Image':
+        // The catalog's accessibility field is `description`, not `alt`.
         return (
-          // eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL from a surface; next/image needs configured hosts
-          <img
-            key={id}
-            src={String(component.url ?? '')}
-            alt={String(component.alt ?? '')}
-            className="max-w-full rounded-md"
-          />
+          <SurfaceImage key={id} url={String(component.url ?? '')} alt={String(component.description ?? '')} />
         );
       case 'Button':
         return (
@@ -97,6 +92,29 @@ function childIds(component: A2UIComponent): string[] {
     for (const ref of component.children) if (typeof ref === 'string') ids.push(ref);
   }
   return ids;
+}
+
+/** A broken image collapses to nothing; the alt text is the honest fallback. */
+function SurfaceImage({ url, alt }: { url: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+  // An image that broke before hydration already fired its error event;
+  // onError alone would miss it, and the gap would render as silence.
+  useEffect(() => {
+    const img = ref.current;
+    if (img?.complete && img.naturalWidth === 0) setFailed(true);
+  }, []);
+  if (failed) {
+    return (
+      <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm italic text-muted-foreground">
+        🖼 image unavailable — {alt || 'no description provided'}
+      </p>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL from a surface; next/image needs configured hosts
+    <img ref={ref} src={url} alt={alt} className="max-w-full rounded-md" onError={() => setFailed(true)} />
+  );
 }
 
 function Gap({ label }: { label: string }) {
