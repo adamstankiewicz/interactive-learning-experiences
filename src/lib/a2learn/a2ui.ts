@@ -1,4 +1,4 @@
-import type { FlashcardSpec, MarkdownCardSpec, WidgetKind } from '@/lib/pathway/schema';
+import type { FlashcardSpec, MarkdownCardSpec, StepRevealSpec, WidgetKind } from '@/lib/pathway/schema';
 
 import { A2LEARN_EVENT_PREFIX } from '@/lib/a2learn/manifest';
 
@@ -15,7 +15,7 @@ import { A2LEARN_EVENT_PREFIX } from '@/lib/a2learn/manifest';
  * Coverage is deliberately incremental and honestly labeled: a kind is
  * supported when it has an entry in `MAPPERS` below — `A2UI_SUPPORTED_KINDS`
  * is derived from that map, so the list and the dispatch cannot drift, and
- * the conformance suite requires a fixture per supported kind. The first two
+ * the conformance suite requires a fixture per supported kind. The mapped
  * kinds are the reading shapes. Known fidelity limits, stated rather than
  * papered over: flashcard's flip becomes front/back Tabs — the reveal
  * survives as renderer-local tab switching, the animation does not — and a
@@ -43,8 +43,8 @@ export type A2UISurfaceMessage = {
 };
 
 /**
- * The completion action a surface's done button dispatches. Neither mapped
- * kind assesses (`assesses: false` on both registry entries), so the context
+ * The completion action a surface's done button dispatches. None of the
+ * mapped kinds assess (`assesses: false` on every one's registry entry), so the context
  * deliberately carries no `correct` claim — completion is not mastery, and
  * an A2UI consumer must not be told otherwise. When an assessing kind joins
  * this file, its action gains a verdict from real checking, gated on the
@@ -174,6 +174,35 @@ function flashcardSurface(spec: FlashcardSpec, surfaceId: string): A2UISurfaceMe
   return surface(surfaceId, spec.kind, components);
 }
 
+function stepRevealSurface(spec: StepRevealSpec, surfaceId: string): A2UISurfaceMessage {
+  // The reveal survives as navigation, not as gating: Tabs let a reader walk
+  // the steps in order or jump around, where the native widget enforces
+  // one-at-a-time disclosure. Sequence stays visible in the tab titles; the
+  // discipline does not survive projection, and that's stated, not hidden.
+  const tabs = spec.steps.map((step, i) => ({ title: step.title, child: `step-${i}-col` }));
+  const stepComponents: A2UIComponent[] = spec.steps.flatMap((step, i) => {
+    const children = [`step-${i}-body`];
+    const parts: A2UIComponent[] = [{ id: `step-${i}-body`, component: 'Text', text: step.body }];
+    if (step.why) {
+      children.push(`step-${i}-why`);
+      parts.push({ id: `step-${i}-why`, component: 'Text', text: `Why: ${step.why}`, variant: 'caption' });
+    }
+    parts.push({ id: `step-${i}-col`, component: 'Column', children });
+    return parts;
+  });
+
+  const components: A2UIComponent[] = [
+    { id: 'root', component: 'Column', children: ['prompt', 'steps-card', 'done'] },
+    { id: 'prompt', component: 'Text', text: spec.prompt },
+    { id: 'steps-card', component: 'Card', child: 'steps' },
+    { id: 'steps', component: 'Tabs', tabs },
+    ...stepComponents,
+    ...doneButton(spec.kind, 'Done'),
+  ];
+
+  return surface(surfaceId, spec.kind, components);
+}
+
 /**
  * The dispatch table IS the support list — `A2UI_SUPPORTED_KINDS` derives
  * from it, so claiming a kind without mapping it (or vice versa) is
@@ -182,6 +211,7 @@ function flashcardSurface(spec: FlashcardSpec, surfaceId: string): A2UISurfaceMe
 const MAPPERS: Partial<Record<WidgetKind, (spec: never, surfaceId: string) => A2UISurfaceMessage>> = {
   'markdown-card': markdownCardSurface,
   flashcard: flashcardSurface,
+  'step-reveal': stepRevealSurface,
 };
 
 export const A2UI_SUPPORTED_KINDS = Object.keys(MAPPERS) as WidgetKind[];
