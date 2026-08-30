@@ -105,6 +105,12 @@ function structuralProblems(message) {
     if (c.children && !Array.isArray(c.children) && typeof c.children === 'object') {
       if (typeof c.children.componentId === 'string') refs.push(c.children.componentId);
     }
+    // Tabs nest their child refs one level down: tabs[].child.
+    if (Array.isArray(c.tabs)) {
+      for (const tab of c.tabs) {
+        if (tab && typeof tab.child === 'string') refs.push(tab.child);
+      }
+    }
     for (const ref of refs) {
       if (!ids.has(ref)) problems.push(`${c.id} references missing component: ${ref}`);
     }
@@ -116,9 +122,15 @@ function structuralProblems(message) {
 // must all be reported, or layer 3 is a no-op wearing a checkmark.
 {
   const problems = structuralProblems({
-    createSurface: { components: [{ id: 'a', child: 'ghost' }, { id: 'a' }] },
+    createSurface: {
+      components: [
+        { id: 'a', child: 'ghost' },
+        { id: 'a' },
+        { id: 'b', tabs: [{ title: 'T', child: 'tab-ghost' }] },
+      ],
+    },
   });
-  const wants = ['duplicate component id', 'missing component', "no 'root'"];
+  const wants = ['duplicate component id', 'missing component: ghost', 'missing component: tab-ghost', "no 'root'"];
   if (!wants.every((w) => problems.some((p) => p.includes(w)))) {
     console.error(`✗ negative control: structural checker missed known defects (got: ${problems.join('; ') || 'nothing'})`);
     process.exit(1);
