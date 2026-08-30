@@ -62,7 +62,7 @@ describe('/api/mcp protocol surface', () => {
     expect(show._meta.ui.resourceUri).toMatch(/^ui:\/\//);
   });
 
-  it('takes audience, not a grade, and keeps the alias show_widget shipped with', async () => {
+  it('takes an audience hint, not a grade, and keeps the alias show_widget shipped with', async () => {
     const { json } = await rpc({ jsonrpc: '2.0', id: 21, method: 'tools/list' });
     const { result } = json;
     const props = (name: string) =>
@@ -70,9 +70,12 @@ describe('/api/mcp protocol surface', () => {
 
     // Segment-neutral by name: nothing in the surface presumes the learner
     // is in a grade, so a higher-ed or workplace deployment has an honest
-    // argument to pass instead of one that lies.
+    // argument to pass instead of one that lies. The `Hint` suffix is part
+    // of the contract too — `audience` stays reserved for the scheme-scoped,
+    // graph-verified field on emitted manifests.
     for (const name of ['show_widget', 'find_activity', 'build_pathway']) {
-      expect(props(name).audience?.type).toBe('string');
+      expect(props(name).audienceHint?.type).toBe('string');
+      expect(props(name)).not.toHaveProperty('audience');
     }
 
     // These two are new here, so they never carried the old name.
