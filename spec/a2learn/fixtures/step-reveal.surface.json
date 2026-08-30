@@ -9,7 +9,7 @@
         "component": "Column",
         "children": [
           "prompt",
-          "steps-card",
+          "steps",
           "done"
         ]
       },
@@ -19,27 +19,28 @@
         "text": "Let's compare 2/6 and 5/6 together, one step at a time."
       },
       {
-        "id": "steps-card",
-        "component": "Card",
-        "child": "steps"
+        "id": "steps",
+        "component": "List",
+        "direction": "horizontal",
+        "children": [
+          "step-0",
+          "step-1",
+          "step-2"
+        ]
       },
       {
-        "id": "steps",
-        "component": "Tabs",
-        "tabs": [
-          {
-            "title": "Step 1: Check the denominators",
-            "child": "step-0-col"
-          },
-          {
-            "title": "Step 2: Compare the numerators",
-            "child": "step-1-col"
-          },
-          {
-            "title": "Step 3: Write the comparison",
-            "child": "step-2-col"
-          }
-        ]
+        "id": "step-0",
+        "component": "Card",
+        "child": "step-0-col"
+      },
+      {
+        "id": "step-0-title",
+        "component": "Text",
+        "text": "Step 1: Check the denominators"
+      },
+      {
+        "id": "step-0-divider",
+        "component": "Divider"
       },
       {
         "id": "step-0-body",
@@ -56,9 +57,25 @@
         "id": "step-0-col",
         "component": "Column",
         "children": [
+          "step-0-title",
+          "step-0-divider",
           "step-0-body",
           "step-0-why"
         ]
+      },
+      {
+        "id": "step-1",
+        "component": "Card",
+        "child": "step-1-col"
+      },
+      {
+        "id": "step-1-title",
+        "component": "Text",
+        "text": "Step 2: Compare the numerators"
+      },
+      {
+        "id": "step-1-divider",
+        "component": "Divider"
       },
       {
         "id": "step-1-body",
@@ -69,8 +86,24 @@
         "id": "step-1-col",
         "component": "Column",
         "children": [
+          "step-1-title",
+          "step-1-divider",
           "step-1-body"
         ]
+      },
+      {
+        "id": "step-2",
+        "component": "Card",
+        "child": "step-2-col"
+      },
+      {
+        "id": "step-2-title",
+        "component": "Text",
+        "text": "Step 3: Write the comparison"
+      },
+      {
+        "id": "step-2-divider",
+        "component": "Divider"
       },
       {
         "id": "step-2-body",
@@ -87,6 +120,8 @@
         "id": "step-2-col",
         "component": "Column",
         "children": [
+          "step-2-title",
+          "step-2-divider",
           "step-2-body",
           "step-2-why"
         ]

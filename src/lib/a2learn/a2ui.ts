@@ -176,14 +176,20 @@ function flashcardSurface(spec: FlashcardSpec, surfaceId: string): A2UISurfaceMe
 }
 
 function stepRevealSurface(spec: StepRevealSpec, surfaceId: string): A2UISurfaceMessage {
-  // The reveal survives as navigation, not as gating: Tabs let a reader walk
-  // the steps in order or jump around, where the native widget enforces
-  // one-at-a-time disclosure. Sequence stays visible in the tab titles; the
-  // discipline does not survive projection, and that's stated, not hidden.
-  const tabs = spec.steps.map((step, i) => ({ title: step.title, child: `step-${i}-col` }));
+  // A walk-through is a sequence, and the catalog's word for a sequence is a
+  // horizontal List — one Card per step, paged by the renderer. What doesn't
+  // survive projection is the gating: a deck pages freely in both directions,
+  // where the native widget enforces one-at-a-time disclosure.
+  const stepIds = spec.steps.map((_, i) => `step-${i}`);
   const stepComponents: A2UIComponent[] = spec.steps.flatMap((step, i) => {
-    const children = [`step-${i}-body`];
-    const parts: A2UIComponent[] = [{ id: `step-${i}-body`, component: 'Text', text: step.body }];
+    const children = [`step-${i}-title`, `step-${i}-divider`, `step-${i}-body`];
+    const parts: A2UIComponent[] = [
+      { id: `step-${i}`, component: 'Card', child: `step-${i}-col` },
+      // Title verbatim — same rule as markdown-card: no added emphasis markers.
+      { id: `step-${i}-title`, component: 'Text', text: step.title },
+      { id: `step-${i}-divider`, component: 'Divider' },
+      { id: `step-${i}-body`, component: 'Text', text: step.body },
+    ];
     if (step.why) {
       children.push(`step-${i}-why`);
       parts.push({ id: `step-${i}-why`, component: 'Text', text: `Why: ${step.why}`, variant: 'caption' });
@@ -193,10 +199,9 @@ function stepRevealSurface(spec: StepRevealSpec, surfaceId: string): A2UISurface
   });
 
   const components: A2UIComponent[] = [
-    { id: 'root', component: 'Column', children: ['prompt', 'steps-card', 'done'] },
+    { id: 'root', component: 'Column', children: ['prompt', 'steps', 'done'] },
     { id: 'prompt', component: 'Text', text: spec.prompt },
-    { id: 'steps-card', component: 'Card', child: 'steps' },
-    { id: 'steps', component: 'Tabs', tabs },
+    { id: 'steps', component: 'List', direction: 'horizontal', children: stepIds },
     ...stepComponents,
     ...doneButton(spec.kind, 'Done'),
   ];
