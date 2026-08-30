@@ -22,6 +22,8 @@ import { A2LEARN_EVENT_PREFIX } from '@/lib/a2learn/manifest';
 
 type Props = {
   a2learnSurface: A2UISurfaceMessage;
+  /** Generic-primitives composition (a2learn:Sequence / a2learn:Reveal), when one exists. */
+  composition?: A2UISurfaceMessage | null;
   basicSurface: A2UISurfaceMessage;
 };
 
@@ -58,10 +60,10 @@ function A2LearnSurfaceView({
   );
 }
 
-export function A2UIComparison({ a2learnSurface, basicSurface }: Props) {
+export function A2UIComparison({ a2learnSurface, composition, basicSurface }: Props) {
   const [action, setAction] = useState<Record<string, unknown> | null>(null);
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className={`grid gap-6 lg:grid-cols-2 ${composition ? 'xl:grid-cols-3' : ''}`}>
       <div className="flex flex-col gap-4">
         <p className="text-sm font-medium text-muted-foreground">
           a2learn catalog (draft) — full fidelity, registry as renderer
@@ -69,6 +71,14 @@ export function A2UIComparison({ a2learnSurface, basicSurface }: Props) {
         <A2LearnSurfaceView surface={a2learnSurface} onAction={setAction} />
         <ActionLog action={action} />
       </div>
+      {composition && (
+        <div>
+          <p className="mb-2 text-sm font-medium text-muted-foreground">
+            a2learn primitives (draft) — behavior as data
+          </p>
+          <A2UISurfaceDemo surface={composition} />
+        </div>
+      )}
       <div>
         <p className="mb-2 text-sm font-medium text-muted-foreground">
           A2UI basic catalog — universal fallback

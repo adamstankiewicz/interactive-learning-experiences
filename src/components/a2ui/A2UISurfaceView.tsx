@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import type { A2UIComponent, A2UISurfaceMessage } from '@/lib/a2learn/a2ui';
+import type { SequencePolicy } from '@/lib/a2learn/primitives';
 
 /**
  * A renderer for the slice of the A2UI basic catalog the boundary mapper
@@ -165,6 +166,56 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
             {children()}
           </button>
         );
+      // --- a2learn interaction primitives (draft catalog = basic ∪ primitives) ---
+      case 'a2learn:Sequence': {
+        const policy = (component.policy ?? {}) as Partial<SequencePolicy>;
+        const items = childIds(component).map((childId) => ({
+          id: childId,
+          node: render(childId, path),
+        }));
+        const action = component.completeAction as Record<string, unknown> | undefined;
+        const finale = action ? { label: 'Done', onClick: () => onAction?.(action) } : undefined;
+        if (policy.disclosure === 'gated') {
+          return (
+            <GatedSequenceView
+              key={id}
+              items={items}
+              accumulate={policy.revealed !== 'replace'}
+              finale={finale}
+            />
+          );
+        }
+        return <DeckView key={id} items={items} finale={finale} />;
+      }
+      case 'a2learn:Reveal': {
+        const faces = (Array.isArray(component.faces) ? component.faces : []) as {
+          title?: unknown;
+          child?: unknown;
+        }[];
+        if (faces.length === 2) {
+          const pair = faces.map((tab) => ({
+            title: String(tab.title ?? ''),
+            child: typeof tab.child === 'string' ? tab.child : null,
+          }));
+          return (
+            <FlipCard
+              key={id}
+              faces={pair as [FlipFace, FlipFace]}
+              render={(childId) => render(childId, path)}
+            />
+          );
+        }
+        return (
+          <TabsView
+            key={id}
+            tabs={faces.map((tab) => ({
+              title: String(tab.title ?? ''),
+              child: typeof tab.child === 'string' ? tab.child : null,
+            }))}
+            render={(childId) => render(childId, path)}
+          />
+        );
+      }
       default:
         return <Gap key={id} label={`unrenderable component: ${component.component}`} />;
     }
@@ -300,6 +351,58 @@ function DeckView({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Sequence(disclosure: gated): items reveal one advance at a time —
+ * accumulate keeps passed items visible, replace shows only the newest.
+ * The advance past the last item is the completion, exactly the native
+ * step-reveal's discipline, driven here entirely by policy data.
+ */
+function GatedSequenceView({
+  items,
+  accumulate,
+  finale,
+}: {
+  items: { id: string; node: React.ReactNode }[];
+  accumulate: boolean;
+  finale?: { label: string; onClick: () => void };
+}) {
+  const [revealed, setRevealed] = useState(1);
+  const atEnd = revealed >= items.length;
+  const visible = accumulate ? items.slice(0, revealed) : items.slice(revealed - 1, revealed);
+  return (
+    <div className="flex flex-col gap-3">
+      {visible.map((item, i) => (
+        <motion.div
+          key={item.id}
+          initial={i === visible.length - 1 ? { y: 12, opacity: 0 } : false}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+        >
+          {item.node}
+        </motion.div>
+      ))}
+      {!atEnd ? (
+        <button
+          type="button"
+          onClick={() => setRevealed((n) => n + 1)}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+        >
+          Next →
+        </button>
+      ) : finale ? (
+        <button
+          type="button"
+          onClick={finale.onClick}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+        >
+          {finale.label}
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { A2UIComparison } from '@/components/a2ui/A2UIComparison';
 import { toA2UISurface, A2UI_SUPPORTED_KINDS } from '@/lib/a2learn/a2ui';
 import { toA2LearnSurface } from '@/lib/a2learn/catalog';
+import { toA2LearnComposition } from '@/lib/a2learn/primitives';
 
 /**
  * The A2UI boundary, functional: the same fixture specs the conformance
@@ -32,6 +33,7 @@ export default function A2UIDemoPage() {
     name,
     spec,
     a2learnSurface: toA2LearnSurface(spec, `demo-a2learn-${name}`),
+    composition: toA2LearnComposition(spec, `demo-composed-${name}`),
     surface: toA2UISurface(spec, `demo-${name}`),
   }));
 
@@ -53,20 +55,19 @@ export default function A2UIDemoPage() {
         catalog slice the mapper emits.
       </p>
       <p className="mb-8 text-sm text-muted-foreground">
-        Both columns are A2UI surfaces — the two tiers of the same spec. The first is the a2learn
-        catalog (draft): its component is the widget kind itself, the registry is the renderer, so
-        it is the exact native experience — flip animation, completion reporting, the same loop
-        the MCP Apps shell speaks. The second is the basic-catalog projection any A2UI renderer
-        can draw — and presentation is the renderer&apos;s half of the protocol, so this
-        one draws it in the app&apos;s own design language: the deck pages horizontally, a tab
-        switch turns the card over. What stays behind in the projection is semantics the catalog
-        cannot carry — per-card progress, checked completion, links and images in text — and that gap
-        is what the versioned a2learn catalog (#98) closes for hosts beyond this app.
+        Every column is an A2UI surface — the same spec at three tiers of the a2learn catalog
+        story. Full fidelity: the widget kind as one component, the registry as renderer — the
+        exact native experience. Generic primitives (where composed): behavior as data —
+        a2learn:Sequence with a traversal policy (linear or free, gated or all, accumulate or
+        replace) and a2learn:Reveal with faces — so new activity shapes compose at generation
+        time from existing words, no new component code. Universal fallback: the basic catalog
+        any A2UI renderer draws. Gating survives at the primitives tier and not below; per-card
+        checking survives only at the top — each tier states what it keeps.
         Basic-mapped kinds today: {A2UI_SUPPORTED_KINDS.join(', ')}.
       </p>
 
       <div className="flex flex-col gap-10">
-        {pairs.map(({ name, spec, a2learnSurface, surface }) => (
+        {pairs.map(({ name, spec, a2learnSurface, composition, surface }) => (
           <section key={name}>
             <h2 className="mb-1 text-lg font-medium">{name}</h2>
             <p className="mb-3 text-sm text-muted-foreground">
@@ -76,7 +77,11 @@ export default function A2UIDemoPage() {
             </p>
             {surface && a2learnSurface ? (
               <>
-                <A2UIComparison a2learnSurface={a2learnSurface} basicSurface={surface} />
+                <A2UIComparison
+                  a2learnSurface={a2learnSurface}
+                  composition={composition}
+                  basicSurface={surface}
+                />
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm text-muted-foreground">
                     widget spec (input)
@@ -93,6 +98,16 @@ export default function A2UIDemoPage() {
                     {JSON.stringify(a2learnSurface, null, 2)}
                   </pre>
                 </details>
+                {composition && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-sm text-muted-foreground">
+                      primitives createSurface message (generic composition)
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto rounded-md bg-muted/40 p-3 text-xs">
+                      {JSON.stringify(composition, null, 2)}
+                    </pre>
+                  </details>
+                )}
                 <details className="mt-2">
                   <summary className="cursor-pointer text-sm text-muted-foreground">
                     basic-catalog createSurface message (fallback)
