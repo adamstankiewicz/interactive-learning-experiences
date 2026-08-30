@@ -18,9 +18,10 @@ import { A2LEARN_EVENT_PREFIX } from '@/lib/a2learn/manifest';
  * the conformance suite requires a fixture per supported kind. The mapped
  * kinds are the reading shapes. Known fidelity limits, stated rather than
  * papered over: flashcard's flip becomes front/back Tabs — the reveal
- * survives as renderer-local tab switching, the animation does not — and a
- * markdown body using links or tables renders them as literal Markdown in
- * strict renderers (the catalog's `Text` scopes itself to simple Markdown).
+ * survives as renderer-local tab switching, the animation does not — and
+ * the catalog's `Text` scopes itself to simple Markdown without HTML,
+ * links, or images, so a body leaning on those loses them in any
+ * spec-faithful renderer.
  * Full mechanics for every kind is the a2learn catalog's job (#98), not
  * this projection's. The durable home for this mapping is an optional field on the
  * widget registry entry — tracked with the registry-owned-semantics

@@ -60,7 +60,7 @@ export default function A2UIDemoPage() {
         can draw — and presentation is the renderer&apos;s half of the protocol, so this
         one draws it in the app&apos;s own design language: the deck pages horizontally, a tab
         switch turns the card over. What stays behind in the projection is semantics the catalog
-        cannot carry — per-card progress, checked completion, markdown formatting — and that gap
+        cannot carry — per-card progress, checked completion, links and images in text — and that gap
         is what the versioned a2learn catalog (#98) closes for hosts beyond this app.
         Basic-mapped kinds today: {A2UI_SUPPORTED_KINDS.join(', ')}.
       </p>

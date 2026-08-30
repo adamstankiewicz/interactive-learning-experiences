@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import type { A2UIComponent, A2UISurfaceMessage } from '@/lib/a2learn/a2ui';
 
@@ -16,10 +18,10 @@ import type { A2UIComponent, A2UISurfaceMessage } from '@/lib/a2learn/a2ui';
  * Presentation is the renderer's job — that's A2UI's core split: the
  * surface carries semantics, the host draws them in its own design
  * language. So this renderer animates tab switches, styles cards like the
- * app's cards, and pages horizontal lists like a deck. What it never does
- * is exceed the semantics: Text draws its string as plain text (a markdown
- * body shows literal `**` marks — the mapper documents exactly that), and
- * no component gains state the surface didn't model.
+ * app's cards, pages horizontal lists like a deck, and renders Text's
+ * simple-Markdown scope the way the catalog defines it (no HTML, links and
+ * images unwrapped to their text). What it never does is exceed the
+ * semantics: no component gains state the surface didn't model.
  */
 
 type Props = {
@@ -104,10 +106,28 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
       }
       case 'Text': {
         const caption = component.variant === 'caption';
+        // The catalog's Text supports "simple Markdown formatting (without
+        // HTML, images, or links)" — so render exactly that: GFM emphasis,
+        // lists and headings; raw HTML ignored, links and images unwrapped
+        // to their text. Drawing literal ** marks would under-render the
+        // spec, not respect it.
         return (
-          <p key={id} className={caption ? 'text-sm text-muted-foreground' : 'text-base'}>
-            {String(component.text ?? '')}
-          </p>
+          <div
+            key={id}
+            className={
+              caption
+                ? 'text-sm text-muted-foreground [&_p]:leading-relaxed'
+                : 'flex flex-col gap-2 text-base [&_li]:leading-relaxed [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5'
+            }
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              disallowedElements={['a', 'img']}
+              unwrapDisallowed
+            >
+              {String(component.text ?? '')}
+            </ReactMarkdown>
+          </div>
         );
       }
       case 'Divider':
