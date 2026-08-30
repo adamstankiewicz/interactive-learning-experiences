@@ -1,6 +1,6 @@
 # a2learn — draft v0 (experimental)
 
-**a2learn** ("agent-to-learning") is a specification for **agent-generated,
+**a2learn** ("agent-to-learning") is a document format for **agent-generated,
 agent-discoverable interactive learning activities**. It defines *data*, not
 wire behavior: what a learning activity **is** (its surface), how it is
 **described for discovery** (its manifest), and what its **interactions
@@ -13,9 +13,10 @@ from specifications that already exist and already have hosts:
 | Agent ↔ UI transport | [AG-UI](https://github.com/ag-ui-protocol/ag-ui) | a2learn payloads ride AG-UI events unchanged |
 | Distribution into chat hosts | [MCP Apps](https://modelcontextprotocol.io) | activities are invokable MCP tools; surfaces render in MCP Apps iframes |
 
-This is a deliberate scope choice: **a2learn is a spec, not a protocol.** New
-protocols require every host to implement wire behavior; formats spread by
-emit-and-validate. The one part with protocol flavor — the event vocabulary —
+This is a deliberate scope choice: **a2learn is a format, not a protocol** —
+and we say *format*, not *specification*, on purpose: it earns the second
+word when a second independent implementation exists. New protocols require
+every host to implement wire behavior; formats spread by emit-and-validate. The one part with protocol flavor — the event vocabulary —
 is specified as payload shapes with *bindings* to AG-UI and MCP, never as a
 new wire protocol.
 
@@ -51,7 +52,7 @@ informative. Conformance is always claimed against a class in
   are open data; new component *kinds* are code and travel a separate,
   curated channel.)
 - **Generation-shaped.** Structured output reliably fails on nested unions
-  and wide flat objects. The spec's wire shapes may be rich; *authoring*
+  and wide flat objects. The format's wire shapes may be rich; *authoring*
   representations stay flat, with mapping at the boundary. References are
   plain strings (`bindTo`), never expression languages.
 - **Standards-anchored, verifiably.** Manifest alignment claims name their
@@ -64,10 +65,10 @@ informative. Conformance is always claimed against a class in
 ## Status
 
 Draft v0, reference-implementation-led: this repository is the reference
-implementation, and the spec documents what ships (or is explicitly marked
+implementation, and the format documents what ships (or is explicitly marked
 **Planned**). Breaking changes are allowed and changelogged throughout 0.x.
-The spec formalizes reality, never aspiration — see the format-strategy
-lesson: implementation first (Jupyter, glTF, Markdown), spec-first is how
+The format formalizes reality, never aspiration — see the format-strategy
+lesson: implementation first (Jupyter, glTF, Markdown), standards-first is how
 formats fragment (QTI).
 
 Each section is tagged with an implementation status:

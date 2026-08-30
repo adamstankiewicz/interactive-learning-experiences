@@ -11,7 +11,7 @@ documents on purpose — most interaction never leaves the client.
   the renderer at zero latency and zero tokens. They are never events.
 - **Event tier** — pedagogy-changing moments reach the agent: a result was
   produced, help was requested, an author steered. Only these payloads
-  exist in this spec.
+  exist in this format.
 
 A conforming host MUST NOT forward local-tier interaction to a model by
 default; chatty surfaces would otherwise be a cost and privacy hazard.

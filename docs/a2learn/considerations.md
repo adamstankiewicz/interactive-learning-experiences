@@ -1,6 +1,6 @@
 # a2learn — security, privacy, and accessibility considerations (draft v0)
 
-Informative unless marked with RFC 2119 keywords. This spec targets
+Informative unless marked with RFC 2119 keywords. This format targets
 learners who are often children; these sections are not boilerplate.
 
 ## Security considerations
@@ -35,7 +35,7 @@ content-tier activities.
 **A `WidgetResult` stream is an education record.** Aggregated results and
 data-model snapshots constitute student performance data; deployments in
 US K-12 contexts inherit FERPA/COPPA-shaped obligations, and equivalents
-elsewhere. The spec's division of responsibility:
+elsewhere. The format's division of responsibility:
 
 - **Manifests and surfaces MUST NOT contain learner data.** Content and
   people never travel in the same artifact; registries index only content.

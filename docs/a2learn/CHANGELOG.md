@@ -1,11 +1,11 @@
-# a2learn spec changelog
+# a2learn format changelog
 
 Breaking changes are allowed throughout v0 and are recorded here. Entries
 say what changed *and what an implementer must do about it*.
 
 ## v0 draft — 2026-08-21
 
-Initial draft: README (scope: a spec riding AG-UI/A2UI/MCP, not a
+Initial draft: README (scope: a format riding AG-UI/A2UI/MCP, not a
 protocol), `surface.md` (A2UI profile: flat components, `bindTo`
 references, `WidgetResult` contract, namespaced `a2learn` extensions),
 `manifest.md` (discovery/listing format: verified standards alignment,

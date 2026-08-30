@@ -25,7 +25,7 @@ an exporter.
 - MUST NOT mark a standards claim `verified: true` unless the code resolved
   against the named source.
 - SHOULD keep authoring-side generation shapes flat (see README design
-  principles); the wire shape is what this spec governs.
+  principles); the wire shape is what this format governs.
 
 ### Renderer
 
@@ -88,12 +88,12 @@ higher version.
 Third parties MAY add fields under their own namespace prefix (`x-` or a
 reverse-DNS key). Producers and registries MUST preserve such fields;
 renderers MUST ignore the ones they do not understand. The `a2learn`
-namespace itself is reserved for this specification.
+namespace itself is reserved for this formatification.
 
 ## Path to 1.0
 
 v1.0 is gated on: at least **two independent implementations** of the
 Renderer class, machine-readable schemas plus a conformance fixture suite,
-and a window of **two months without breaking changes**. The spec
+and a window of **two months without breaking changes**. The format
 formalizes what implementations ship — a requirement no implementation
 exercises is a candidate for removal before 1.0, not a reason to build.
