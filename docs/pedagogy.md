@@ -56,6 +56,52 @@ and assignment freezes the reviewed instance. The literature on generative
 content in classrooms is unambiguous that expert review is required; here
 it is architectural, not optional.
 
+## Where this sits relative to project-based learning
+
+This is a deliberate-practice layer, not a project platform. Gold-standard
+project-based learning — sustained inquiry, authentic public products,
+critique and revision over weeks — needs multi-session artifacts,
+collaboration, and rubric judgment of open-ended work, none of which this
+server pretends to provide. The relationship is complementary, and it is
+the one the research demands: the standing critique of project-based
+learning (Kirschner, Sweller & Clark on minimally guided instruction) is
+that projects fail novices when underlying skills aren't explicitly
+scaffolded, and PBL's own gold-standard rubrics list embedded scaffolding
+as required. That scaffold is what this project is: just-in-time skill
+practice a project — or the agent supporting it — can call mid-stream,
+with evidence of the doing coming back. A few kinds already lean
+constructive (the writing workshop's critique-and-revision cycle, the
+debate), proof the registry can hold production, not just recognition.
+Claiming "PBL support" beyond that would violate the labels-are-earned
+rule, so we don't.
+
+## Cautions we take from the critical literature
+
+Justin Reich's *Failure to Disrupt* is the pre-mortem this project designs
+against, and three of its warnings are load-bearing here:
+
+- **The trap of routine assessment.** Software gravitates toward what is
+  easy to assess, and a typed evidence contract could become a drill
+  machine. The design pushes back — open-ended kinds carry no false
+  verdicts (`correct: null` is a first-class value), generation includes
+  constructive tasks, and human review is structural — but the limit is
+  real: the most valuable learning stays ill-structured and human-judged,
+  and this contract measures the part that can be measured, not the whole.
+- **The EdTech Matthew effect.** Free tools disproportionately reach the
+  already-advantaged. "Free and self-hostable" is an equity *precondition*,
+  not an equity strategy; reaching under-resourced settings is distribution
+  work through the institutions that serve them, and the roadmap treats it
+  that way.
+- **The pedagogy of poverty.** Registries don't decide which students get
+  the drill kinds and which get the constructive ones — deployments do. We
+  can name the risk, ship both halves of the registry, and surface usage
+  honestly in reports; we cannot engineer the risk away, and won't claim
+  to.
+
+The same lab's open-source practice simulations for teachers (Teacher
+Moments) are a kindred project: the practice-loop idea, aimed at teacher
+learning — a reminder that "the student" in this loop need not be a child.
+
 ## Where deeper grounding lands next
 
 These are roadmap commitments, listed so the direction is inspectable:
