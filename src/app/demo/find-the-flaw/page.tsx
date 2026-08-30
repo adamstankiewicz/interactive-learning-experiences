@@ -151,7 +151,7 @@ export default function FindTheFlawDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Find the Flaw</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Find the flaw</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           A worked example with one mistake in it. Find where it goes wrong, then say why — the same
           interaction whether the work is a calculation, an experiment, an argument or an explanation.

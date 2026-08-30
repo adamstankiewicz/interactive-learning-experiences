@@ -167,7 +167,7 @@ export default function DraftMeterDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Draft Meter</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Draft meter</h1>
         <p className="mt-2 text-muted-foreground">
           Question, textbox, one line. Same component and same scoring call in all four of these —
           what changes is the three things each one is looking for, and those come from the standard.

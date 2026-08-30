@@ -83,7 +83,7 @@ export default function SwiperFlashcardDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Swiper Flashcard</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Swiper flashcard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Sort each clue into the correct plate boundary type. Drag the card up or down — or use the buttons. An{' '}
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">onComplete</code>{' '}

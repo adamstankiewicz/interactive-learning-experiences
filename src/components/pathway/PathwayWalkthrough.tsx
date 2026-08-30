@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import Link from 'next/link';
+import { motion } from 'motion/react';
 
+import { ActivityFrame } from '@/components/pathway/ActivityFrame';
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { WidgetTelemetryProvider } from '@/components/widgets/telemetry-context';
 import { useTelemetry, type RemediationPayload } from '@/hooks/useTelemetry';
@@ -58,6 +60,13 @@ const ALWAYS_ENABLED = new Set([
 function widgetKindOf(widget: unknown): string | null {
   return widget && typeof widget === 'object' && 'kind' in widget && typeof widget.kind === 'string'
     ? widget.kind
+    : null;
+}
+
+/** An injected remediation widget carries its own "Let's revisit: …" title. */
+function widgetTitleOf(widget: unknown): string | null {
+  return widget && typeof widget === 'object' && 'title' in widget && typeof widget.title === 'string'
+    ? widget.title
     : null;
 }
 
@@ -150,9 +159,26 @@ export function PathwayWalkthrough({
   // Total step count = original steps + one per injected widget.
   const totalSteps = session.steps.length + Object.keys(injectedWidgets).length;
 
+  // Absolute-index helpers over the injected slots — the same mapping the
+  // progress bar does inline, shared with the activity frame's header.
+  const injectedIndexList = Object.keys(injectedWidgets).map(Number).sort((a, b) => a - b);
+  const isInjectedStep = (index: number) => injectedIndexList.includes(index);
+  const originalStepIndex = (index: number) =>
+    index - injectedIndexList.filter((i) => i < index).length;
+
+  // Same ref idiom as currentStepRef: advanceStep runs from event handlers,
+  // so reading the latest injected slots through a ref keeps its identity
+  // stable without depending on a per-render derived array.
+  const injectedIndexRef = useRef(injectedIndexList);
+  useEffect(() => { injectedIndexRef.current = injectedIndexList; });
+
   const advanceStep = useCallback(() => {
     setViewingStep(null);
-    setStars((n) => n + 1);
+    // Injected remediation steps cost no star (design 1g) — help, not a
+    // penalty, and the star total still matches the pathway's own length.
+    if (!injectedIndexRef.current.includes(currentStepRef.current)) {
+      setStars((n) => n + 1);
+    }
     telemetry.flush();
     setCurrentStep((n) => {
       const next = n + 1;
@@ -200,30 +226,116 @@ export function PathwayWalkthrough({
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
-      <div className="flex w-full items-center justify-between">
-        <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 text-xs font-bold text-violet-600">
-          {session.standardCode ?? '✨ exploring'}
-        </span>
-        <div className="flex items-center gap-2">
-          <a
-            href="/games"
-            className="rounded-full border-2 border-pink-200 bg-white/80 px-3 py-1 text-xs font-bold text-pink-600 hover:bg-pink-50 transition-colors"
+      {/* Design 1g header: three things only — a 30px circular exit, one
+          continuous 14px progress bar, and the star count. State, topic, and
+          the standard live in the quiet line beneath. */}
+      <div className="flex w-full items-center gap-3">
+        <Link
+          href="/learn"
+          aria-label="Exit pathway"
+          className="flex size-[30px] shrink-0 items-center justify-center rounded-full border border-foreground bg-card text-sm font-bold text-foreground transition-colors hover:bg-sunk"
+        >
+          ✕
+        </Link>
+        {totalSteps > 1 ? (
+          <div
+            className="relative h-3.5 min-w-0 flex-1 overflow-hidden rounded-full border border-border bg-track"
+            role="progressbar"
+            aria-valuenow={currentStep}
+            aria-valuemin={0}
+            aria-valuemax={totalSteps}
+            aria-label={`Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
           >
-            🎮 Take a break
-          </a>
-          <span className="flex items-center gap-1 rounded-full border-2 border-amber-200 bg-white/80 px-4 py-1">
             <motion.span
-              key={stars}
-              initial={{ scale: 1.8, rotate: -20 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-              className="text-xl"
-            >
-              ⭐
-            </motion.span>
-            <span className="text-lg font-black text-amber-600">{stars}</span>
-          </span>
-        </div>
+              className="absolute inset-y-0 left-0 border-r border-foreground bg-brand-fill"
+              initial={false}
+              animate={{ width: `${(Math.min(currentStep, totalSteps) / totalSteps) * 100}%` }}
+              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+            />
+            {injectedIndexList.map((index) => (
+              <span
+                key={`notch-${index}`}
+                aria-hidden="true"
+                className={`absolute inset-y-0 w-1 bg-brand-press ${index === lastInjectedAt ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+                style={{ left: `${(index / totalSteps) * 100}%` }}
+              />
+            ))}
+            {/* Invisible per-step buttons keep tap-to-review under the
+                continuous bar. */}
+            <span className="absolute inset-0 flex">
+              {Array.from({ length: totalSteps }, (_, index) => {
+                const isDone = index < currentStep;
+                const isCurrent = index === currentStep;
+                const isViewing = index === viewingStep;
+                const stepTitle = isInjectedStep(index)
+                  ? 'Extra practice'
+                  : (session.steps[originalStepIndex(index)]?.title ?? `Activity ${index + 1}`);
+                return (
+                  <button
+                    key={`step-${index}-of-${totalSteps}`}
+                    type="button"
+                    title={isDone || isCurrent ? stepTitle : undefined}
+                    aria-label={isDone ? `Review: ${stepTitle}` : stepTitle}
+                    disabled={finished || (!isDone && !isCurrent)}
+                    onClick={
+                      isDone ? () => setViewingStep(isViewing ? null : index)
+                      : isCurrent ? () => setViewingStep(null)
+                      : undefined
+                    }
+                    className={`h-full min-w-0 flex-1 ${!finished && (isDone || isCurrent) ? 'cursor-pointer' : 'cursor-default'} ${isViewing ? 'bg-verified/30' : 'bg-transparent'}`}
+                  />
+                );
+              })}
+            </span>
+          </div>
+        ) : (
+          <span className="min-w-0 flex-1" aria-hidden="true" />
+        )}
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-foreground bg-card py-1 pr-3.5 pl-1.5">
+          <motion.span
+            key={stars}
+            initial={{ scale: 1.6, rotate: -16 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+            className="flex size-6 items-center justify-center rounded-full border border-foreground bg-brand-fill text-sm text-foreground motion-reduce:transition-none"
+            aria-hidden="true"
+          >
+            ★
+          </motion.span>
+          <span className="font-heading text-lg font-black tabular-nums">{stars}</span>
+        </span>
+      </div>
+
+      {/* The quiet line: state on the left; topic, standard, and the break
+          link on the right. */}
+      <div className="-mt-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="text-xs text-muted-foreground">
+          {finished
+            ? 'All done'
+            : isReviewing
+              ? 'Looking back at a finished activity'
+              : isInjectedStep(currentStep)
+                ? 'Just added · extra practice'
+                : `Activity ${Math.min(currentStep + 1, totalSteps)} of ${totalSteps}`}
+        </span>
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="max-w-56 truncate text-xs text-muted-foreground">{session.topic}</span>
+          {session.standardCode ? (
+            <span className="rounded-full border border-verified-edge bg-verified-tint px-2 py-px font-mono text-[10px] font-semibold text-verified">
+              ✓ {session.standardCode}
+            </span>
+          ) : (
+            <span className="rounded-full border border-warning-edge bg-warning-tint px-2 py-px font-mono text-[10px] font-semibold text-warning">
+              Exploring
+            </span>
+          )}
+          <Link
+            href="/games"
+            className="text-xs font-bold text-ink-2 underline-offset-2 transition-colors hover:text-foreground hover:underline"
+          >
+            Take a break
+          </Link>
+        </span>
       </div>
 
       {!finished && (
@@ -235,135 +347,83 @@ export function PathwayWalkthrough({
         >
           <p className="text-center text-xl font-black text-balance">{session.bigIdea}</p>
 
-          {totalSteps > 1 && (
-            <div className="flex w-full items-center gap-1.5 py-1" role="progressbar" aria-valuenow={currentStep} aria-valuemax={totalSteps}>
-              <AnimatePresence initial={false}>
-                {Array.from({ length: totalSteps }, (_, index) => {
-                  const isDone = index < currentStep;
-                  const isCurrent = index === currentStep;
-                  const isViewing = index === viewingStep;
-                  const isNewlyInjected = index === lastInjectedAt;
-                  // Map the absolute index back to an original step title, accounting
-                  // for injected slots shifting the originals forward.
-                  const injectedIndices = Object.keys(injectedWidgets).map(Number).sort((a, b) => a - b);
-                  const originalIndex = index - injectedIndices.filter((i) => i < index).length;
-                  const isInjected = injectedIndices.includes(index);
-                  const stepTitle = isInjected
-                    ? 'Extra practice'
-                    : (session.steps[originalIndex]?.title ?? `Activity ${index + 1}`);
-                  const tooltipText = (isDone || isCurrent) ? stepTitle : null;
-                  return (
-                    <div key={`step-${index}-of-${totalSteps}`} className="group relative min-w-0 flex-1 flex flex-col items-center">
-                      {tooltipText && (
-                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900/90 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-10">
-                          {tooltipText}
-                        </div>
-                      )}
-                    <motion.button
-                      type="button"
-                      aria-label={isDone ? `Review activity ${index + 1}` : `Activity ${index + 1}`}
-                      disabled={!isDone && !isCurrent}
-                      onClick={
-                        isDone ? () => setViewingStep(isViewing ? null : index)
-                        : isCurrent ? () => setViewingStep(null)
-                        : undefined
-                      }
-                      // Entry: new segments pop in from scale 0
-                      initial={{ scaleX: 0, opacity: 0 }}
-                      animate={{
-                        scaleX: 1,
-                        opacity: 1,
-                        // Newly injected segment gets an attention pulse
-                        scale: isNewlyInjected ? [1, 1.15, 0.95, 1.05, 1] : 1,
-                      }}
-                      transition={isNewlyInjected
-                        ? { duration: 0.5, ease: 'easeOut', scale: { duration: 0.6, delay: 0.15 } }
-                        : { type: 'spring', stiffness: 400, damping: 30 }
-                      }
-                      className={[
-                        'relative w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400',
-                        isViewing
-                          ? 'h-3 bg-emerald-400/70 shadow-[0_0_0_3px_rgba(52,211,153,0.6)] cursor-pointer'
-                          : isCurrent
-                            ? isReviewing
-                              ? 'h-3 bg-violet-400 cursor-pointer'
-                              : 'h-3 bg-violet-400 shadow-[0_0_0_3px_rgba(139,92,246,0.5)] cursor-pointer'
-                            : isDone
-                              ? 'h-3 bg-emerald-400/70 cursor-pointer hover:bg-emerald-400'
-                              : 'h-3 bg-white/25 cursor-default',
-                        '',
-                        'transition-[height,background-color] duration-300',
-                      ].join(' ')}
-                    >
-                      {/* Completion sweep — fills left-to-right when a step is done */}
-                      {isDone && !isViewing && (
-                        <motion.span
-                          className="absolute inset-0 rounded-full bg-emerald-400/70 origin-left"
-                          initial={{ scaleX: 0 }}
-                          animate={{ scaleX: 1 }}
-                          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-                        />
-                      )}
-                      {/* Dot on whichever step is currently displayed */}
-                      {index === displayStep && (
-                        <motion.span
-                          key={displayStep}
-                          className="absolute inset-0 flex items-center justify-center"
-                          initial={{ opacity: 0, scale: 0.4 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-                        >
-                          <span className={`h-2 w-2 rounded-full ${isViewing ? 'bg-emerald-500' : 'bg-violet-500'}`} />
-                        </motion.span>
-                      )}
-                    </motion.button>
-                    </div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          )}
-
           {isReviewing && (
             <button
               type="button"
               onClick={() => setViewingStep(null)}
-              className="self-start rounded-xl border-2 border-violet-200 bg-white/80 px-3 py-1 text-sm font-bold text-violet-600 hover:bg-violet-50"
+              className="self-start rounded-xl border border-border bg-card px-3 py-1 text-sm font-bold text-ink-2 hover:border-foreground hover:text-foreground"
             >
               ← Back to current
             </button>
           )}
 
           {currentWidget ? (
-            <div className={`w-full rounded-3xl border-4 bg-white/80 p-4 ${isReviewing ? 'border-emerald-200 opacity-90' : 'border-violet-200'}`}>
-              <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode} stepIndex={currentStep}>
-                <WidgetRenderer
-                  key={displayStep}
-                  spec={currentWidget}
-                  onComplete={
-                    isReviewing ? undefined
-                    : HAS_OWN_CTA.has(currentKind ?? '') ? advanceStep
-                    : markWidgetDone
-                  }
-                />
-              </WidgetTelemetryProvider>
+            <div className="w-full">
+              <ActivityFrame
+                kind={currentKind ?? 'activity'}
+                title={
+                  isInjectedStep(displayStep)
+                    ? (widgetTitleOf(currentWidget) ?? 'Extra practice')
+                    : (session.steps[originalStepIndex(displayStep)]?.title ?? `Activity ${displayStep + 1}`)
+                }
+                state={
+                  isReviewing ? (
+                    <span className="shrink-0 rounded-full border border-verified-edge bg-verified-tint px-2 py-px font-mono text-[10px] uppercase tracking-[0.12em] text-verified">
+                      ✓ done
+                    </span>
+                  ) : isInjectedStep(displayStep) ? (
+                    <span className="shrink-0 rounded-full border border-foreground bg-brand-fill px-2 py-px font-mono text-[10px] uppercase tracking-[0.12em] text-foreground">
+                      just added
+                    </span>
+                  ) : undefined
+                }
+              >
+                <WidgetTelemetryProvider telemetry={telemetry} standardCode={session.standardCode} stepIndex={currentStep}>
+                  <WidgetRenderer
+                    key={displayStep}
+                    spec={currentWidget}
+                    onComplete={
+                      isReviewing ? undefined
+                      : HAS_OWN_CTA.has(currentKind ?? '') ? advanceStep
+                      : markWidgetDone
+                    }
+                  />
+                </WidgetTelemetryProvider>
+              </ActivityFrame>
+
+              {!isReviewing && isInjectedStep(displayStep) && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  This one doesn&rsquo;t cost you a star. Your pathway is waiting
+                  exactly where you left it.
+                </p>
+              )}
 
               {/* External button for widgets that fire onComplete silently (no internal CTA),
-                  and for the three widgets that never fire onComplete at all. */}
+                  and for the three widgets that never fire onComplete at all. The reason a
+                  button is live or waiting is stated, not implied. */}
               {!isReviewing && !HAS_OWN_CTA.has(currentKind ?? '') && (
-                <button
-                  type="button"
-                  onClick={advanceStep}
-                  disabled={!widgetDone && !ALWAYS_ENABLED.has(currentKind ?? '')}
-                  className="mt-4 w-full rounded-2xl bg-emerald-500 py-3 font-black text-white shadow-[0_5px_0_0_#047857] transition-opacity active:translate-y-1 active:shadow-[0_2px_0_0_#047857] disabled:opacity-30 disabled:shadow-[0_5px_0_0_#047857] disabled:active:translate-y-0"
-                >
-                  {currentStep + 1 === totalSteps ? "I'm done! 🎉" : 'Next activity →'}
-                </button>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={advanceStep}
+                    disabled={!widgetDone && !ALWAYS_ENABLED.has(currentKind ?? '')}
+                    className="w-full rounded-2xl border border-foreground bg-brand-fill py-3 font-heading font-black text-foreground shadow-[0_5px_0_0_var(--brand-press)] transition-all hover:bg-brand-fill-hover active:translate-y-[2px] active:shadow-[0_2px_0_0_var(--brand-press)] disabled:opacity-40 disabled:shadow-[0_5px_0_0_var(--brand-press)] disabled:active:translate-y-0 motion-reduce:transition-none"
+                  >
+                    {currentStep + 1 === totalSteps ? "I'm done!" : 'Next activity →'}
+                  </button>
+                  <p className="mt-1.5 text-center text-xs text-muted-foreground">
+                    {ALWAYS_ENABLED.has(currentKind ?? '')
+                      ? 'No finish line on this one — move on whenever you want.'
+                      : widgetDone
+                        ? 'Nice — ready when you are.'
+                        : 'Finish the activity to keep going.'}
+                  </p>
+                </div>
               )}
             </div>
           ) : (
-            <p className="rounded-2xl border-4 border-violet-200 bg-white/80 p-4 text-center font-bold text-violet-500">
-              ✨ Building this activity…
+            <p className="w-full rounded-2xl border border-dashed border-border bg-card p-4 text-center font-bold text-muted-foreground">
+              Building this activity…
             </p>
           )}
         </motion.div>
@@ -376,8 +436,13 @@ export function PathwayWalkthrough({
           transition={{ type: 'spring', stiffness: 280, damping: 26 }}
           className="flex w-full flex-col items-center gap-5"
         >
-          <p className="text-center text-4xl">🎉</p>
-          <p className="text-center text-xl font-black text-balance">
+          <p
+            className="flex size-14 items-center justify-center rounded-full border border-foreground bg-brand-fill text-2xl text-foreground"
+            aria-hidden="true"
+          >
+            ★
+          </p>
+          <p className="text-center font-heading text-xl font-black text-balance">
             All done — {totalSteps} activities, {stars} stars!
           </p>
 
@@ -387,14 +452,14 @@ export function PathwayWalkthrough({
                 type="button"
                 onClick={onRestart.another}
                 disabled={onRestart.busy}
-                className="rounded-2xl bg-amber-400 px-7 py-3 font-black text-amber-950 shadow-[0_5px_0_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_0_#b45309] disabled:opacity-50"
+                className="rounded-2xl border border-foreground bg-brand-fill px-7 py-3 font-heading font-black text-foreground shadow-[0_5px_0_0_var(--brand-press)] transition-all hover:bg-brand-fill-hover active:translate-y-0.5 active:shadow-[0_2px_0_0_var(--brand-press)] disabled:opacity-50 motion-reduce:transition-none"
               >
-                {onRestart.busy ? 'Building…' : 'Another one! 🚀'}
+                {onRestart.busy ? 'Building…' : 'Another one!'}
               </button>
               <button
                 type="button"
                 onClick={onRestart.newTopic}
-                className="rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-black text-violet-600"
+                className="rounded-2xl border border-border bg-card px-5 py-3 font-heading font-black text-ink-2 hover:border-foreground hover:text-foreground"
               >
                 New topic
               </button>

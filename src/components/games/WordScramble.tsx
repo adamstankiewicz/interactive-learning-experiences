@@ -109,7 +109,7 @@ export function WordScramble({ onComplete }: { onComplete?: () => void }) {
   return (
     <div className="flex min-h-[500px] flex-col items-center gap-6 p-6">
       <div className="text-center">
-        <h2 className="mb-2 text-3xl font-black text-violet-600">Word Scramble</h2>
+        <h2 className="mb-2 text-3xl font-black text-violet-600">Word scramble</h2>
         <p className="text-lg font-bold text-slate-600">
           Score: {score} | Word {currentWordIndex + 1}/{WORDS.length}
         </p>

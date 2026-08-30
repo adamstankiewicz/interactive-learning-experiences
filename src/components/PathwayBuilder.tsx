@@ -5,12 +5,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { Plus } from "lucide-react";
 
 import { ActivityTrail } from "@/components/pathway/ActivityTrail";
+import { BuildNarrative } from "@/components/pathway/BuildNarrative";
 import {
   LessonPlanUpload,
   type LessonPlanPick,
 } from "@/components/pathway/LessonPlanUpload";
 import { PathwayCompletionStrip, PathwayDocument } from "@/components/pathway/PathwayDocument";
-import { AssignToStudents } from "@/components/roster/AssignToStudents";
+import { PlanRail } from "@/components/pathway/PlanRail";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -92,11 +93,9 @@ export function PathwayBuilder() {
 
   const streaming = state.status === "streaming";
   const started = state.status !== "idle";
-  // Topic is the one thing this page asks first — it's the variable a
-  // teacher is actively deciding day to day; grade is usually a fixed fact
-  // about them, so it (and the submit action) only earns screen space once
-  // there's actually a topic to attach it to. Mirrors `/learn`'s one-question
-  // focus rather than presenting every field as equally important at once.
+  // The card shows everything it asks up front (design 1c): topic, grade,
+  // and the primary are always visible. `engaged` only decides when the
+  // example chips step aside for a topic the teacher is actually typing.
   const engaged = started || Boolean(topic.trim());
 
   function runSubmit() {
@@ -128,32 +127,40 @@ export function PathwayBuilder() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-gradient-to-br from-violet-100/80 via-pink-50/60 to-amber-50/70 dark:from-violet-950/50 dark:via-fuchsia-950/25 dark:to-amber-950/20">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
-        {!started && (
-          <div className="pt-14">
-            <motion.h1
-              initial={{ scale: 0.92, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="font-(family-name:--font-lexend) text-4xl font-black tracking-tight text-balance sm:text-5xl"
+    <div className="flex min-h-dvh flex-col bg-background">
+      {/* The ink plane: the hero is one input, floating on ink. Literal ink in
+          both themes — the plane is the same object day and night, which is
+          why the card inside scopes itself `.light-surface`. */}
+      {!started && (
+        <div className="bg-[#1f1915] pb-20">
+          <div className="mx-auto w-full max-w-3xl px-6 pt-12">
+            {/* Quiet by design (1c): a mono overline and one grey sub-line —
+                no headline. The white card is the hero. */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#98938d]"
             >
-              Turn a topic into a lesson{" "}
-              <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent dark:from-violet-400 dark:to-pink-400">
-                students can do
-              </span>
-              .
-            </motion.h1>
-            <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">
+              New pathway
+            </motion.p>
+            <p className="mt-2 max-w-xl text-base leading-relaxed text-[#bbb7b2]">
               Name what you&rsquo;re teaching. We find the standard it maps to
-              in the Learning Commons knowledge graph, then build a pathway from
-              its verified learning components — with interactive activities
-              your students work through.
+              in the standards graph, then build a pathway from its verified
+              learning components.
             </p>
           </div>
-        )}
+        </div>
+      )}
 
-        <form onSubmit={submit} className={started ? "pt-8" : "mt-8"}>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 pb-20">
+        <form
+          onSubmit={submit}
+          className={
+            started
+              ? "mx-auto w-full max-w-3xl pt-8"
+              : "light-surface mx-auto -mt-14 w-full max-w-3xl border border-[#1f1915] bg-card p-5 text-foreground shadow-[6px_6px_0_rgba(31,25,21,.22)]"
+          }
+        >
           {/* One question first: what. Grade, the submit action, and every
               optional field only earn space once there's a topic to hang
               them off — the opening moment is a single focused decision,
@@ -172,54 +179,11 @@ export function PathwayBuilder() {
             placeholder="What are you teaching?"
             aria-label="Topic"
             rows={1}
-            className="min-h-16 w-full resize-none rounded-2xl border-3 border-violet-200 bg-white/70 px-5 py-4 text-lg font-semibold placeholder:font-normal placeholder:text-violet-300 focus-visible:border-violet-400 focus-visible:ring-violet-300/50 dark:border-violet-800 dark:bg-white/5 dark:placeholder:text-violet-700 dark:focus-visible:border-violet-500"
+            className="min-h-16 w-full resize-none border-border bg-transparent px-4 py-3.5 text-[16.5px] font-semibold placeholder:font-normal placeholder:text-muted-foreground focus-visible:border-foreground"
           />
 
-          {!engaged && (
-            <div className="mt-4">
-              <p className="text-xs text-muted-foreground">
-                ✨ Or start from an example
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {EXAMPLES.map((example) => (
-                  <Button
-                    key={example.topic}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setTopic(example.topic);
-                      setGradeHint(example.grade);
-                      // An example has nothing to do with the uploaded plan,
-                      // so building from one must not cite it.
-                      setLessonPlan(null);
-                    }}
-                    className="rounded-full border-2 border-violet-200 font-normal text-violet-600 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/40"
-                  >
-                    {example.topic}
-                    <span className="text-violet-400 dark:text-violet-500">
-                      · Gr {example.grade}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-              <LessonPlanUpload
-                disabled={streaming}
-                onPick={pickFromLessonPlan}
-                onClear={() => setLessonPlan(null)}
-              />
-              {lessonPlan && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Building with{" "}
-                  <span className="font-medium text-foreground">{lessonPlan.filename}</span>{" "}
-                  as context — the pathway follows how your plan teaches this.
-                </p>
-              )}
-            </div>
-          )}
-
           <AnimatePresence initial={false}>
-            {engaged && (
+            {(engaged || !started) && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -242,10 +206,8 @@ export function PathwayBuilder() {
                   >
                     <SelectTrigger
                       className={cn(
-                        "h-12! w-full rounded-xl border-2 border-violet-200 bg-white/70 px-4 text-sm font-semibold hover:bg-white/90 dark:border-violet-800 dark:bg-white/5 dark:hover:bg-white/10 sm:w-40",
-                        !gradeHint
-                          ? "text-muted-foreground"
-                          : "text-violet-700 dark:text-violet-300",
+                        "h-12! w-full border border-border bg-card px-4 text-sm font-semibold hover:border-foreground sm:w-40",
+                        !gradeHint ? "text-muted-foreground" : "text-foreground",
                       )}
                       aria-label="Grade level"
                     >
@@ -277,7 +239,7 @@ export function PathwayBuilder() {
                     <button
                       type="submit"
                       disabled={!topic.trim()}
-                      className="h-12 shrink-0 rounded-xl bg-emerald-500 px-6 text-sm font-black text-white shadow-[0_4px_0_0_#047857] transition-transform hover:bg-emerald-400 active:translate-y-1 active:shadow-[0_1px_0_0_#047857] disabled:pointer-events-none disabled:opacity-40"
+                      className="h-12 shrink-0 border border-foreground bg-brand-fill px-6 font-heading text-sm font-bold text-foreground transition-colors hover:bg-brand-fill-hover disabled:pointer-events-none disabled:opacity-40"
                     >
                       {started ? "Rebuild ↻" : "Build pathway →"}
                     </button>
@@ -294,6 +256,50 @@ export function PathwayBuilder() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {!engaged && (
+            <div className="mt-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Or start from an example
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {EXAMPLES.map((example) => (
+                  <Button
+                    key={example.topic}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTopic(example.topic);
+                      setGradeHint(example.grade);
+                      // An example has nothing to do with the uploaded plan,
+                      // so building from one must not cite it.
+                      setLessonPlan(null);
+                    }}
+                    className="border border-border font-normal text-ink-2 hover:border-foreground hover:bg-sunk hover:text-foreground"
+                  >
+                    {example.topic}
+                    <span className="text-muted-foreground">
+                      · Gr {example.grade}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+              <LessonPlanUpload
+                disabled={streaming}
+                onPick={pickFromLessonPlan}
+                onClear={() => setLessonPlan(null)}
+              />
+              {lessonPlan && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Building with{" "}
+                  <span className="font-medium text-foreground">{lessonPlan.filename}</span>{" "}
+                  as context — the pathway follows how your plan teaches this.
+                </p>
+              )}
+            </div>
+          )}
+
 
           {!started && (
             <Collapsible className="mt-4">
@@ -323,6 +329,7 @@ export function PathwayBuilder() {
         </form>
 
         {started && <ActivityTrail state={state} />}
+        {started && <BuildNarrative state={state} />}
 
         {state.error && (
           <Alert variant="destructive" className="mt-6">
@@ -330,21 +337,42 @@ export function PathwayBuilder() {
           </Alert>
         )}
 
-        <PathwayCompletionStrip state={state} />
-
-        {state.status === "done" && (
-          <AssignToStudents
-            topic={state.topic}
-            gradeHint={gradeHint || undefined}
-            parentSessionId={state.sessionId ?? undefined}
-          />
+        {/* The degraded run, stated plainly: nothing verified, so this is an
+            exploration pathway. The cost is named — no mastery rollup, no
+            standards alignment — and the pathway is still built and playable. */}
+        {state.anchor && !state.anchor.standard.verified && (
+          <div className="mt-6 border-l-[3px] border-warning bg-warning-tint p-3.5">
+            <p className="text-sm font-semibold text-warning">
+              ⚠ This is an exploration pathway. It is not standards-aligned.
+            </p>
+            <p className="mt-1 text-xs text-warning/90">
+              No proposed code survived the graph. The pathway is still built and
+              playable, but there is no mastery rollup, and students will see
+              &ldquo;exploring&rdquo; where a standard code would be. The rejected
+              codes stay on the session record.
+            </p>
+          </div>
         )}
 
-        <PathwayDocument
-          state={state}
-          onRegenerateStep={regenerateStep}
-          onEditPlan={editPlan}
-        />
+        <PathwayCompletionStrip state={state} />
+
+        {/* Design 1d: document + 316px rail. The rail carries assignment,
+            provenance, and coverage; the document stays the readable artifact.
+            While a run streams, the BuildNarrative's right column above is
+            where the pathway forms (design 1c) — the document only exists
+            once the run settles, never as a parallel copy below it. */}
+        {!streaming && (
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-8">
+            <PathwayDocument
+              state={state}
+              onRegenerateStep={regenerateStep}
+              onEditPlan={editPlan}
+            />
+            <div className="mt-8">
+              <PlanRail state={state} gradeHint={gradeHint || undefined} />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

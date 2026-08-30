@@ -7,9 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-archivo);
+  --font-serif: var(--font-source-serif);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -44,6 +45,21 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Practice Pathways design tokens — the handoff palette, beyond shadcn's roles. */
+  --color-sunk: var(--sunk);
+  --color-track: var(--track);
+  --color-ink: var(--foreground);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--muted-foreground);
+  --color-brand-fill: var(--brand-fill);
+  --color-brand-fill-hover: var(--brand-fill-hover);
+  --color-brand-press: var(--brand-press);
+  --color-brand-text: var(--primary-tint-foreground);
+  --color-verified: var(--success);
+  --color-verified-tint: var(--verified-tint);
+  --color-verified-edge: var(--verified-edge);
+  --color-warning-tint: var(--warning-tint);
+  --color-warning-edge: var(--warning-edge);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -54,138 +70,185 @@
 }
 
 /*
- * `.light-surface` re-declares this same palette for one subtree. The student
- * surfaces (/learn and a shared pathway) hard-code pastel light chrome — a
- * violet/pink gradient and white cards, with no dark variants — but the widgets
- * they host are token-themed. Without this, a student in dark mode gets
- * `--foreground` near-white on those hard-coded white cards, i.e. invisible
- * feedback text, and `bg-card` chips render near-black.
+ * Practice Pathways palette: warm graphite ink + one highlighter, semantic
+ * colours that never double as decoration, warm-biased neutrals, and light and
+ * dark designed as siblings. Every text/surface pair below was checked against
+ * WCAG 2.2 AA (4.5:1 body, 3:1 large/UI) — the ratios live in the design
+ * handoff; re-check any substitution.
+ *
+ * Two rules that are not stylistic:
+ * 1. The highlighter (--brand-fill) is a marker, never a surface: as a fill it
+ *    always carries a 1px ink border, and it never appears in chip/status form.
+ * 2. Semantic colours always ship with an icon and a word; colour alone never
+ *    conveys verification state.
+ *
+ * `.light-surface` still re-declares the light palette for the student
+ * subtree; it is scheduled for deletion in the walkthrough redesign slice,
+ * when /learn's hard-coded pastel chrome becomes token-themed.
  */
 :root,
 .light-surface {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /*
-   * The one confident brand hue. The base shadcn theme this builds on ships
-   * pure greyscale; this app has two faces — a teacher-facing builder and a
-   * student-facing /learn — and they need to read as the same product.
-   * /learn already has a violet identity (its gradient background, its mic
-   * button), so primary is built around that hue rather than introducing a
-   * third color language. Chosen for contrast, not just vibe: 6.31:1 against
-   * --primary-foreground, comfortably past the 4.5:1 text floor everything
-   * else in this file holds to.
-   */
-  --primary: oklch(0.5 0.2 292);
-  --primary-foreground: oklch(0.985 0 0);
-  /* For brand-hued text sitting on a light primary-tinted surface (a badge,
-     not a solid button) — identical to --primary in light mode, where it
-     already clears 4.5:1; dark mode needs its own lighter value below. */
-  --primary-tint-foreground: var(--primary);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* Widget feedback and manipulative fills. The base theme's palette is
-     greyscale, so these are the only chromatic tokens: correct,
-     needs-another-look, and the "student selected this part" fill shared
-     by every manipulative. */
-  /* Lightness is set so feedback text clears WCAG AA (4.5:1) against --card,
-     matching the shipped --destructive. The obvious emerald/amber sit at
-     ~3.5:1 and fail — this is student-facing copy, so it has to hold. */
-  --success: oklch(0.528 0.145 163.225);
-  --warning: oklch(0.56 0.153 70.08);
-  /* Selected vs unselected parts differ only by fill, so the pair has to clear
-     the 3:1 non-text contrast bar (WCAG 1.4.11) on its own. */
+  --background: #fcfaf7; /* paper */
+  --foreground: #1f1915; /* ink */
+  --ink-2: #58514c;
+  --card: #ffffff;
+  --card-foreground: #1f1915;
+  --popover: #ffffff;
+  --popover-foreground: #1f1915;
+  --sunk: #f6f3ef;
+  --track: #e8e4dd; /* progress tracks — one step deeper than sunk */
+  /* Primary action = the highlighter with ink text (12.33:1). The mandatory
+     1px ink border is applied by the button styles, not the token. */
+  --primary: #e3df41;
+  --primary-foreground: #1f1915;
+  --brand-fill: #e3df41;
+  --brand-fill-hover: #f2ef63;
+  --brand-press: #8e8b0f;
+  /* Brand-coloured text on light surfaces (7.62:1). */
+  --primary-tint-foreground: #595600;
+  --secondary: #f6f3ef;
+  --secondary-foreground: #1f1915;
+  --muted: #f6f3ef;
+  --muted-foreground: #736c66; /* ink-3, 5.18:1 on card */
+  --accent: #f6f3ef;
+  --accent-foreground: #1f1915;
+  --destructive: #bd093f; /* 6.41:1 on card */
+  --success: #1c6d26; /* verified, 6.45:1 on card */
+  --verified-tint: #dbf3db;
+  --verified-edge: #b6e3b8;
+  --warning: #775400; /* unverified / needs review, 6.87:1 on card */
+  --warning-tint: #fcebc7;
+  --warning-edge: #eed49a;
+  /* Manipulative selection fill — kept from the previous system; its hue
+     (237°) sits safely outside the brand/warning band the guest hues avoid. */
   --selected: oklch(0.639 0.169 237.323);
-  --selected-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  /* Focus rings pick up the brand hue too, at low chroma — a warm glow
-     instead of a flat grey outline, without competing with --primary itself. */
-  --ring: oklch(0.708 0.08 292);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  /* Rounder than the base theme's default (10px), short of /learn's explicit
-     rounded-2xl/3xl treatments on its own bespoke elements — the "same
-     warmth, calmer register" the builder and /learn are meant to share.
-     Radius alone never affects text contrast, so this is safe to raise
-     without re-checking any of the ratios documented above. */
-  --radius: 0.875rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --selected-foreground: #ffffff;
+  --border: #e1ddd8; /* rule — decorative separation only */
+  --input: #e1ddd8;
+  /* Focus is always visible and always ink: the highlighter is too
+     low-contrast (1.41:1) to be a focus ring. */
+  --ring: #1f1915;
+  --chart-1: #e1ddd8;
+  --chart-2: #736c66;
+  --chart-3: #58514c;
+  --chart-4: #3d3731;
+  --chart-5: #1f1915;
+  /* Teacher register is square. The student register raises this via
+     `.register-student` below — the only systematic difference between the
+     two registers. */
+  --radius: 0rem;
+  --sidebar: #fcfaf7;
+  --sidebar-foreground: #1f1915;
+  --sidebar-primary: #1f1915;
+  --sidebar-primary-foreground: #fcfaf7;
+  --sidebar-accent: #f6f3ef;
+  --sidebar-accent-foreground: #1f1915;
+  --sidebar-border: #e1ddd8;
+  --sidebar-ring: #1f1915;
+  /* Purpose tags for PathwayPlan.steps[].purpose — fills and AA-checked text. */
+  --purpose-activate-bg: #fcebc7;
+  --purpose-activate-fg: #775400;
+  --purpose-model-bg: #e5e9f6;
+  --purpose-model-fg: #33477f;
+  --purpose-practice-bg: #dbf3db;
+  --purpose-practice-fg: #1c6d26;
+  --purpose-check-bg: #f6e3ea;
+  --purpose-check-fg: #9b1745;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /*
-   * The base theme's dark mode default inverts to a near-white button with
-   * dark text — a convention for a *monochrome* primary. A hued one reads
-   * better the conventional way: a rich, visible fill with light text on
-   * top. Lightened
-   * from the light-mode value to stay legible against a near-black page
-   * (3.63:1 against --card) while still clearing 4.5:1 against its own
-   * --primary-foreground text.
-   */
-  --primary: oklch(0.565 0.19 292);
-  --primary-foreground: oklch(0.985 0 0);
-  /* --primary itself is tuned to sit under light text as a button fill
-     (3.63:1 against --card is fine for a large filled area, but text this
-     small needs 4.5:1) — too dark to also work as small text on a dark,
-     lightly-tinted card. Lightened until it clears 4.5:1 in that role. */
-  --primary-tint-foreground: oklch(0.65 0.16 292);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.765 0.177 163.223);
-  --warning: oklch(0.828 0.189 84.429);
+  --background: #13100d; /* ground — warm charcoal, not an inverted document */
+  --foreground: #f5f3f1;
+  --ink-2: #bbb7b2;
+  --card: #1f1b18;
+  --card-foreground: #f5f3f1;
+  --popover: #1f1b18;
+  --popover-foreground: #f5f3f1;
+  --sunk: #292623; /* card-2 */
+  --track: #393430;
+  /* The highlighter is identical in both themes; its text flips to the dark
+     ground (13.45:1) so "ink on the marker" stays true as a sibling rule. */
+  --primary: #e3df41;
+  --primary-foreground: #13100d;
+  --brand-fill: #e3df41;
+  --brand-fill-hover: #f2ef63;
+  --brand-press: #797600;
+  --primary-tint-foreground: #dcd848; /* brand text, 11.37:1 on card */
+  --secondary: #292623;
+  --secondary-foreground: #f5f3f1;
+  --muted: #292623;
+  --muted-foreground: #98938d; /* 5.60:1 on card */
+  --accent: #292623;
+  --accent-foreground: #f5f3f1;
+  --destructive: #f65b72; /* 5.42:1 on card */
+  --success: #70d482; /* 9.36:1 on card */
+  --verified-tint: #16361c;
+  --verified-edge: #2c5c34;
+  --warning: #e7ba54; /* 9.42:1 on card */
+  --warning-tint: #3a2b07;
+  --warning-edge: #6e5310;
   --selected: oklch(0.746 0.16 232.661);
-  --selected-foreground: oklch(0.205 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0.08 292);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --selected-foreground: #13100d;
+  --border: #393430;
+  --input: #393430;
+  --ring: #f5f3f1;
+  --chart-1: #393430;
+  --chart-2: #98938d;
+  --chart-3: #bbb7b2;
+  --chart-4: #d8d4d0;
+  --chart-5: #f5f3f1;
+  --sidebar: #13100d;
+  --sidebar-foreground: #f5f3f1;
+  --sidebar-primary: #f5f3f1;
+  --sidebar-primary-foreground: #13100d;
+  --sidebar-accent: #292623;
+  --sidebar-accent-foreground: #f5f3f1;
+  --sidebar-border: #393430;
+  --sidebar-ring: #f5f3f1;
+  --purpose-activate-bg: #3a2b07;
+  --purpose-activate-fg: #e7ba54;
+  --purpose-model-bg: #232b40;
+  --purpose-model-fg: #a9bcf0;
+  --purpose-practice-bg: #16361c;
+  --purpose-practice-fg: #70d482;
+  --purpose-check-bg: #3c1220;
+  --purpose-check-fg: #f2a2bc;
+}
+
+/*
+ * The student register: same palette, same type, same semantics — rounded.
+ * Cards 18–22px, inner elements 10–16px. Applied on the student subtree
+ * (/learn, shared pathways) alongside the register's own press-shadow
+ * button treatment.
+ */
+.register-student {
+  --radius: 1.25rem;
+}
+
+/*
+ * Guest hue: each generated activity carries one model-chosen hue
+ * (--activity-h, a number), rendered at fixed lightness/chroma so contrast
+ * cannot move (any hue: 5.6–7.1:1 text-on-card light, 8.0–9.0:1 dark). The
+ * hue appears only on the activity's own skin — frame border, header fill,
+ * active drop target, kind label, score dial — never on chrome, buttons,
+ * chips, or states.
+ */
+.activity-skin {
+  --activity-text: oklch(0.48 0.14 var(--activity-h, 220));
+  --activity-fill: oklch(0.62 0.16 var(--activity-h, 220));
+  --activity-tint: oklch(0.95 0.04 var(--activity-h, 220));
+  --activity-edge: oklch(0.85 0.06 var(--activity-h, 220));
+}
+.dark .activity-skin {
+  --activity-text: oklch(0.78 0.13 var(--activity-h, 220));
+  --activity-fill: oklch(0.7 0.15 var(--activity-h, 220));
+  --activity-tint: oklch(0.3 0.05 var(--activity-h, 220));
+  --activity-edge: oklch(0.42 0.11 var(--activity-h, 220));
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
@@ -193,4 +256,31 @@
   html {
     @apply font-sans;
   }
+  /* Focus is always visible: 3px ink, offset 2 — on everything interactive. */
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading), var(--font-plex-sans), sans-serif;
+    font-stretch: 112%;
+  }
+}
+
+@keyframes caret-blink {
+  0%, 45% { opacity: 1; }
+  50%, 95% { opacity: 0; }
+}
+.caret-blink { animation: caret-blink 1.1s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .caret-blink { animation: none; }
+}
+
+@keyframes segment-grow {
+  from { width: 4%; }
+  to { width: 92%; }
+}
+.segment-grow { animation: segment-grow 9s cubic-bezier(0.2, 0.6, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .segment-grow { animation: none; width: 100%; }
 }

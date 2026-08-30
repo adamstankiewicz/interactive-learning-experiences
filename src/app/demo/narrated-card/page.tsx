@@ -47,7 +47,7 @@ export default function NarratedCardDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Narrated Card</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Narrated card</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Reads content aloud sentence by sentence, highlighting each sentence as it is spoken.
         </p>

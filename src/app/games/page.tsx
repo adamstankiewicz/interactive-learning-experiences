@@ -11,14 +11,14 @@ type GameType = 'menu' | 'memory' | 'scramble' | 'pacman';
 const GAMES = [
   {
     id: 'memory' as const,
-    name: 'Memory Match',
+    name: 'Memory match',
     emoji: '🎴',
     description: 'Find matching pairs',
     component: MemoryMatch,
   },
   {
     id: 'scramble' as const,
-    name: 'Word Scramble',
+    name: 'Word scramble',
     emoji: '🔤',
     description: 'Unscramble the letters',
     component: WordScramble,

@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { ActivityFrame } from '@/components/pathway/ActivityFrame';
 import { WidgetRenderer } from '@/components/widgets/registry';
 import { plainMath } from '@/lib/learning-commons/format';
 import type { Anchor, DeepPartial } from '@/lib/pathway/events';
@@ -32,14 +33,11 @@ type RegenerateStep = (anchor: Anchor, plan: PathwayPlan, stepIndex: number) => 
 type EditPlan = (plan: PathwayPlan) => void;
 
 /**
- * Each step purpose gets its own icon and stage color — the same violet/
- * pink/amber/emerald family `/learn` builds its whole identity from — so the
- * four kinds read as distinct at a glance and a teacher scanning the list
- * sees a step's category from its border alone, not just a small label.
- * Raw Tailwind palette classes rather than the token system, on purpose:
- * this is the same "local, literal color" approach `/learn` and
- * `PathwayWalkthrough` already use, deliberately separate from the app's
- * quieter shadcn token layer.
+ * Each step purpose gets its own icon and stage color from the design
+ * system's purpose-tag tokens (globals.css) — AA-checked fill/text pairs in
+ * both themes — so the four kinds read as distinct at a glance and a teacher
+ * scanning the list sees a step's category from its border alone, not just a
+ * small label.
  */
 const PURPOSE_META: Record<
   string,
@@ -48,30 +46,30 @@ const PURPOSE_META: Record<
   activate: {
     label: 'Activate',
     Icon: Sparkles,
-    border: 'border-pink-200 dark:border-pink-900',
-    tint: 'bg-pink-100 dark:bg-pink-950/50',
-    icon: 'text-pink-500 dark:text-pink-400',
+    border: 'border-(--purpose-activate-fg)/25',
+    tint: 'bg-(--purpose-activate-bg)',
+    icon: 'text-(--purpose-activate-fg)',
   },
   model: {
     label: 'Model',
     Icon: BookOpen,
-    border: 'border-violet-200 dark:border-violet-900',
-    tint: 'bg-violet-100 dark:bg-violet-950/50',
-    icon: 'text-violet-500 dark:text-violet-400',
+    border: 'border-(--purpose-model-fg)/25',
+    tint: 'bg-(--purpose-model-bg)',
+    icon: 'text-(--purpose-model-fg)',
   },
   practice: {
     label: 'Practice',
     Icon: Repeat,
-    border: 'border-amber-200 dark:border-amber-900',
-    tint: 'bg-amber-100 dark:bg-amber-950/50',
-    icon: 'text-amber-600 dark:text-amber-400',
+    border: 'border-(--purpose-practice-fg)/25',
+    tint: 'bg-(--purpose-practice-bg)',
+    icon: 'text-(--purpose-practice-fg)',
   },
   check: {
     label: 'Check',
     Icon: CircleCheck,
-    border: 'border-emerald-200 dark:border-emerald-900',
-    tint: 'bg-emerald-100 dark:bg-emerald-950/50',
-    icon: 'text-emerald-600 dark:text-emerald-400',
+    border: 'border-(--purpose-check-fg)/25',
+    tint: 'bg-(--purpose-check-bg)',
+    icon: 'text-(--purpose-check-fg)',
   },
 };
 
@@ -82,10 +80,10 @@ const PURPOSE_META: Record<
  * the card) carry the hue, so a step's category reads once, not three times.
  */
 const WAYPOINT_META: Record<string, { dot: string }> = {
-  activate: { dot: 'bg-pink-400' },
-  model: { dot: 'bg-violet-400' },
-  practice: { dot: 'bg-amber-400' },
-  check: { dot: 'bg-emerald-400' },
+  activate: { dot: 'bg-(--purpose-activate-fg)' },
+  model: { dot: 'bg-(--purpose-model-fg)' },
+  practice: { dot: 'bg-(--purpose-practice-fg)' },
+  check: { dot: 'bg-(--purpose-check-fg)' },
 };
 
 /** A preview cycle of the four purposes' waypoint dots, for the skeleton — real steps aren't known yet. */
@@ -116,6 +114,12 @@ const WIDGET_KIND_LABEL: Record<string, string> = {
 };
 
 type PartialStep = DeepPartial<PathwayPlan>['steps'] extends (infer S)[] | undefined ? S : never;
+
+function widgetKindOfSpec(widget: unknown): string | null {
+  return widget && typeof widget === 'object' && 'kind' in widget && typeof widget.kind === 'string'
+    ? widget.kind
+    : null;
+}
 
 /**
  * The generated pathway, as the artifact a teacher actually reads.
@@ -258,11 +262,11 @@ export function PathwayDocument({
             {plan?.outcomes?.map((outcome, index) => (
               <li
                 key={index}
-                className="flex items-start gap-3 rounded-2xl border-3 border-emerald-200 bg-card px-4 py-3.5 shadow-sm dark:border-emerald-900"
+                className="flex items-start gap-3 rounded-2xl border border-verified-edge bg-card px-4 py-3.5"
               >
                 <span
                   aria-hidden
-                  className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+                  className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-verified-tint text-verified"
                 >
                   <Target className="size-3.5" />
                 </span>
@@ -448,6 +452,7 @@ export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
 
   const stepCount = state.plan?.steps?.length ?? 0;
   const code = state.anchor?.standard.verified ? state.anchor.standard.code : null;
+  const rejectedCount = Object.values(state.verdicts).filter((ok) => !ok).length;
   const elapsedMs = state.startedAt !== null && state.finishedAt !== null ? state.finishedAt - state.startedAt : null;
 
   const summary = [
@@ -463,10 +468,10 @@ export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
       initial={{ opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-      className="mt-6 rounded-3xl border-3 border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-5 dark:border-emerald-900 dark:from-emerald-950/40 dark:via-transparent dark:to-amber-950/10"
+      className="mt-6 rounded-3xl border border-verified-edge bg-verified-tint p-5"
     >
       <div className="flex flex-wrap items-center gap-4">
-        <span className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300">
+        <span className="relative flex size-12 shrink-0 items-center justify-center rounded-full border border-verified-edge bg-card text-verified">
           <Check className="size-6" aria-hidden />
           {CONFETTI.map((p, i) => (
             <motion.span
@@ -484,10 +489,15 @@ export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
         <div className="min-w-0 flex-1">
           <p className="font-heading text-lg font-black text-balance">Your pathway is ready! 🎉</p>
           {summary && <p className="text-sm text-muted-foreground">{summary}</p>}
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Nothing is assigned yet.
+            {rejectedCount > 0 &&
+              ` ${rejectedCount} rejected code${rejectedCount === 1 ? ' is' : 's are'} kept on the session record.`}
+          </p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-violet-100 bg-white/70 px-4 py-3 dark:border-violet-900 dark:bg-white/5">
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
         <ShareLink sessionId={state.sessionId} />
       </div>
     </motion.div>
@@ -497,7 +507,7 @@ export function PathwayCompletionStrip({ state }: { state: PathwayState }) {
 /** One placeholder outcome row — shared by the full pre-anchor skeleton and the real document's own outcomes section while `plan` is still in flight. */
 function OutcomeSkeletonRow() {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border-3 border-emerald-100 bg-card px-4 py-3.5 dark:border-emerald-950">
+    <div className="flex items-start gap-3 rounded-2xl border border-verified-edge bg-card px-4 py-3.5">
       <Skeleton className="mt-0.5 size-6 shrink-0 rounded-full" />
       <Skeleton className="h-4 w-2/3" />
     </div>
@@ -588,7 +598,7 @@ function DocumentHeader({
       <div className="flex flex-wrap items-center gap-2">
         {standard.verified ? (
           <>
-            <span className="rounded-full border-2 border-violet-200 bg-white/80 px-3 py-1 font-mono text-xs font-bold text-violet-600 dark:border-violet-800 dark:bg-white/5 dark:text-violet-300">
+            <span className="rounded-full border border-verified-edge bg-verified-tint px-3 py-1 font-mono text-xs font-bold text-verified">
               {standard.code}
             </span>
             <span className="text-xs text-muted-foreground">
@@ -691,7 +701,12 @@ const StepCard = memo(function StepCard({
     // Quiet on purpose: the waypoint dot and the pill below already say which
     // kind of step this is — a colored border on top of both just repeats
     // the same signal a third time and reads as noise, not information.
-    <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/10 transition-colors">
+    <div
+      className={cn(
+        'overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/10 transition-colors',
+        regenerating && 'shadow-[inset_3px_0_0_var(--brand-fill)]',
+      )}
+    >
       <div className="flex flex-col gap-1.5 px-4 py-3.5 sm:flex-row sm:gap-4">
         <span className="shrink-0">
           <span
@@ -754,7 +769,16 @@ const StepCard = memo(function StepCard({
         >
 
           {hasWidget ? (
-            <WidgetRenderer key={widgetSeq} spec={widget} />
+            <ActivityFrame
+              kind={widgetKindOfSpec(widget) ?? step?.widgetKind ?? 'activity'}
+              title={
+                step?.title ??
+                (step?.widgetKind && WIDGET_KIND_LABEL[step.widgetKind]) ??
+                'Interactive activity'
+              }
+            >
+              <WidgetRenderer key={widgetSeq} spec={widget} />
+            </ActivityFrame>
           ) : pending ? (
             <div className="flex flex-col items-center gap-3 py-6 text-center">
               <motion.span
@@ -875,7 +899,7 @@ function EditableText({
         setEditing(true);
       }}
       className={cn(
-        'cursor-text rounded text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50',
+        'cursor-text border-b-2 border-dashed border-transparent text-left outline-none transition-colors hover:border-border focus-visible:ring-2 focus-visible:ring-ring/50',
         as === 'p' && 'block w-full',
         className,
       )}

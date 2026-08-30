@@ -172,7 +172,7 @@ export function WritingWorkshop({ spec, onComplete }: Props) {
           placeholder={spec.placeholder}
           rows={14}
           disabled={pending}
-          className="block min-h-[320px] w-full resize-y rounded-lg border border-input bg-transparent p-4 text-sm leading-[1.75] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-60"
+          className="block min-h-[320px] w-full resize-y rounded-lg border border-input bg-transparent p-4 font-serif text-[15px] leading-[1.65] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-60"
         />
       ) : (
         <div className="rounded-lg border border-border bg-card p-4">
