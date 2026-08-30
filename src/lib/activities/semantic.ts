@@ -15,9 +15,9 @@ import { embedMany } from 'ai';
  *   one small request, comparable to the standards-graph lookup discovery
  *   already makes.
  * - Anthropic ships no embeddings endpoint, so the default deployment falls
- *   back to lexical ranking. Embeddings light up from either an armed
- *   OpenAI fallback key (already the repo's emergency-exit pattern) or a
- *   Bedrock deployment.
+ *   back to lexical ranking. Embeddings light up from an armed OpenAI
+ *   fallback key (already the repo's emergency-exit pattern), an OpenRouter
+ *   deployment, or a Bedrock deployment.
  */
 
 export type Embedder = (texts: string[]) => Promise<number[][]>;
@@ -64,6 +64,18 @@ export function getEmbedder(): Embedder | null {
     };
   }
 
+  if (provider === 'openrouter' && process.env.OPENROUTER_API_KEY) {
+    return async (texts) => {
+      const { createOpenRouter } = await import('@openrouter/ai-sdk-provider');
+      const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
+      const { embeddings } = await embedMany({
+        model: openrouter.embedding(process.env.OPENROUTER_EMBED_MODEL_ID ?? 'openai/text-embedding-3-small'),
+        values: texts,
+      });
+      return embeddings;
+    };
+  }
+
   if (provider === 'bedrock') {
     return async (texts) => {
       const { createAmazonBedrock } = await import('@ai-sdk/amazon-bedrock');
@@ -74,7 +86,9 @@ export function getEmbedder(): Embedder | null {
           : {}),
       });
       const { embeddings } = await embedMany({
-        model: bedrock.embedding('amazon.titan-embed-text-v2:0'),
+        // Bedrock model access is per account and per region — override when
+        // Titan v2 isn't enabled (mirrors BEDROCK_MODEL_ID for generation).
+        model: bedrock.embedding(process.env.BEDROCK_EMBED_MODEL_ID ?? 'amazon.titan-embed-text-v2:0'),
         values: texts,
       });
       return embeddings;

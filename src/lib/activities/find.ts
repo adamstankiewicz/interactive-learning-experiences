@@ -119,8 +119,11 @@ export async function findActivities(input: {
       const rankedIndices = await rankSemantically(need, eligible, embedder);
       ordered = rankedIndices.map(({ index }) => eligible[index]);
       ranking = 'semantic';
-    } catch {
-      // Lexical order already computed; the result says which ranker ran.
+    } catch (error) {
+      // Lexical order already computed; the result says which ranker ran —
+      // but say why in the logs, or a misconfigured embedder (a Bedrock 403,
+      // a bad key) silently downgrades every deployment forever.
+      console.warn('[find_activity] semantic ranking unavailable, using lexical:', error instanceof Error ? error.message : error);
     }
   }
 
