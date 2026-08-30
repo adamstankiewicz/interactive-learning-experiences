@@ -1,0 +1,9 @@
+{
+  "kind": "flashcard",
+  "learningComponentId": "lc-fractions-2",
+  "prompt": "Match each fraction word to what it means.",
+  "cards": [
+    { "id": "c1", "front": { "text": "numerator", "markdown": null, "imageUrl": null, "imageAlt": null }, "back": { "text": "how many parts you have", "markdown": null, "imageUrl": null, "imageAlt": null } },
+    { "id": "c2", "front": { "text": "denominator", "markdown": null, "imageUrl": null, "imageAlt": null }, "back": { "text": "how many equal parts make the whole", "markdown": null, "imageUrl": null, "imageAlt": null } }
+  ]
+}

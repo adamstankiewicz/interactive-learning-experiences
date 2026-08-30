@@ -1,0 +1,106 @@
+{
+  "version": "v1.0",
+  "createSurface": {
+    "surfaceId": "a2learn-fixture-flashcard",
+    "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "components": [
+      {
+        "id": "root",
+        "component": "Column",
+        "children": [
+          "prompt",
+          "card-0",
+          "card-1",
+          "done"
+        ]
+      },
+      {
+        "id": "prompt",
+        "component": "Text",
+        "text": "Match each fraction word to what it means."
+      },
+      {
+        "id": "card-0",
+        "component": "Card",
+        "child": "card-0-col"
+      },
+      {
+        "id": "card-0-col",
+        "component": "Column",
+        "children": [
+          "card-0-front",
+          "card-0-divider",
+          "card-0-back"
+        ]
+      },
+      {
+        "id": "card-0-front",
+        "component": "Text",
+        "text": "**numerator**"
+      },
+      {
+        "id": "card-0-divider",
+        "component": "Divider"
+      },
+      {
+        "id": "card-0-back",
+        "component": "Text",
+        "text": "how many parts you have"
+      },
+      {
+        "id": "card-1",
+        "component": "Card",
+        "child": "card-1-col"
+      },
+      {
+        "id": "card-1-col",
+        "component": "Column",
+        "children": [
+          "card-1-front",
+          "card-1-divider",
+          "card-1-back"
+        ]
+      },
+      {
+        "id": "card-1-front",
+        "component": "Text",
+        "text": "**denominator**"
+      },
+      {
+        "id": "card-1-divider",
+        "component": "Divider"
+      },
+      {
+        "id": "card-1-back",
+        "component": "Text",
+        "text": "how many equal parts make the whole"
+      },
+      {
+        "id": "done",
+        "component": "Button",
+        "variant": "primary",
+        "child": "done-label",
+        "action": {
+          "event": {
+            "name": "a2learn.widget_completed",
+            "userMessage": "Finished the activity.",
+            "context": {
+              "kind": "flashcard",
+              "correct": true
+            }
+          }
+        }
+      },
+      {
+        "id": "done-label",
+        "component": "Text",
+        "text": "Done"
+      }
+    ],
+    "dataModel": {
+      "a2learn": {
+        "kind": "flashcard"
+      }
+    }
+  }
+}

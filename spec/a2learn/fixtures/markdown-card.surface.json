@@ -1,0 +1,66 @@
+{
+  "version": "v1.0",
+  "createSurface": {
+    "surfaceId": "a2learn-fixture-markdown-card",
+    "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "components": [
+      {
+        "id": "root",
+        "component": "Card",
+        "child": "layout"
+      },
+      {
+        "id": "layout",
+        "component": "Column",
+        "children": [
+          "title",
+          "body",
+          "tip",
+          "done"
+        ]
+      },
+      {
+        "id": "title",
+        "component": "Text",
+        "text": "**Why the denominator matters**"
+      },
+      {
+        "id": "body",
+        "component": "Text",
+        "text": "When you split a whole into **equal parts**, the denominator tells you *how many parts* make the whole.\n\n- 1/3 means the whole is split into 3 equal parts\n- 1/4 means it is split into 4\n\n> More parts means each part is smaller — that is why 1/3 is bigger than 1/4."
+      },
+      {
+        "id": "tip",
+        "component": "Text",
+        "text": "Tip: Sketch both fractions on the same-size bar before comparing them.",
+        "variant": "caption"
+      },
+      {
+        "id": "done",
+        "component": "Button",
+        "variant": "primary",
+        "child": "done-label",
+        "action": {
+          "event": {
+            "name": "a2learn.widget_completed",
+            "userMessage": "Finished the activity.",
+            "context": {
+              "kind": "markdown-card",
+              "correct": true
+            }
+          }
+        }
+      },
+      {
+        "id": "done-label",
+        "component": "Text",
+        "text": "Got it"
+      }
+    ],
+    "dataModel": {
+      "a2learn": {
+        "kind": "markdown-card"
+      }
+    }
+  }
+}
