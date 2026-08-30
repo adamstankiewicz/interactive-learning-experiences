@@ -39,7 +39,7 @@ describe('/api/mcp protocol surface', () => {
     expect(show._meta.ui.resourceUri).toMatch(/^ui:\/\//);
   });
 
-  it('takes audience, not a grade, and keeps the alias show_widget shipped with', async () => {
+  it('takes audienceHint, not a grade, and keeps the alias show_widget shipped with', async () => {
     const res = await rpc({ jsonrpc: '2.0', id: 21, method: 'tools/list' });
     const { result } = await res.json();
     const props = (name: string) =>
@@ -49,7 +49,10 @@ describe('/api/mcp protocol surface', () => {
     // is in a grade, so a higher-ed or workplace deployment has an honest
     // argument to pass instead of one that lies.
     for (const name of ['show_widget', 'find_activity', 'build_pathway']) {
-      expect(props(name).audience?.type).toBe('string');
+      expect(props(name).audienceHint?.type).toBe('string');
+      // `audience` on a manifest is scheme-scoped and graph-derived. The tool
+      // input is unverified caller text, so it must not borrow the bare name.
+      expect(props(name)).not.toHaveProperty('audience');
     }
 
     // These two are new here, so they never carried the old name.

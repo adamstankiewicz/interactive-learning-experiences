@@ -188,9 +188,9 @@ function tools(origin: string) {
             type: 'string',
             description: 'Optional. A Common Core or NGSS code if known; verified against the standards graph.',
           },
-          audience: {
+          audienceHint: {
             type: 'string',
-            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". Steers standard selection; a hint, not a verified claim.',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". An unverified steer for standard selection, never a claim about the activity.',
           },
           need: {
             type: 'string',
@@ -211,13 +211,13 @@ function tools(origin: string) {
             type: 'string',
             description: 'What the activity should be about, in plain words — "the Industrial Revolution", "comparing fractions". Enough on its own.',
           },
-          audience: {
+          audienceHint: {
             type: 'string',
-            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". Steers standard selection; a hint, not a verified claim.',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". An unverified steer for standard selection, never a claim about the activity.',
           },
           gradeHint: {
             type: 'string',
-            description: 'Deprecated alias for `audience`, still accepted so callers written against the shipped tool keep working.',
+            description: 'Deprecated alias for `audienceHint`, still accepted so callers written against the shipped tool keep working.',
           },
           standardCode: {
             type: 'string',
@@ -254,9 +254,9 @@ function tools(origin: string) {
             type: 'string',
             description: 'What the pathway teaches, in plain words — "comparing fractions", "the water cycle".',
           },
-          audience: {
+          audienceHint: {
             type: 'string',
-            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". Steers standard selection; a hint, not a verified claim.',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". An unverified steer for standard selection, never a claim about the activity.',
           },
         },
         required: ['topic'],
@@ -401,19 +401,20 @@ async function handle(message: RpcRequest, request: Request) {
         const args = (message.params?.arguments ?? {}) as {
           topic?: string;
           standardCode?: string;
-          audience?: string;
+          audienceHint?: string;
           need?: string;
         };
 
         try {
-          // `audience` is free text at this boundary — a hint that steers
-          // standard selection. The scheme-scoped `audience` on the emitted
-          // manifest comes from the graph, never from this string.
+          // Named `audienceHint`, not `audience`, and the suffix is load-bearing:
+          // the manifest's `audience` is scheme-scoped and graph-derived, so
+          // reusing the bare name for unverified caller text would make one
+          // word mean two things across the same surface.
           const found = await findActivities({
             topic: args.topic,
             standardCode: args.standardCode,
             need: args.need,
-            gradeHint: args.audience,
+            gradeHint: args.audienceHint,
           });
 
           const header = found.standard
@@ -439,14 +440,14 @@ async function handle(message: RpcRequest, request: Request) {
       }
 
       if (message.params?.name === 'build_pathway') {
-        const args = (message.params?.arguments ?? {}) as { topic?: string; audience?: string };
+        const args = (message.params?.arguments ?? {}) as { topic?: string; audienceHint?: string };
         const topic = typeof args.topic === 'string' ? args.topic.trim() : '';
         if (!topic) {
           return ok(message.id, { content: [{ type: 'text', text: 'A topic is required.' }], isError: true });
         }
 
         try {
-          const run = await runPathway(topic, args.audience?.trim() || undefined);
+          const run = await runPathway(topic, args.audienceHint?.trim() || undefined);
 
           // Persistence is best-effort and separately guarded: a storage
           // failure must not discard a pathway that took five model calls to
@@ -468,7 +469,7 @@ async function handle(message: RpcRequest, request: Request) {
               sessionId = await adapter.persistSession({
                 studentId: ownerId,
                 topic,
-                gradeHint: args.audience?.trim() || null,
+                gradeHint: args.audienceHint?.trim() || null,
                 anchor: run.anchor,
                 plan: run.plan,
                 stepWidgets: run.stepWidgets,
@@ -541,18 +542,18 @@ async function handle(message: RpcRequest, request: Request) {
 
       const args = (message.params?.arguments ?? {}) as {
         topic?: string;
-        audience?: string;
-        /** Deprecated alias for `audience`; this tool shipped with it. */
+        audienceHint?: string;
+        /** Deprecated alias for `audienceHint`; this tool shipped with it. */
         gradeHint?: string;
         standardCode?: string;
         kind?: string;
       };
-      const audience = args.audience ?? args.gradeHint;
+      const audienceHint = args.audienceHint ?? args.gradeHint;
 
       try {
         const built = await buildWidget({
           topic: args.topic,
-          gradeHint: audience,
+          gradeHint: audienceHint,
           standardCode: args.standardCode,
           kind: args.kind,
         });
@@ -583,7 +584,7 @@ async function handle(message: RpcRequest, request: Request) {
 
         if (topic && (args.standardCode || args.kind)) {
           try {
-            const retry = await buildWidget({ topic, gradeHint: audience });
+            const retry = await buildWidget({ topic, gradeHint: audienceHint });
             return ok(message.id, {
               content: [
                 {
