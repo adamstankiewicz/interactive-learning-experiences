@@ -388,8 +388,9 @@ const activity = await createActivity(options[0]);
 
 &lt;ActivityFrame activity={activity} onResult={(r) =&gt; agent.observe(r)} /&gt;</code></pre>
   <ul>
-    <li><strong>A document format.</strong> Activities are data: a surface (a profile of Google's A2UI,
-    flat components and shared state wired by plain references) plus a manifest (verified standards,
+    <li><strong>A document format.</strong> Activities are data: a surface (drafted as a profile of
+    Google's A2UI — flat components and shared state wired by plain references; the app's own
+    wire format maps to it at the boundary, and conformance is tracked openly) plus a manifest (verified standards,
     pedagogy, accessibility and language declarations, provenance). Drafted openly with conformance
     classes and a changelog. We call it a format, not a specification; it earns the second word when a
     second implementation exists.</li>
