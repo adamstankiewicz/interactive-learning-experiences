@@ -63,6 +63,32 @@ pnpm mcp:build                     # REQUIRED after any change reachable from wi
                                    # and stale = widgets break in every MCP host. CI diffs it.
 ```
 
+## What needs a test — and which kind
+
+The PR template's "a test that fails without this PR" box is load-bearing:
+in an agent-maintained repo, gates are the contract, and untested logic is
+a gate with a hole in it. Match the instrument to the code:
+
+- **Pure or deterministic logic** (scoring, collectors, state machines,
+  strip/aggregate helpers): vitest, colocated as `*.test.ts`. If review
+  finds a behavior bug in logic like this, the fix ships with the test
+  that would have caught it.
+- **Wire and format surfaces** (protocol envelopes, emitted documents):
+  pin the contract — real `Request`s against the route for the envelope;
+  golden files validated against vendored upstream schemas for formats
+  (`pnpm conformance` is the house pattern), always with negative
+  controls so a vacuously-green validator can't hide.
+- **Model-call quality** (generation, scoring accuracy): never unit
+  tests — that's the eval harness (planned; Braintrust-local). Don't
+  fake it with snapshot tests of model output.
+- **UI components**: lowest priority today; behavior worth guarding
+  usually lives in an extractable pure helper — extract and test that
+  instead.
+
+`vitest` stubs Next's `server-only` marker (see `vitest.config.mts`);
+tests must run offline — use the keyless `example` standards source
+(`STANDARDS_SOURCE=example`) instead of mocking verification.
+
 ## Gotchas that cost real time
 
 - **`widgetSpec`/`widgetKind` in `src/lib/pathway/schema.ts` are
