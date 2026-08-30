@@ -73,7 +73,25 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
           </div>
         );
       }
-      case 'Card':
+      case 'Card': {
+        // Compositional presentation: a Card whose sole child is a two-tab
+        // Tabs is a thing with two faces — draw it as a real flip card. The
+        // semantics are untouched (same components, same two panels); only
+        // the affordance is native.
+        const child = typeof component.child === 'string' ? byId.get(component.child) : undefined;
+        if (child?.component === 'Tabs' && Array.isArray(child.tabs) && child.tabs.length === 2) {
+          const faces = (child.tabs as { title?: unknown; child?: unknown }[]).map((tab) => ({
+            title: String(tab.title ?? ''),
+            child: typeof tab.child === 'string' ? tab.child : null,
+          }));
+          return (
+            <FlipCard
+              key={id}
+              faces={faces as [FlipFace, FlipFace]}
+              render={(childId) => render(childId, path)}
+            />
+          );
+        }
         return (
           <div
             key={id}
@@ -82,6 +100,7 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
             {children()}
           </div>
         );
+      }
       case 'Text': {
         const caption = component.variant === 'caption';
         return (
@@ -141,6 +160,47 @@ function childIds(component: A2UIComponent): string[] {
     for (const ref of component.children) if (typeof ref === 'string') ids.push(ref);
   }
   return ids;
+}
+
+type FlipFace = { title: string; child: string | null };
+
+/**
+ * A genuine 3D flip: one container rotating in perspective, two
+ * backface-hidden faces stacked in the same grid cell (so the tallest face
+ * sets the height), tap anywhere to turn it over. The caption names the
+ * other face using the surface's own tab titles — no flashcard vocabulary
+ * baked into the renderer.
+ */
+function FlipCard({
+  faces,
+  render,
+}: {
+  faces: [FlipFace, FlipFace];
+  render: (childId: string) => React.ReactNode;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  const faceClass =
+    'col-start-1 row-start-1 flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-card p-6 text-center shadow-sm [backface-visibility:hidden]';
+  return (
+    <div className="flex flex-col gap-2">
+      <div style={{ perspective: 1100 }}>
+        <motion.div
+          className="grid cursor-pointer transform-3d"
+          animate={{ rotateY: flipped ? 180 : 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.9, 0.3, 1] }}
+          onClick={() => setFlipped((f) => !f)}
+        >
+          <div className={faceClass}>{faces[0].child ? render(faces[0].child) : null}</div>
+          <div className={`${faceClass} transform-[rotateY(180deg)]`}>
+            {faces[1].child ? render(faces[1].child) : null}
+          </div>
+        </motion.div>
+      </div>
+      <p className="text-center text-sm text-muted-foreground">
+        Tap to see {flipped ? faces[0].title.toLowerCase() : faces[1].title.toLowerCase()}
+      </p>
+    </div>
+  );
 }
 
 /**
