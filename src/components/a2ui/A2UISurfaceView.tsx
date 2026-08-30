@@ -43,7 +43,7 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
       case 'Column':
         return (
           <div key={id} className="flex flex-col gap-3">
-            {children()}
+            {columnChildren(component, path)}
           </div>
         );
       case 'Row':
@@ -150,6 +150,47 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
     }
   }
 
+  /**
+   * A Column's children, with one compositional merge: a horizontal List
+   * (a deck) immediately followed by an action Button folds that button
+   * into the deck's paging controls as the final page's action — the same
+   * button, the same action, presented where the reader finishes, the way
+   * the native widgets end on their own CTA. Nothing is dropped or added.
+   */
+  function columnChildren(component: A2UIComponent, path: Set<string>): React.ReactNode[] {
+    const ids = childIds(component);
+    const nodes: React.ReactNode[] = [];
+    for (let i = 0; i < ids.length; i++) {
+      const child = byId.get(ids[i]);
+      const following = i + 1 < ids.length ? byId.get(ids[i + 1]) : undefined;
+      if (
+        child?.component === 'List' &&
+        child.direction === 'horizontal' &&
+        following?.component === 'Button' &&
+        following.action &&
+        typeof following.action === 'object'
+      ) {
+        const labelSource =
+          typeof following.child === 'string' ? byId.get(following.child) : undefined;
+        const action = following.action as Record<string, unknown>;
+        nodes.push(
+          <DeckView
+            key={ids[i]}
+            items={childIds(child).map((childId) => ({ id: childId, node: render(childId, path) }))}
+            finale={{
+              label: String(labelSource?.text ?? 'Done'),
+              onClick: () => onAction?.(action),
+            }}
+          />,
+        );
+        i++; // the button is folded into the deck — don't render it twice
+        continue;
+      }
+      nodes.push(render(ids[i], path));
+    }
+    return nodes;
+  }
+
   return <div className="flex flex-col gap-3">{render('root', new Set())}</div>;
 }
 
@@ -168,7 +209,14 @@ function childIds(component: A2UIComponent): string[] {
  * position dots as renderer affordances, and page changes slide in place —
  * the same 320ms slide-and-fade the native widgets use, not a scroll.
  */
-function DeckView({ items }: { items: { id: string; node: React.ReactNode }[] }) {
+function DeckView({
+  items,
+  finale,
+}: {
+  items: { id: string; node: React.ReactNode }[];
+  /** Rendered in Next's place on the last page — the deck's own completion action. */
+  finale?: { label: string; onClick: () => void };
+}) {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
 
@@ -211,14 +259,24 @@ function DeckView({ items }: { items: { id: string; node: React.ReactNode }[] })
             >
               ← Back
             </button>
-            <button
-              type="button"
-              disabled={index === items.length - 1}
-              onClick={() => go(index + 1)}
-              className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
-            >
-              Next →
-            </button>
+            {finale && index === items.length - 1 ? (
+              <button
+                type="button"
+                onClick={finale.onClick}
+                className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                {finale.label}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={index === items.length - 1}
+                onClick={() => go(index + 1)}
+                className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              >
+                Next →
+              </button>
+            )}
           </div>
         </>
       )}
