@@ -33,6 +33,24 @@ body:
         - "No — it's exploratory / expressive"
     validations:
       required: true
+  - type: dropdown
+    id: completion
+    attributes:
+      label: How does a student finish it?
+      description: The walkthrough needs to know — a kind with its own continue button behaves differently from one with no finish line.
+      options:
+        - "It has its own continue/done button"
+        - "It signals done and the walkthrough shows the button"
+        - "Open-ended — no unambiguous done moment"
+    validations:
+      required: true
+  - type: textarea
+    id: access
+    attributes:
+      label: How does it work without a mouse, and without sight?
+      description: Keyboard path and screen-reader story, briefly. Widgets ship for classrooms — every student in them. (CAST's UDL guidelines are the reference.)
+    validations:
+      required: true
   - type: textarea
     id: generation
     attributes:
