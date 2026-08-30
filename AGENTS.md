@@ -37,9 +37,14 @@ student works → structured evidence returns to whatever assigned it.
 1. **The model never writes code that runs.** Generated output fills Zod
    schemas rendered by human-written components. Never eval, never render
    model-emitted markup outside the schema path.
-2. **Student identity never reaches this server from an integration.**
-   Anonymous ids only on the wire. Educator identity may someday reach the
-   edge; student identity never does.
+2. **Student identity never crosses the integration boundary.** Anonymous
+   ids only on the wire — an assigning agent never sends one, and this
+   server never hands one back. A deployment that maps those ids to real
+   people inside its own storage adapter is the supported pattern, not an
+   exception: the mapping stays in the deployment and never travels. What
+   the rule forbids is identity arriving from, or leaking to, an
+   integration. Educator identity may someday reach the edge; student
+   identity never does.
 3. **No verdicts for unmeasured work.** `correct: null` for anything
    without a real check; a widget kind must declare `assesses` (a "check"
    step on a non-assessing kind reports mastery nothing measured).
