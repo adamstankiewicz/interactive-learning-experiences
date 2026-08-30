@@ -27,9 +27,10 @@ const PAGES: Record<string, { file: string; title: string; nav: string; section:
   registry: { file: 'registry.md', title: 'The widget registry', nav: 'Widget registry', section: 'Reference' },
   'mcp-tools': { file: 'mcp-tools.md', title: 'MCP tools', nav: 'MCP tools', section: 'Reference' },
   evidence: { file: 'evidence.md', title: 'The evidence contract', nav: 'Evidence contract', section: 'Reference' },
+  messaging: { file: 'messaging.md', title: 'Messaging guide', nav: 'Messaging', section: 'Project' },
 };
 
-const SECTIONS = ['Learn', 'Guides', 'Reference'];
+const SECTIONS = ['Learn', 'Guides', 'Reference', 'Project'];
 
 /**
  * The markdown's relative links are written for GitHub. In the app they

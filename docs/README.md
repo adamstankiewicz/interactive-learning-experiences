@@ -42,6 +42,12 @@ how. Start from who you are:
 | [MCP tools](./mcp-tools.md) | The wire surface an agent calls, shipped and planned |
 | [The evidence contract](./evidence.md) | The event shapes, their honesty rules, and what reads them |
 
+**Project** — for people who represent it
+
+| Page | Answers |
+|---|---|
+| [Messaging guide](./messaging.md) | The sentence, the category, the claim-hygiene rules, and the boilerplate — so everyone pitches it identically |
+
 The a2learn document format draft (surface + manifest, conformance classes)
 lives separately under `docs/a2learn/` once its branch merges.
 
