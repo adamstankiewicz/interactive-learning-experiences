@@ -754,7 +754,145 @@ export const writingWorkshopSpec = z.object({
 
 export type WritingWorkshopSpec = z.infer<typeof writingWorkshopSpec>;
 
+// --- composed: an activity assembled from pedagogical primitives ---------
+
+/**
+ * The composed kind is the registry's generative escape hatch: instead of one
+ * fixed interaction, the model emits a flat tree of *pedagogical primitives*
+ * (issue #100 holds the vocabulary and its learning-science grounding) and
+ * human-written renderers draw it. Invariant 1 holds — this is data, validated
+ * here, never code. The v1 alphabet is deliberately verdict-free: nothing in
+ * it can measure, so a composed activity's `assesses` is false by
+ * construction (derived from the alphabet, not asserted). Verdict-carrying
+ * primitives (Check/Response) join only with the #99 evidence contract.
+ *
+ * Components reference each other by id in a flat list — the same shape A2UI
+ * surfaces use, so compositions project to the a2learn catalog verbatim.
+ */
+
+const composedChildId = z.string().describe('The id of another component in this composition.');
+
+const composedText = z.object({
+  type: z.literal('Text'),
+  id: z.string(),
+  text: z.string().describe('Markdown body text. Bold key terms; no headings, links, or images.'),
+  variant: z
+    .enum(['body', 'caption'])
+    .nullable()
+    .describe('"caption" renders small and muted; null means body.'),
+});
+
+const composedCallout = z.object({
+  type: z.literal('Callout'),
+  id: z.string(),
+  intent: z
+    .enum(['why', 'tip', 'note'])
+    .describe('"why" for reasoning behind an idea (elaborative), "tip" for strategy advice, "note" for anything else.'),
+  label: z.string().describe('Short bold lead-in, e.g. "Why?" or "Tip:".'),
+  text: z.string().describe('One or two sentences of markdown.'),
+});
+
+const composedGroup = z.object({
+  type: z.literal('Group'),
+  id: z.string(),
+  children: z.array(composedChildId).describe('2–6 child ids, rendered top to bottom.'),
+});
+
+const composedReveal = z.object({
+  type: z.literal('Reveal'),
+  id: z.string(),
+  faces: z
+    .array(z.object({ title: z.string(), child: composedChildId }))
+    .describe('Exactly 2 faces: front first, back second. The student taps to turn it over — put the prompt on the front and the payoff on the back.'),
+});
+
+const composedSequence = z.object({
+  type: z.literal('Sequence'),
+  id: z.string(),
+  policy: z.object({
+    order: z.enum(['linear', 'free']).describe('"linear" when items build on each other; "free" when they can be browsed.'),
+    disclosure: z.enum(['gated', 'all']).describe('"gated" holds each item back until the student advances — use for walkthroughs.'),
+    revealed: z.enum(['accumulate', 'replace']).describe('"accumulate" keeps passed items visible (worked examples); "replace" shows one at a time (decks).'),
+  }),
+  children: z.array(composedChildId).describe('2–8 item ids, in teaching order.'),
+});
+
+const composedComponent = z.discriminatedUnion('type', [
+  composedText,
+  composedCallout,
+  composedGroup,
+  composedReveal,
+  composedSequence,
+]);
+export type ComposedComponent = z.infer<typeof composedComponent>;
+
+export const composedSpec = z.object({
+  kind: z.literal('composed'),
+  learningComponentId: z.string().nullable(),
+  title: z.string().describe('Short student-facing activity title.'),
+  components: z
+    .array(composedComponent)
+    .describe('Flat component list. Exactly one component must have id "root" — usually a Group or Sequence that references the rest. 3–20 components.'),
+});
+export type ComposedSpec = z.infer<typeof composedSpec>;
+
+/**
+ * Structural rules the union cannot express (discriminated-union members must
+ * stay plain objects, and providers never see refinements anyway). The
+ * generator runs this before accepting a composition; the registry entry's
+ * schema runs it again at render time.
+ */
+export function compositionProblems(spec: ComposedSpec): string[] {
+  const problems: string[] = [];
+  const ids = new Set<string>();
+  for (const c of spec.components) {
+    if (ids.has(c.id)) problems.push(`duplicate component id: ${c.id}`);
+    ids.add(c.id);
+  }
+  if (!ids.has('root')) problems.push('no component with id "root"');
+
+  const childRefs = (c: ComposedComponent): string[] =>
+    c.type === 'Group' || c.type === 'Sequence'
+      ? c.children
+      : c.type === 'Reveal'
+        ? c.faces.map((f) => f.child)
+        : [];
+
+  for (const c of spec.components) {
+    for (const ref of childRefs(c)) {
+      if (!ids.has(ref)) problems.push(`${c.id} references missing component: ${ref}`);
+      if (ref === c.id) problems.push(`${c.id} references itself`);
+    }
+  }
+  if (spec.components.some((c) => c.type === 'Reveal' && c.faces.length !== 2)) {
+    problems.push('a Reveal must have exactly 2 faces');
+  }
+
+  // Cycle check: walk from root; a composition is a tree, not a graph.
+  const byId = new Map(spec.components.map((c) => [c.id, c]));
+  const visiting = new Set<string>();
+  const walk = (id: string): boolean => {
+    if (visiting.has(id)) return false;
+    visiting.add(id);
+    const node = byId.get(id);
+    const ok = !node || childRefs(node).every(walk);
+    visiting.delete(id);
+    return ok;
+  };
+  if (ids.has('root') && !walk('root')) problems.push('composition contains a reference cycle');
+
+  return problems;
+}
+
+/** The strict form — for the registry entry, where refinements are allowed. */
+export const composedSpecStrict = composedSpec.superRefine((spec, ctx) => {
+  for (const problem of compositionProblems(spec)) {
+    ctx.addIssue({ code: 'custom', message: problem });
+  }
+});
+
 export const widgetSpec = z.discriminatedUnion('kind', [
+  composedSpec,
   debateAiSpec,
   writingWorkshopSpec,
   fractionAreaModelSpec,
@@ -783,6 +921,7 @@ export const learningOutcome = z.object({
 
 /** The widget kinds the registry can render. Keep in step with `widgetSpec`. */
 export const widgetKind = z.enum([
+  'composed',
   'fraction-area-model',
   'swiper-flashcard',
   'draft-meter',

@@ -3,6 +3,7 @@
  * transitively; only ever imported by `pathway/generate.ts`, never by a
  * client component. Import `./builtins` (not this file) for rendering.
  */
+import '@/lib/widgets/definitions/composed.generate';
 import '@/lib/widgets/definitions/fraction-area-model.generate';
 import '@/lib/widgets/definitions/swiper-flashcard.generate';
 import '@/lib/widgets/definitions/draft-meter.generate';
