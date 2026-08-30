@@ -35,14 +35,8 @@ async function extractText(file: File): Promise<string> {
   const isText = file.type.startsWith('text/plain') || file.name.toLowerCase().endsWith('.txt');
 
   if (isPdf) {
-    // Imported from lib/pdf-parse.js, not the package root: the root's
-    // index.js runs a debug branch on any `require.parent`-less load (true
-    // under Next's bundler) that reads a fixture file from the package's own
-    // test directory and throws ENOENT since that file isn't shipped.
-    const { default: pdfParse } = await import('pdf-parse/lib/pdf-parse.js');
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const parsed = await pdfParse(buffer);
-    return parsed.text;
+    const { pdfToText } = await import('@/lib/pdf-text');
+    return pdfToText(new Uint8Array(await file.arrayBuffer()));
   }
 
   if (isText) return file.text();
