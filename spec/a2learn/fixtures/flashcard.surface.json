@@ -9,9 +9,7 @@
         "component": "Column",
         "children": [
           "prompt",
-          "card-0",
-          "card-1",
-          "card-2",
+          "deck",
           "done",
           "success"
         ]
@@ -20,6 +18,16 @@
         "id": "prompt",
         "component": "Text",
         "text": "Match each fraction word to what it means."
+      },
+      {
+        "id": "deck",
+        "component": "List",
+        "direction": "horizontal",
+        "children": [
+          "card-0",
+          "card-1",
+          "card-2"
+        ]
       },
       {
         "id": "card-0",

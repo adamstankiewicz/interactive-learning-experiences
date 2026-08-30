@@ -1,19 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 
 import type { A2UIComponent, A2UISurfaceMessage } from '@/lib/a2learn/a2ui';
 
 /**
- * A minimal renderer for the slice of the A2UI basic catalog the boundary
- * mapper emits: Column, Card, Text, Divider, Image, Button. This is not a
- * general A2UI client — it exists so the app can *show* a mapped surface
- * being a real UI, not just JSON that validates. A component outside the
- * emitted slice renders as a visible gap, never silently dropped.
+ * A renderer for the slice of the A2UI basic catalog the boundary mapper
+ * emits: Column, Card, Text, Divider, Image, Button, Tabs, List. This is
+ * not a general A2UI client — it exists so the app can *show* a mapped
+ * surface being a real UI, not just JSON that validates. A component
+ * outside the emitted slice renders as a visible gap, never silently
+ * dropped.
  *
- * Fidelity is deliberately strict-renderer: Text draws its string as plain
- * text, so a markdown body shows literal `**` marks — the exact degradation
- * the mapper's header documents. Honesty over polish applies to demos too.
+ * Presentation is the renderer's job — that's A2UI's core split: the
+ * surface carries semantics, the host draws them in its own design
+ * language. So this renderer animates tab switches, styles cards like the
+ * app's cards, and pages horizontal lists like a deck. What it never does
+ * is exceed the semantics: Text draws its string as plain text (a markdown
+ * body shows literal `**` marks — the mapper documents exactly that), and
+ * no component gains state the surface didn't model.
  */
 
 type Props = {
@@ -40,9 +46,39 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
             {children()}
           </div>
         );
+      case 'Row':
+        return (
+          <div key={id} className="flex flex-row items-center gap-3">
+            {children()}
+          </div>
+        );
+      case 'List': {
+        const horizontal = component.direction === 'horizontal';
+        if (!horizontal) {
+          return (
+            <div key={id} className="flex flex-col gap-3">
+              {children()}
+            </div>
+          );
+        }
+        // A horizontal list pages like a deck: full-width snap targets, one
+        // in view at a time, swipe or scroll to move through.
+        return (
+          <div key={id} className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
+            {childIds(component).map((childId) => (
+              <div key={childId} className="w-full shrink-0 snap-center">
+                {render(childId, path)}
+              </div>
+            ))}
+          </div>
+        );
+      }
       case 'Card':
         return (
-          <div key={id} className="rounded-lg border border-border bg-card p-4">
+          <div
+            key={id}
+            className="flex min-h-44 flex-col justify-center gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm"
+          >
             {children()}
           </div>
         );
@@ -107,8 +143,13 @@ function childIds(component: A2UIComponent): string[] {
   return ids;
 }
 
-/** Tab switching is renderer-local state — the one interaction the basic
- *  catalog gives back (this is how the flashcard reveal survives projection). */
+/**
+ * Tab switching is renderer-local state — the one interaction the basic
+ * catalog gives back (this is how the flashcard reveal survives projection).
+ * Presentation is ours to choose, so a switch flips: the panel turns over
+ * like a card, and the whole panel is tappable to advance to the next tab —
+ * semantics unchanged, affordance native.
+ */
 function TabsView({
   tabs,
   render,
@@ -118,9 +159,10 @@ function TabsView({
 }) {
   const [active, setActive] = useState(0);
   const current = tabs[active];
+  const advance = () => setActive((i) => (i + 1) % tabs.length);
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-1 border-b border-border" role="tablist">
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-center gap-1" role="tablist">
         {tabs.map((tab, i) => (
           <button
             key={i}
@@ -129,8 +171,8 @@ function TabsView({
             aria-selected={i === active}
             className={
               i === active
-                ? 'rounded-t-md border-b-2 border-primary px-3 py-1.5 text-sm font-medium'
-                : 'px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground'
+                ? 'rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
+                : 'rounded-full px-3 py-1 text-xs text-muted-foreground hover:bg-muted'
             }
             onClick={() => setActive(i)}
           >
@@ -138,7 +180,18 @@ function TabsView({
           </button>
         ))}
       </div>
-      {current?.child ? render(current.child) : null}
+      <motion.div
+        key={active}
+        initial={{ rotateY: -90, opacity: 0.4 }}
+        animate={{ rotateY: 0, opacity: 1 }}
+        transition={{ duration: 0.28, ease: 'easeOut' }}
+        style={{ transformPerspective: 900 }}
+        className="cursor-pointer"
+        onClick={advance}
+        title="Tap to turn over"
+      >
+        {current?.child ? render(current.child) : null}
+      </motion.div>
     </div>
   );
 }

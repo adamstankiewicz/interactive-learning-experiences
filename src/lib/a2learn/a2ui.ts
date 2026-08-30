@@ -159,8 +159,11 @@ function flashcardSurface(spec: FlashcardSpec, surfaceId: string): A2UISurfaceMe
   });
 
   const components: A2UIComponent[] = [
-    { id: 'root', component: 'Column', children: ['prompt', ...cardIds, 'done', 'success'] },
+    { id: 'root', component: 'Column', children: ['prompt', 'deck', 'done', 'success'] },
     { id: 'prompt', component: 'Text', text: spec.prompt },
+    // A horizontal List is the catalog's word for a deck: renderers page or
+    // scroll it, so cards present one at a time instead of as a wall.
+    { id: 'deck', component: 'List', direction: 'horizontal', children: cardIds },
     ...cardComponents,
     ...doneButton(spec.kind, 'Done'),
     // The author wrote this for the end of the deck; a static surface shows

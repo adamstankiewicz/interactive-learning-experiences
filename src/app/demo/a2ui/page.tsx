@@ -10,7 +10,7 @@ import { toA2LearnSurface } from '@/lib/a2learn/catalog';
 /**
  * The A2UI boundary, functional: the same fixture specs the conformance
  * suite proves (`spec/a2learn/fixtures/`), mapped live through
- * `toA2UISurface` at render time and drawn by a minimal renderer of the
+ * `toA2UISurface` at render time and drawn by the app's renderer of the
  * emitted catalog slice. Deterministic and offline — no model call, so what
  * this page shows is exactly what the conformance gate guarantees.
  */
@@ -49,17 +49,20 @@ export default function A2UIDemoPage() {
           Google&apos;s A2UI
         </a>{' '}
         basic catalog — the same surfaces the conformance suite validates against the vendored
-        upstream schemas, mapped live on this page and rendered by a minimal renderer of the six
-        component types the mapper emits.
+        upstream schemas, mapped live on this page and rendered by this app&apos;s renderer of the
+        catalog slice the mapper emits.
       </p>
       <p className="mb-8 text-sm text-muted-foreground">
-        Both columns are A2UI surfaces — the two tiers of the same spec. The left is the a2learn
+        Both columns are A2UI surfaces — the two tiers of the same spec. The first is the a2learn
         catalog (draft): its component is the widget kind itself, the registry is the renderer, so
         it is the exact native experience — flip animation, completion reporting, the same loop
-        the MCP Apps shell speaks. The right is the basic-catalog projection any generic A2UI
-        renderer can draw: the reveal survives as tabs, markdown as literal text. The remaining
-        gap between the columns is what the versioned a2learn catalog (#98) closes for hosts
-        beyond this app. Basic-mapped kinds today: {A2UI_SUPPORTED_KINDS.join(', ')}.
+        the MCP Apps shell speaks. The second is the basic-catalog projection any A2UI renderer
+        can draw — and presentation is the renderer&apos;s half of the protocol, so this
+        one draws it in the app&apos;s own design language: the deck pages horizontally, a tab
+        switch turns the card over. What stays behind in the projection is semantics the catalog
+        cannot carry — per-card progress, checked completion, markdown formatting — and that gap
+        is what the versioned a2learn catalog (#98) closes for hosts beyond this app.
+        Basic-mapped kinds today: {A2UI_SUPPORTED_KINDS.join(', ')}.
       </p>
 
       <div className="flex flex-col gap-10">
