@@ -216,6 +216,32 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
           />
         );
       }
+      case 'a2learn:Callout': {
+        // Pedagogical emphasis with intent as data — the renderer maps
+        // intent to its design language; unknown intents get the neutral box.
+        const intent = String(component.intent ?? 'note');
+        const tone =
+          intent === 'why'
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30'
+            : intent === 'tip'
+              ? 'border-primary/25 bg-primary/5'
+              : 'border-border bg-muted/40';
+        const labelTone = intent === 'tip' ? 'font-semibold text-primary' : 'font-semibold';
+        return (
+          <div key={id} className={`rounded-lg border px-4 py-3 text-sm ${tone}`}>
+            {component.label ? <span className={labelTone}>{String(component.label)} </span> : null}
+            {typeof component.child === 'string' ? (
+              render(component.child, path)
+            ) : (
+              <span className="[&_p]:inline">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['a', 'img']} unwrapDisallowed>
+                  {String(component.text ?? '')}
+                </ReactMarkdown>
+              </span>
+            )}
+          </div>
+        );
+      }
       default:
         return <Gap key={id} label={`unrenderable component: ${component.component}`} />;
     }

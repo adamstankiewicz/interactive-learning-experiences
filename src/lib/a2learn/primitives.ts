@@ -1,5 +1,5 @@
 import type { A2UIComponent, A2UISurfaceMessage } from '@/lib/a2learn/a2ui';
-import type { FlashcardSpec, StepRevealSpec } from '@/lib/pathway/schema';
+import type { FlashcardSpec, MarkdownCardSpec, StepRevealSpec } from '@/lib/pathway/schema';
 
 import { A2LEARN_CATALOG_DRAFT } from '@/lib/a2learn/catalog';
 import { A2LEARN_EVENT_PREFIX } from '@/lib/a2learn/manifest';
@@ -43,6 +43,14 @@ export type SequencePolicy = {
 
 export const SEQUENCE = 'a2learn:Sequence';
 export const REVEAL = 'a2learn:Reveal';
+/**
+ * `a2learn:Callout` — the first *content* primitive: a block whose
+ * pedagogical intent is data (`intent`: 'why' | 'tip' | 'note' today,
+ * open to more), with a bold `label` and markdown `text`. The native
+ * widgets style a "why" and a "tip" as emphasized boxes; without this
+ * word that emphasis degrades to a muted caption in every projection.
+ */
+export const CALLOUT = 'a2learn:Callout';
 
 function completedAction(kind: string) {
   return {
@@ -71,7 +79,7 @@ function stepRevealComposition(spec: StepRevealSpec, surfaceId: string): A2UISur
     ];
     if (step.why) {
       children.push(`step-${i}-why`);
-      parts.push({ id: `step-${i}-why`, component: 'Text', text: `Why: ${step.why}`, variant: 'caption' });
+      parts.push({ id: `step-${i}-why`, component: CALLOUT, intent: 'why', label: 'Why?', text: step.why });
     }
     parts.push({ id: `step-${i}`, component: 'Column', children });
     return parts;
@@ -88,6 +96,18 @@ function stepRevealComposition(spec: StepRevealSpec, surfaceId: string): A2UISur
       completeAction: completedAction(spec.kind),
     },
     ...items,
+  ]);
+}
+
+function markdownCardComposition(spec: MarkdownCardSpec, surfaceId: string): A2UISurfaceMessage {
+  const children = ['title', 'body', ...(spec.tip ? ['tip'] : [])];
+  return compositionSurface(surfaceId, [
+    { id: 'root', component: 'Column', children },
+    { id: 'title', component: 'Text', text: spec.title },
+    { id: 'body', component: 'Text', text: spec.body },
+    ...(spec.tip
+      ? [{ id: 'tip', component: CALLOUT, intent: 'tip', label: 'Tip:', text: spec.tip } as A2UIComponent]
+      : []),
   ]);
 }
 
@@ -155,6 +175,8 @@ export function toA2LearnComposition(spec: unknown, surfaceId: string): A2UISurf
       return stepRevealComposition(spec as StepRevealSpec, surfaceId);
     case 'flashcard':
       return flashcardComposition(spec as FlashcardSpec, surfaceId);
+    case 'markdown-card':
+      return markdownCardComposition(spec as MarkdownCardSpec, surfaceId);
     default:
       return null;
   }
