@@ -70,6 +70,21 @@ ajv.addSchema(basicCatalog);
 ajv.addSchema({ ...basicCatalog, $id: 'https://a2ui.org/specification/v1_0/catalog.json' });
 const validate = ajv.compile(messageSchema);
 
+// --- negative controls: prove each layer can reject before trusting green ---
+// The $id alias above is exactly the plumbing that could silently vacuate
+// validation; these fail-closed checks run every time, not just in review.
+// Empirical note: the upstream schema accepts a createSurface with no
+// components at all — only the structural layer catches that, which is why
+// both layers get their own control here.
+if (validate({})) {
+  console.error('✗ negative control: schema validator accepted an empty message — validation is vacuous');
+  process.exit(1);
+}
+if (validate({ createSurface: { surfaceId: 's', catalogId: 'c', components: [{ bogus: true }] } })) {
+  console.error('✗ negative control: schema validator accepted a malformed component — validation is vacuous');
+  process.exit(1);
+}
+
 // --- structural invariants the schema cannot express ---
 function structuralProblems(message) {
   const problems = [];
@@ -95,6 +110,25 @@ function structuralProblems(message) {
     }
   }
   return problems;
+}
+
+// Structural layer: a duplicate id, a dangling child ref, and a missing root
+// must all be reported, or layer 3 is a no-op wearing a checkmark.
+{
+  const problems = structuralProblems({
+    createSurface: { components: [{ id: 'a', child: 'ghost' }, { id: 'a' }] },
+  });
+  const wants = ['duplicate component id', 'missing component', "no 'root'"];
+  if (!wants.every((w) => problems.some((p) => p.includes(w)))) {
+    console.error(`✗ negative control: structural checker missed known defects (got: ${problems.join('; ') || 'nothing'})`);
+    process.exit(1);
+  }
+}
+
+// Input layer: the zod gate must reject a spec the pipeline could never produce.
+if (widgetSpec.safeParse({ kind: 'no-such-kind' }).success) {
+  console.error('✗ negative control: widgetSpec accepted an unknown kind — the fixture gate is open');
+  process.exit(1);
 }
 
 // --- run every fixture ---
