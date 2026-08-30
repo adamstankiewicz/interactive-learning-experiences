@@ -1,0 +1,33 @@
+/*
+ * The widget shell's stylesheet — the app's real theme, compiled standalone.
+ *
+ * One import, one source of truth: the shell gets its tokens, dark mode, and
+ * utilities from the same globals.css the app uses, so a retheme lands here
+ * automatically. Compiling it directly (instead of lifting the app's built
+ * CSS out of .next) is what breaks the old circular dependency — the shell
+ * no longer needs a finished `next build`, so it can be produced as a
+ * prebuild step and never committed or manually rebuilt again. It also
+ * removes @font-face by construction: next/font never runs in this compile,
+ * so there is nothing to strip and nothing nondeterministic to guard.
+ */
+@import "../src/app/globals.css";
+
+/*
+ * Everything globals.css leaves to next/font, defined here for a document
+ * that has no font pipeline: every `--font-*` variable the theme layer
+ * references gets a real stack, so no widget ever renders with an invalid
+ * font-family from an undefined variable. A system stack is closer to what
+ * a chat host uses anyway.
+ */
+:root {
+  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-source-serif: Georgia, "Times New Roman", serif;
+}
+
+/* Let the host's own surface show through instead of painting a slab. */
+html,
+body {
+  background: transparent;
+  margin: 0;
+}
