@@ -52,6 +52,28 @@ describe('findActivities', () => {
     expect(withGrade.activities.map((a) => a.id)).toEqual(without.activities.map((a) => a.id));
   });
 
+  it("carries the graph's grade levels as a scheme-scoped audience", async () => {
+    const result = await findActivities({ standardCode: 'MATH.4.NF.EQUIV' });
+
+    for (const listing of result.activities) {
+      // Scheme-scoped, never a bare label: "4" only means grade 4 because
+      // `k12-us` says which system named it.
+      expect(listing.audience).toEqual([{ scheme: 'k12-us', values: ['4'] }]);
+    }
+  });
+
+  it('never launders an unverified grade hint into a scheme', async () => {
+    // A code that will not verify, so no model call: standard stays null.
+    const result = await findActivities({ standardCode: 'FAKE.9.99', gradeHint: '8th grade' });
+
+    expect(result.standard).toBeNull();
+    for (const listing of result.activities) {
+      // "8th grade" is not a `k12-us` value, and nothing verified it. An
+      // absent audience reads as unstated, which is the honest answer.
+      expect(listing.audience).toEqual([]);
+    }
+  });
+
   it('keeps a hallucinated code on the record and degrades to standard-agnostic listings', async () => {
     const result = await findActivities({ standardCode: 'FAKE.9.99', topic: 'the water cycle' });
 

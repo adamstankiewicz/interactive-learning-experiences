@@ -74,6 +74,22 @@ function scoreEntry(
   return score;
 }
 
+/**
+ * The graph's grade levels as a scheme-scoped audience entry. Every standards
+ * source wired today is US K-12, so the scheme is a literal here; a source
+ * whose levels aren't K-12 grades declares its own, and this becomes a lookup.
+ *
+ * The caller's free-text `gradeHint` deliberately does *not* fall back into
+ * this field. "8th grade" is not a `k12-us` value, and laundering unscoped
+ * user text into a scheme is precisely what the scheme exists to prevent —
+ * an absent audience reads as unstated, which is the honest answer when all
+ * we have is a hint nobody verified.
+ */
+function audienceFor(standard: StandardRef | null): ActivityManifest['audience'] {
+  const values = standard?.gradeLevels ?? [];
+  return values.length > 0 ? [{ scheme: 'k12-us', values }] : [];
+}
+
 export async function findActivities(input: {
   standardCode?: string;
   topic?: string;
@@ -142,7 +158,7 @@ export async function findActivities(input: {
         standards: standard
           ? [{ code: standard.code, source: standard.sourceId, verified: standard.verified }]
           : [],
-        gradeBand: standard?.gradeLevels ?? (input.gradeHint ? [input.gradeHint] : []),
+        audience: audienceFor(standard),
         pedagogy: { assesses: entry.assesses, mechanics: [entry.kind] },
         delivery: { mcp: { tool: 'show_widget', arguments: invokeArgs } },
         provenance: { generated: true },

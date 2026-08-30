@@ -36,7 +36,15 @@ export type ActivityManifest = {
   generative: true;
   /** Every code here survived graph verification, or is flagged `verified: false` — a listing never launders an unchecked code. */
   standards: { code: string; source: string; verified: boolean }[];
-  gradeBand: string[];
+  /**
+   * Who the activity is for, as scheme-scoped labels. `scheme` names the
+   * system that owns the values, so "4" is unambiguous — grade 4 under
+   * `k12-us`, not year 4 or level 4 under something else. Mirrors the
+   * `standards[]` shape above: a value plus the authority that named it.
+   *
+   * Empty means *unstated*, never "suitable for anyone".
+   */
+  audience: { scheme: string; values: string[] }[];
   /**
    * What an agent needs before assigning: `assesses` mirrors the registry
    * entry's flag (completion without it is not evidence of mastery);
