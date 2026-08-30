@@ -17,14 +17,19 @@ import remarkGfm from 'remark-gfm';
 
 const REPO_BLOB = 'https://github.com/adamstankiewicz/interactive-learning-experiences/blob/main';
 
-const PAGES: Record<string, { file: string; title: string; nav: string }> = {
-  '': { file: 'README.md', title: 'Docs', nav: 'Overview' },
-  quickstart: { file: 'quickstart.md', title: 'Quickstart', nav: 'Quickstart' },
-  registry: { file: 'registry.md', title: 'The widget registry', nav: 'Registry' },
-  'mcp-tools': { file: 'mcp-tools.md', title: 'MCP tools', nav: 'MCP tools' },
-  evidence: { file: 'evidence.md', title: 'The evidence contract', nav: 'Evidence' },
-  architecture: { file: 'architecture.md', title: 'Architecture', nav: 'Architecture' },
+const PAGES: Record<string, { file: string; title: string; nav: string; section: string }> = {
+  '': { file: 'README.md', title: 'Docs', nav: 'Overview', section: '' },
+  'the-loop': { file: 'the-loop.md', title: 'How the loop works', nav: 'How the loop works', section: 'Learn' },
+  pedagogy: { file: 'pedagogy.md', title: 'Pedagogy', nav: 'Pedagogy', section: 'Learn' },
+  architecture: { file: 'architecture.md', title: 'Architecture', nav: 'Architecture', section: 'Learn' },
+  quickstart: { file: 'quickstart.md', title: 'Quickstart', nav: 'Quickstart', section: 'Guides' },
+  configuration: { file: 'configuration.md', title: 'Configuration', nav: 'Configuration', section: 'Guides' },
+  registry: { file: 'registry.md', title: 'The widget registry', nav: 'Widget registry', section: 'Reference' },
+  'mcp-tools': { file: 'mcp-tools.md', title: 'MCP tools', nav: 'MCP tools', section: 'Reference' },
+  evidence: { file: 'evidence.md', title: 'The evidence contract', nav: 'Evidence contract', section: 'Reference' },
 };
+
+const SECTIONS = ['Learn', 'Guides', 'Reference'];
 
 /**
  * The markdown's relative links are written for GitHub. In the app they
@@ -78,11 +83,60 @@ export default async function DocsPage({ params }: { params: Promise<{ slug?: st
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-baseline gap-x-5 gap-y-1 px-6 py-3">
+        <div className="mx-auto flex w-full max-w-5xl items-baseline gap-5 px-6 py-3">
           <Link href="/docs" className="font-mono text-sm font-medium">
             a2learn docs
           </Link>
-          <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <a
+            href="/open.html"
+            className="ml-auto text-sm text-muted-foreground hover:text-foreground"
+          >
+            About →
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-5xl gap-10 px-6">
+        <aside className="hidden w-44 shrink-0 py-10 lg:block">
+          <nav className="sticky top-8 flex flex-col gap-5 text-sm">
+            <Link
+              href="/docs"
+              className={
+                activeKey === ''
+                  ? 'font-medium text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }
+            >
+              Overview
+            </Link>
+            {SECTIONS.map((section) => (
+              <div key={section} className="flex flex-col gap-1.5">
+                <p className="font-mono text-[11px] tracking-wider text-muted-foreground uppercase">
+                  {section}
+                </p>
+                {Object.entries(PAGES)
+                  .filter(([, entry]) => entry.section === section)
+                  .map(([key, entry]) => (
+                    <Link
+                      key={entry.file}
+                      href={`/docs/${key}`}
+                      className={
+                        key === activeKey
+                          ? 'font-medium text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }
+                    >
+                      {entry.nav}
+                    </Link>
+                  ))}
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 max-w-3xl flex-1 py-10">
+          {/* Small screens get the nav as a wrapped row instead of a rail. */}
+          <nav className="mb-8 flex flex-wrap gap-x-4 gap-y-1 border-b border-border pb-4 text-sm lg:hidden">
             {Object.entries(PAGES).map(([key, entry]) => (
               <Link
                 key={entry.file}
@@ -97,16 +151,6 @@ export default async function DocsPage({ params }: { params: Promise<{ slug?: st
               </Link>
             ))}
           </nav>
-          <a
-            href="/open.html"
-            className="ml-auto text-sm text-muted-foreground hover:text-foreground"
-          >
-            About →
-          </a>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-3xl px-6 py-10">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -172,7 +216,8 @@ export default async function DocsPage({ params }: { params: Promise<{ slug?: st
         >
           {markdown}
         </ReactMarkdown>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

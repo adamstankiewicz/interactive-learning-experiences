@@ -1,15 +1,46 @@
 # a2learn docs
 
-Documentation for adopters and extenders of the activity server. The
-[landing page](./index.html) carries the why; these pages carry the how.
+The [landing page](./index.html) carries the why; these pages carry the
+how. Start from who you are:
+
+- **Building an AI tutor?** [Quickstart](./quickstart.md) →
+  [The evidence contract](./evidence.md) — point your agent at the server,
+  then read what flows back when a student works.
+- **Evaluating for a platform or district?**
+  [How the loop works](./the-loop.md) → [Architecture](./architecture.md)
+  — the mechanism end to end, then the seams and where student data
+  cannot go.
+- **An educator or instructional designer?**
+  [The learning science behind the design](./pedagogy.md) — every
+  structural choice, traced to its finding.
+- **Contributing an activity kind or a standards source?**
+  [The widget registry](./registry.md) →
+  [CONTRIBUTING](../CONTRIBUTING.md).
+
+## All pages
+
+**Learn** — how and why it works
+
+| Page | Answers |
+|---|---|
+| [How the loop works](./the-loop.md) | Practice as a tool call: one request edge in, three return edges out |
+| [Pedagogy](./pedagogy.md) | The learning-science lineage of the design, and what deeper grounding is coming |
+| [Architecture](./architecture.md) | The four seams, the protocol facades, and the student-data boundary |
+
+**Guides** — get something running
 
 | Page | Answers |
 |---|---|
 | [Quickstart](./quickstart.md) | Point an MCP host at it, or run your own instance, in minutes |
-| [The widget registry](./registry.md) | The core extension API: catalog entries, generators, and how a new activity kind ships |
-| [MCP tools](./mcp-tools.md) | The wire surface an agent calls: `show_widget`, `score_draft`, and what's coming |
-| [The evidence contract](./evidence.md) | What flows back when a student works, and what reads it |
-| [Architecture](./architecture.md) | The seams — registry, standards source, storage, protocol facades — and where student data does and doesn't go |
+| [Configuration](./configuration.md) | Every environment variable, and the two operational warnings |
+
+**Reference** — the contracts
+
+| Page | Answers |
+|---|---|
+| [The widget registry](./registry.md) | The core extension API: catalog entries, generators, adding a kind |
+| [MCP tools](./mcp-tools.md) | The wire surface an agent calls, shipped and planned |
+| [The evidence contract](./evidence.md) | The event shapes, their honesty rules, and what reads them |
 
 The a2learn document format draft (surface + manifest, conformance classes)
 lives separately under `docs/a2learn/` once its branch merges.

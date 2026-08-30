@@ -33,26 +33,12 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 Deploy is one Vercel deploy of the repo with the same env vars.
 
-> **Public instances:** anyone who has your URL can spend your LLM budget.
-> Keep instances private until token auth (`MCP_ACCESS_TOKEN`, planned for
-> v0.1) lands, or put your own gateway in front.
+## Configuration
 
-## Configuration reference
-
-| Variable | Default | What it does |
-|---|---|---|
-| `LLM_PROVIDER` | `anthropic` | Which provider builds activities: `anthropic`, `openai`, `bedrock`, or `openrouter` |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | — | The key for the chosen provider |
-| `AWS_REGION`, `AWS_BEARER_TOKEN_BEDROCK` | `us-west-2`, — | Bedrock configuration when `LLM_PROVIDER=bedrock` |
-| `OPENAI_FALLBACK_API_KEY`, `OPENAI_FALLBACK_MODEL_ID` | —, `gpt-4o-mini` | Optional second provider used when the primary fails |
-| `STANDARDS_SOURCE` | `learning-commons` | Which standards graph verifies codes; `example` is the built-in keyless source |
-| `LEARNING_COMMONS_API_KEY`, `LEARNING_COMMONS_MCP_URL` | — | Credentials for the default standards source |
-| `STORAGE_ADAPTER` | `memory` | `memory` (nothing persists across restarts) or `supabase` |
-| `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | — | Only when `STORAGE_ADAPTER=supabase`; `pnpm db:start` runs a local stack |
-| `SEED_DEMO_ROSTER` | off | Seeds demo students in the reference app |
-
-Model calls run under **your** keys, inside **your** deployment — scoring a
-student's work never leaves the instance you control.
+One required secret (the LLM key); everything else defaults. The
+[configuration reference](./configuration.md) lists every variable —
+including the two operational warnings worth reading before deploying
+anywhere public.
 
 ## What you just ran
 
