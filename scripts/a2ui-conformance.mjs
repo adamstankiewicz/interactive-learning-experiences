@@ -5,18 +5,23 @@
  *   pnpm conformance           validate fixtures + compare golden surfaces
  *   pnpm conformance:update    regenerate the golden surfaces
  *
- * Three layers of checking, strictest first:
- *  1. Schema: every emitted message validates against the vendored
- *     `agent_to_renderer.json` (+ common_types + the basic catalog).
- *  2. Structure: component ids are unique, and every child reference
- *     resolves — the flat-tree invariants the schema alone cannot state.
- *  3. Drift: output matches the committed golden files, so a mapper change
+ * Four layers of checking, strictest first:
+ *  1. Input: every fixture spec must parse against the app's real widget
+ *     schema (zod) — the gate proves the mapper handles specs the pipeline
+ *     can actually produce, not hand-written fiction.
+ *  2. Schema: every emitted message validates against the vendored
+ *     `agent_to_renderer.json` (+ common_types + the basic catalog), and
+ *     must declare the exact catalog it was validated against.
+ *  3. Structure: component ids are unique, and every child reference —
+ *     including the template form — resolves; the flat-tree invariants the
+ *     schema alone cannot state.
+ *  4. Drift: output matches the committed golden files, so a mapper change
  *     shows up in review as a surface diff, never silently.
  */
 import { build } from 'esbuild';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
@@ -26,18 +31,26 @@ const specDir = join(root, 'spec', 'a2ui', 'v1_0');
 const fixtureDir = join(root, 'spec', 'a2learn', 'fixtures');
 const update = process.argv.includes('--update');
 
-// --- load the mapper (TS, with @/ aliases) via a throwaway esbuild bundle ---
+// --- load the mapper AND the widget schema via one in-memory bundle ---
 const bundle = await build({
-  entryPoints: [join(root, 'src', 'lib', 'a2learn', 'a2ui.ts')],
+  stdin: {
+    contents: `
+      export { toA2UISurface, A2UI_SUPPORTED_KINDS, A2UI_BASIC_CATALOG } from '@/lib/a2learn/a2ui';
+      export { widgetSpec } from '@/lib/pathway/schema';
+    `,
+    resolveDir: root,
+    loader: 'ts',
+  },
   bundle: true,
   format: 'esm',
   write: false,
   tsconfig: join(root, 'tsconfig.json'),
   logLevel: 'error',
 });
-const tmp = join(root, 'node_modules', '.a2learn-conformance.mjs');
-writeFileSync(tmp, bundle.outputFiles[0].text);
-const { toA2UISurface, A2UI_SUPPORTED_KINDS } = await import(pathToFileURL(tmp).href);
+// Imported from a data URL — nothing written to disk, nothing to clean up,
+// and two concurrent runs cannot read each other's bundle.
+const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`;
+const { toA2UISurface, A2UI_SUPPORTED_KINDS, A2UI_BASIC_CATALOG, widgetSpec } = await import(moduleUrl);
 
 // --- assemble the validator from the vendored schemas ---
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -51,7 +64,9 @@ ajv.addSchema(commonTypes);
 ajv.addSchema(basicCatalog);
 // `agent_to_renderer.json` refs `catalog.json#...` relative to its own $id;
 // the surface's actual catalog is bound at runtime. Alias the basic catalog
-// to that resolved URL so validation uses the catalog our surfaces target.
+// to that resolved URL so validation uses the catalog our surfaces target —
+// and because the alias makes validation catalog-blind, layer 2 separately
+// asserts each surface *declares* the catalog it was validated against.
 ajv.addSchema({ ...basicCatalog, $id: 'https://a2ui.org/specification/v1_0/catalog.json' });
 const validate = ajv.compile(messageSchema);
 
@@ -66,10 +81,15 @@ function structuralProblems(message) {
   }
   if (!ids.has('root')) problems.push("no 'root' component — createSurface implies Surface{child:'root'}");
   for (const c of components) {
-    const refs = [
-      ...(typeof c.child === 'string' ? [c.child] : []),
-      ...(Array.isArray(c.children) ? c.children : []),
-    ];
+    const refs = [];
+    if (typeof c.child === 'string') refs.push(c.child);
+    if (Array.isArray(c.children)) refs.push(...c.children);
+    // ChildList's template form: { componentId, path } — the componentId is
+    // a reference too, and a typo there is exactly the silent-empty-list bug
+    // this layer exists to catch.
+    if (c.children && !Array.isArray(c.children) && typeof c.children === 'object') {
+      if (typeof c.children.componentId === 'string') refs.push(c.children.componentId);
+    }
     for (const ref of refs) {
       if (!ids.has(ref)) problems.push(`${c.id} references missing component: ${ref}`);
     }
@@ -78,42 +98,59 @@ function structuralProblems(message) {
 }
 
 // --- run every fixture ---
-mkdirSync(fixtureDir, { recursive: true });
+let failed = false;
+const covered = new Set();
+
+function fail(name, msg) {
+  console.error(`✗ ${name}: ${msg}`);
+  failed = true;
+}
+
 const specs = readdirSync(fixtureDir).filter((f) => f.endsWith('.spec.json'));
 if (!specs.length) {
   console.error(`No fixtures in ${fixtureDir} — add <name>.spec.json widget specs.`);
   process.exit(1);
 }
 
-let failed = false;
-const covered = new Set();
-
 for (const file of specs) {
   const name = file.replace(/\.spec\.json$/, '');
   const spec = readJson(join(fixtureDir, file));
-  const surface = toA2UISurface(spec, `a2learn-fixture-${name}`);
+
+  // Layer 1: the fixture must be a spec the pipeline could actually produce.
+  const parsed = widgetSpec.safeParse(spec);
+  if (!parsed.success) {
+    fail(name, `fixture is not a valid widget spec: ${parsed.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}`);
+    continue;
+  }
+
+  const surface = toA2UISurface(parsed.data, `a2learn-fixture-${name}`);
 
   if (!surface) {
-    console.error(`✗ ${name}: kind "${spec.kind}" is not mapped (A2UI_SUPPORTED_KINDS: ${A2UI_SUPPORTED_KINDS.join(', ')})`);
-    failed = true;
+    fail(name, `kind "${spec.kind}" is not mapped (A2UI_SUPPORTED_KINDS: ${A2UI_SUPPORTED_KINDS.join(', ')})`);
     continue;
   }
   covered.add(spec.kind);
 
+  // Layer 2: upstream schema validity, plus the catalog binding the alias
+  // above cannot check.
   if (!validate(surface)) {
-    console.error(`✗ ${name}: schema validation failed`);
+    fail(name, 'schema validation failed');
     for (const err of validate.errors ?? []) console.error(`   ${err.instancePath} ${err.message}`);
-    failed = true;
+    continue;
+  }
+  if (surface.createSurface.catalogId !== A2UI_BASIC_CATALOG) {
+    fail(name, `catalogId "${surface.createSurface.catalogId}" is not the catalog this suite validates against`);
     continue;
   }
 
+  // Layer 3.
   const structural = structuralProblems(surface);
   if (structural.length) {
-    console.error(`✗ ${name}: ${structural.join('; ')}`);
-    failed = true;
+    fail(name, structural.join('; '));
     continue;
   }
 
+  // Layer 4.
   const goldenPath = join(fixtureDir, `${name}.surface.json`);
   const rendered = `${JSON.stringify(surface, null, 2)}\n`;
   if (update) {
@@ -124,24 +161,21 @@ for (const file of specs) {
     try {
       golden = readFileSync(goldenPath, 'utf8');
     } catch {
-      console.error(`✗ ${name}: no golden surface — run \`pnpm conformance:update\` and commit it`);
-      failed = true;
+      fail(name, 'no golden surface — run `pnpm conformance:update` and commit it');
       continue;
     }
     if (golden !== rendered) {
-      console.error(`✗ ${name}: surface drifted from golden — review, then \`pnpm conformance:update\``);
-      failed = true;
+      fail(name, 'surface drifted from golden — review, then `pnpm conformance:update`');
       continue;
     }
-    console.log(`✓ ${name}: schema-valid, structurally sound, matches golden`);
+    console.log(`✓ ${name}: spec-valid, schema-valid, structurally sound, matches golden`);
   }
 }
 
 // Every claimed kind must have at least one fixture — support is proven, not asserted.
 for (const kind of A2UI_SUPPORTED_KINDS) {
   if (!covered.has(kind)) {
-    console.error(`✗ A2UI_SUPPORTED_KINDS claims "${kind}" but no fixture covers it`);
-    failed = true;
+    fail('coverage', `A2UI_SUPPORTED_KINDS claims "${kind}" but no fixture covers it`);
   }
 }
 

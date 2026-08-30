@@ -22,7 +22,7 @@
       {
         "id": "title",
         "component": "Text",
-        "text": "**Why the denominator matters**"
+        "text": "Why the denominator matters"
       },
       {
         "id": "body",
@@ -45,8 +45,7 @@
             "name": "a2learn.widget_completed",
             "userMessage": "Finished the activity.",
             "context": {
-              "kind": "markdown-card",
-              "correct": true
+              "kind": "markdown-card"
             }
           }
         }

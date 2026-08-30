@@ -1,3 +1,4 @@
+import type { WidgetKind } from '@/lib/pathway/schema';
 import type { StandardRef } from '@/lib/standards/types';
 
 /**
@@ -15,6 +16,10 @@ import type { StandardRef } from '@/lib/standards/types';
 
 export const A2LEARN_VERSION = '0.1.0';
 
+/** Namespace for a2learn event names on any transport (AG-UI custom events,
+ *  A2UI actions): `a2learn.<domain event>`. Owned here, not in a route. */
+export const A2LEARN_EVENT_PREFIX = 'a2learn.';
+
 export type ActivityManifest = {
   /** Manifest format version — semver, bumped by RFC, not by refactor. */
   a2learn: string;
@@ -29,7 +34,7 @@ export type ActivityManifest = {
   };
   pedagogy: {
     /** Widget kind from the registry. */
-    kind: string;
+    kind: WidgetKind;
     /** Whether completing this activity records a real verdict. */
     assesses: boolean;
   };
@@ -48,10 +53,18 @@ export type ActivityManifest = {
   };
 };
 
+/**
+ * No producer calls this yet — it gains one in phase 2, when find_activity's
+ * listing shape converges here. Until then the conformance suite pins the
+ * A2UI half; this half is pinned by tsc only. `assesses` must equal the
+ * registry entry's flag for `kind` — the caller that owns the registry
+ * lookup passes it, so this module stays importable without dragging every
+ * widget definition into its bundle.
+ */
 export function buildManifest(input: {
   title: string;
   standard: StandardRef;
-  kind: string;
+  kind: WidgetKind;
   assesses: boolean;
   language?: string;
   rejectedCodes?: string[];

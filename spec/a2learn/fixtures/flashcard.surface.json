@@ -11,7 +11,9 @@
           "prompt",
           "card-0",
           "card-1",
-          "done"
+          "card-2",
+          "done",
+          "success"
         ]
       },
       {
@@ -28,22 +30,22 @@
         "id": "card-0-col",
         "component": "Column",
         "children": [
-          "card-0-front",
+          "card-0-front-text",
           "card-0-divider",
-          "card-0-back"
+          "card-0-back-text"
         ]
       },
       {
-        "id": "card-0-front",
+        "id": "card-0-front-text",
         "component": "Text",
-        "text": "**numerator**"
+        "text": "numerator"
       },
       {
         "id": "card-0-divider",
         "component": "Divider"
       },
       {
-        "id": "card-0-back",
+        "id": "card-0-back-text",
         "component": "Text",
         "text": "how many parts you have"
       },
@@ -56,24 +58,60 @@
         "id": "card-1-col",
         "component": "Column",
         "children": [
-          "card-1-front",
+          "card-1-front-text",
           "card-1-divider",
-          "card-1-back"
+          "card-1-back-text",
+          "card-1-back-md"
         ]
       },
       {
-        "id": "card-1-front",
+        "id": "card-1-front-text",
         "component": "Text",
-        "text": "**denominator**"
+        "text": "denominator"
       },
       {
         "id": "card-1-divider",
         "component": "Divider"
       },
       {
-        "id": "card-1-back",
+        "id": "card-1-back-text",
         "component": "Text",
         "text": "how many equal parts make the whole"
+      },
+      {
+        "id": "card-1-back-md",
+        "component": "Text",
+        "text": "- more parts means **smaller** parts"
+      },
+      {
+        "id": "card-2",
+        "component": "Card",
+        "child": "card-2-col"
+      },
+      {
+        "id": "card-2-col",
+        "component": "Column",
+        "children": [
+          "card-2-front-image",
+          "card-2-divider",
+          "card-2-back-text"
+        ]
+      },
+      {
+        "id": "card-2-front-image",
+        "component": "Image",
+        "url": "https://example.org/fraction-bar.png",
+        "description": "a bar split into three equal parts",
+        "fit": "contain"
+      },
+      {
+        "id": "card-2-divider",
+        "component": "Divider"
+      },
+      {
+        "id": "card-2-back-text",
+        "component": "Text",
+        "text": "one third"
       },
       {
         "id": "done",
@@ -85,8 +123,7 @@
             "name": "a2learn.widget_completed",
             "userMessage": "Finished the activity.",
             "context": {
-              "kind": "flashcard",
-              "correct": true
+              "kind": "flashcard"
             }
           }
         }
@@ -95,6 +132,12 @@
         "id": "done-label",
         "component": "Text",
         "text": "Done"
+      },
+      {
+        "id": "success",
+        "component": "Text",
+        "text": "When you're done: You matched every card — the words are yours now.",
+        "variant": "caption"
       }
     ],
     "dataModel": {
