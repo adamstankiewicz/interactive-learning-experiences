@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 /**
  * Protocol-level integration: drive the deployed endpoint's handler with real
@@ -126,5 +126,35 @@ describe('/api/mcp protocol surface', () => {
     // A missing required arg is a schema error (-32602) from the SDK; a
     // present-but-blank topic is the tool's own honest refusal.
     expect(json.result?.isError ?? (json.error?.code === -32602)).toBe(true);
+  });
+});
+
+describe('/api/mcp GET', () => {
+  const get = (accept?: string) =>
+    GET(new Request('https://example.test/api/mcp', accept ? { headers: { Accept: accept } } : undefined));
+
+  it('declines the SSE stream with 405 so clients stop reconnecting', async () => {
+    const res = await get('text/event-stream');
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('POST, OPTIONS');
+  });
+
+  // The negative control: without it a handler that 405s everything would
+  // pass the assertion above while silently breaking the "add this URL"
+  // affordance the endpoint is documented by.
+  it('still answers a browser with the connector hint', async () => {
+    const res = await get('text/html,application/xhtml+xml');
+    expect(res.status).toBe(200);
+    expect((await res.json()).transport).toBe('streamable-http');
+  });
+
+  it('treats a client asking for both content types as the stream probe', async () => {
+    // Streamable HTTP clients send `application/json, text/event-stream` on
+    // the stream request too, so matching the stream type has to win.
+    expect((await get('application/json, text/event-stream')).status).toBe(405);
+  });
+
+  it('answers a GET with no Accept header as a human', async () => {
+    expect((await get()).status).toBe(200);
   });
 });

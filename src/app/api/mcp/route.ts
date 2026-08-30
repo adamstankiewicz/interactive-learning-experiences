@@ -36,8 +36,22 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
-/** A GET here is a human checking the URL works, not a client. Say something useful. */
+/**
+ * A GET is one of two things: a human checking the URL works, or a client
+ * opening the server-to-client SSE stream Streamable HTTP defines.
+ *
+ * This transport is stateless and never initiates a message, so there is no
+ * stream to open, and the spec's answer for that is 405. It matters more than
+ * tidiness: a client told "no stream here" definitively stops asking, while a
+ * 200 carrying JSON it cannot parse is ambiguous enough to invite a reconnect
+ * loop. The Accept header is what separates the two callers, so the human
+ * still gets something useful.
+ */
 export async function GET(request: Request) {
+  if ((request.headers.get('accept') ?? '').includes('text/event-stream')) {
+    return new Response(null, { status: 405, headers: { ...CORS, Allow: 'POST, OPTIONS' } });
+  }
+
   return Response.json(
     {
       name: 'interactive-learning-widgets',
