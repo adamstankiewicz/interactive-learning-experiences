@@ -1,0 +1,155 @@
+{
+  "version": "v1.0",
+  "createSurface": {
+    "surfaceId": "a2learn-fixture-step-reveal",
+    "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "components": [
+      {
+        "id": "root",
+        "component": "Column",
+        "children": [
+          "prompt",
+          "steps",
+          "done"
+        ]
+      },
+      {
+        "id": "prompt",
+        "component": "Text",
+        "text": "Let's compare 2/6 and 5/6 together, one step at a time."
+      },
+      {
+        "id": "steps",
+        "component": "List",
+        "direction": "horizontal",
+        "children": [
+          "step-0",
+          "step-1",
+          "step-2"
+        ]
+      },
+      {
+        "id": "step-0",
+        "component": "Card",
+        "child": "step-0-col"
+      },
+      {
+        "id": "step-0-title",
+        "component": "Text",
+        "text": "Step 1: Check the denominators"
+      },
+      {
+        "id": "step-0-divider",
+        "component": "Divider"
+      },
+      {
+        "id": "step-0-body",
+        "component": "Text",
+        "text": "Both fractions have the same denominator, **6**. That means both wholes are cut into six equal parts — so the pieces are the same size."
+      },
+      {
+        "id": "step-0-why",
+        "component": "Text",
+        "text": "Why: Comparing only works when the pieces are the same size.",
+        "variant": "caption"
+      },
+      {
+        "id": "step-0-col",
+        "component": "Column",
+        "children": [
+          "step-0-title",
+          "step-0-divider",
+          "step-0-body",
+          "step-0-why"
+        ]
+      },
+      {
+        "id": "step-1",
+        "component": "Card",
+        "child": "step-1-col"
+      },
+      {
+        "id": "step-1-title",
+        "component": "Text",
+        "text": "Step 2: Compare the numerators"
+      },
+      {
+        "id": "step-1-divider",
+        "component": "Divider"
+      },
+      {
+        "id": "step-1-body",
+        "component": "Text",
+        "text": "Now look at the numerators: 2 and 5. Since every piece is the same size, having **5 pieces** is more than having **2 pieces**."
+      },
+      {
+        "id": "step-1-col",
+        "component": "Column",
+        "children": [
+          "step-1-title",
+          "step-1-divider",
+          "step-1-body"
+        ]
+      },
+      {
+        "id": "step-2",
+        "component": "Card",
+        "child": "step-2-col"
+      },
+      {
+        "id": "step-2-title",
+        "component": "Text",
+        "text": "Step 3: Write the comparison"
+      },
+      {
+        "id": "step-2-divider",
+        "component": "Divider"
+      },
+      {
+        "id": "step-2-body",
+        "component": "Text",
+        "text": "So 5/6 is greater than 2/6, and we write it as **5/6 > 2/6**. Same-size pieces, more of them — that's the whole comparison."
+      },
+      {
+        "id": "step-2-why",
+        "component": "Text",
+        "text": "Why: The symbol always opens toward the bigger amount.",
+        "variant": "caption"
+      },
+      {
+        "id": "step-2-col",
+        "component": "Column",
+        "children": [
+          "step-2-title",
+          "step-2-divider",
+          "step-2-body",
+          "step-2-why"
+        ]
+      },
+      {
+        "id": "done",
+        "component": "Button",
+        "variant": "primary",
+        "child": "done-label",
+        "action": {
+          "event": {
+            "name": "a2learn.widget_completed",
+            "context": {
+              "kind": "step-reveal"
+            }
+          }
+        }
+      },
+      {
+        "id": "done-label",
+        "component": "Text",
+        "text": "Done"
+      }
+    ],
+    "dataModel": {
+      "a2learn": {
+        "kind": "step-reveal"
+      }
+    }
+  }
+}

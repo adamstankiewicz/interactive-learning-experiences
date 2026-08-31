@@ -52,3 +52,4 @@ mcp/dist/
 
 # Built by mcp/build.mjs (predev/prebuild) — never committed.
 public/widget-shell.html
+

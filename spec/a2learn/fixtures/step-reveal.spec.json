@@ -1,0 +1,25 @@
+{
+  "kind": "step-reveal",
+  "learningComponentId": "lc-fractions-3",
+  "prompt": "Let's compare 2/6 and 5/6 together, one step at a time.",
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Step 1: Check the denominators",
+      "body": "Both fractions have the same denominator, **6**. That means both wholes are cut into six equal parts — so the pieces are the same size.",
+      "why": "Comparing only works when the pieces are the same size."
+    },
+    {
+      "id": "s2",
+      "title": "Step 2: Compare the numerators",
+      "body": "Now look at the numerators: 2 and 5. Since every piece is the same size, having **5 pieces** is more than having **2 pieces**.",
+      "why": null
+    },
+    {
+      "id": "s3",
+      "title": "Step 3: Write the comparison",
+      "body": "So 5/6 is greater than 2/6, and we write it as **5/6 > 2/6**. Same-size pieces, more of them — that's the whole comparison.",
+      "why": "The symbol always opens toward the bigger amount."
+    }
+  ]
+}

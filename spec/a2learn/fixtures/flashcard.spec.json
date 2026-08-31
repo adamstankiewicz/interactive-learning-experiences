@@ -1,0 +1,11 @@
+{
+  "kind": "flashcard",
+  "learningComponentId": "lc-fractions-2",
+  "prompt": "Match each fraction word to what it means.",
+  "successMessage": "You matched every card — the words are yours now.",
+  "cards": [
+    { "id": "c1", "front": { "text": "numerator", "markdown": null, "imageUrl": null, "imageAlt": null }, "back": { "text": "how many parts you have", "markdown": null, "imageUrl": null, "imageAlt": null } },
+    { "id": "c2", "front": { "text": "denominator", "markdown": null, "imageUrl": null, "imageAlt": null }, "back": { "text": "how many equal parts make the whole", "markdown": "- more parts means **smaller** parts", "imageUrl": null, "imageAlt": null } },
+    { "id": "c3", "front": { "text": null, "markdown": null, "imageUrl": "https://example.org/fraction-bar.png", "imageAlt": "a bar split into three equal parts" }, "back": { "text": "one third", "markdown": null, "imageUrl": null, "imageAlt": null } }
+  ]
+}
