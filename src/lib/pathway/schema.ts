@@ -875,11 +875,46 @@ const composedHunt = z.object({
  * composed activity's `assesses` stays false with them in play.
  */
 
+const composedEstimate = z.object({
+  type: z.literal('Estimate'),
+  id: z.string(),
+  prompt: z.string().describe('What to estimate, e.g. "What fraction of Earth\'s water is drinkable?"'),
+  min: z.number().describe('Slider minimum.'),
+  max: z.number().describe('Slider maximum.'),
+  unit: z.string().nullable().describe('Display unit, e.g. "%", "years", null for none.'),
+  actual: z.number().describe('The real value, revealed after the student commits.'),
+  feedback: z.string().describe('One sentence of context shown at the reveal.'),
+});
+
+const composedModel = z.object({
+  type: z.literal('Model'),
+  id: z.string(),
+  prompt: z.string().describe('What the knob explores, e.g. "What happens as the denominator grows?"'),
+  variable: z.object({
+    name: z.string().describe('The variable the student sets, e.g. "denominator".'),
+    options: z.array(z.string()).describe('2-6 values in order. All-numeric values render as a slider; labels render as chips.'),
+  }),
+  outcomes: z
+    .array(z.object({ option: z.string(), text: z.string() }))
+    .describe('One outcome per option, same values: the markdown shown when that value is selected. You must author every outcome — the renderer never computes.'),
+});
+
+/**
+ * The two honest input roles (issue #100 round 4): Estimate is a *commit*
+ * input — the value exists to be locked in before a reveal, compared by
+ * juxtaposition, never judged, never transmitted. Model is a *parameter*
+ * input — the value configures which authored content shows. The model
+ * authors outcomes as data, never formulas: nothing model-written executes.
+ * The third role, inputs whose values leave the widget, is Response (#99).
+ */
+
 const composedComponent = z.discriminatedUnion('type', [
   composedText,
   composedCheck,
   composedMatch,
   composedHunt,
+  composedEstimate,
+  composedModel,
   composedCallout,
   composedGroup,
   composedReveal,
@@ -940,6 +975,20 @@ export function compositionProblems(spec: ComposedSpec): string[] {
       (c.items.length < 3 || !c.items.some((i) => i.target) || !c.items.some((i) => !i.target))
     ) {
       problems.push(`${c.id}: a Hunt needs 3+ items with at least one target and one decoy`);
+    }
+    if (c.type === 'Estimate' && (c.min >= c.max || c.actual < c.min || c.actual > c.max)) {
+      problems.push(`${c.id}: an Estimate needs min < max with the actual inside the range`);
+    }
+    if (c.type === 'Model') {
+      const opts = c.variable.options;
+      const outcomeKeys = c.outcomes.map((o) => o.option);
+      if (
+        opts.length < 2 ||
+        opts.length !== outcomeKeys.length ||
+        !opts.every((o) => outcomeKeys.includes(o))
+      ) {
+        problems.push(`${c.id}: a Model needs 2+ options with exactly one authored outcome per option`);
+      }
     }
   }
 

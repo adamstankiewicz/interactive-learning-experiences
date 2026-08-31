@@ -252,6 +252,34 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
           />
         );
       }
+      case 'a2learn:Estimate': {
+        return (
+          <EstimateView
+            key={id}
+            prompt={String(component.prompt ?? '')}
+            min={Number(component.min ?? 0)}
+            max={Number(component.max ?? 100)}
+            unit={component.unit ? String(component.unit) : ''}
+            actual={Number(component.actual ?? 0)}
+            feedback={String(component.feedback ?? '')}
+          />
+        );
+      }
+      case 'a2learn:Model': {
+        const variable = (component.variable ?? {}) as { name?: unknown; options?: unknown };
+        const outcomes = (Array.isArray(component.outcomes) ? component.outcomes : []) as {
+          option?: unknown; text?: unknown;
+        }[];
+        return (
+          <ModelView
+            key={id}
+            prompt={String(component.prompt ?? '')}
+            name={String(variable.name ?? '')}
+            options={(Array.isArray(variable.options) ? variable.options : []).map(String)}
+            outcomes={Object.fromEntries(outcomes.map((o) => [String(o.option ?? ''), String(o.text ?? '')]))}
+          />
+        );
+      }
       case 'a2learn:Callout': {
         // Pedagogical emphasis with intent as data — the renderer maps
         // intent to its design language; unknown intents get the neutral box.
@@ -665,6 +693,146 @@ function HuntView({ prompt, items }: { prompt: string; items: { text: string; ta
         </p>
       )}
       {complete && <p className="text-sm text-muted-foreground">✓ found them all — that&apos;s the discrimination.</p>}
+    </div>
+  );
+}
+
+/**
+ * Estimate: commit a value on the slider, then the reveal shows your mark
+ * and the actual on the same track — juxtaposition, never a verdict badge.
+ * Committing before seeing is the pedagogy; nothing is transmitted.
+ */
+function EstimateView({
+  prompt, min, max, unit, actual, feedback,
+}: {
+  prompt: string; min: number; max: number; unit: string; actual: number; feedback: string;
+}) {
+  const [value, setValue] = useState((min + max) / 2);
+  const [locked, setLocked] = useState(false);
+  const pct = (v: number) => ((v - min) / (max - min || 1)) * 100;
+  const fmt = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}${unit}`;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="text-base font-medium [&_p]:leading-relaxed">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['a', 'img']} unwrapDisallowed>
+          {prompt}
+        </ReactMarkdown>
+      </div>
+      <div className="relative pt-6 pb-1">
+        {locked && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-0 -translate-x-1/2 text-xs font-medium text-primary"
+            style={{ left: `${pct(actual)}%` }}
+          >
+            actual: {fmt(actual)}
+          </motion.div>
+        )}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={(max - min) / 100}
+          value={value}
+          disabled={locked}
+          onChange={(e) => setValue(Number(e.target.value))}
+          className="w-full accent-primary"
+          aria-label={prompt}
+        />
+        {locked && (
+          <div
+            className="pointer-events-none absolute top-6 h-4 w-0.5 -translate-x-1/2 rounded bg-primary"
+            style={{ left: `${pct(actual)}%` }}
+          />
+        )}
+      </div>
+      {!locked ? (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm tabular-nums text-muted-foreground">your estimate: {fmt(value)}</span>
+          <button
+            type="button"
+            onClick={() => setLocked(true)}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Lock it in
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          You said {fmt(value)} · actual {fmt(actual)} — off by {fmt(Math.abs(actual - value))}. {feedback}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Model: an explanation with a knob. The student sets the variable; the
+ * authored outcome for that value shows. All-numeric options render as a
+ * stepped slider, labels as chips. The renderer only ever selects among
+ * authored outcomes — it computes nothing.
+ */
+function ModelView({
+  prompt, name, options, outcomes,
+}: {
+  prompt: string; name: string; options: string[]; outcomes: Record<string, string>;
+}) {
+  const [index, setIndex] = useState(0);
+  const numeric = options.length > 0 && options.every((o) => /^-?\d+(\.\d+)?$/.test(o.trim()));
+  const current = options[index] ?? '';
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="text-base font-medium [&_p]:leading-relaxed">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['a', 'img']} unwrapDisallowed>
+          {prompt}
+        </ReactMarkdown>
+      </div>
+      {numeric ? (
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">{name}:</span>
+          <input
+            type="range"
+            min={0}
+            max={options.length - 1}
+            step={1}
+            value={index}
+            onChange={(e) => setIndex(Number(e.target.value))}
+            className="flex-1 accent-primary"
+            aria-label={name}
+          />
+          <span className="w-12 text-right text-sm font-medium tabular-nums">{current}</span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-sm text-muted-foreground">{name}:</span>
+          {options.map((option, i) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setIndex(i)}
+              className={
+                i === index
+                  ? 'rounded-full bg-primary px-3 py-1 text-sm text-primary-foreground'
+                  : 'rounded-full border border-border px-3 py-1 text-sm text-muted-foreground hover:text-foreground'
+              }
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+      <motion.div
+        key={current}
+        initial={{ opacity: 0.4, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="rounded-lg bg-muted/40 px-4 py-3 text-sm [&_p]:leading-relaxed"
+      >
+        <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['a', 'img']} unwrapDisallowed>
+          {outcomes[current] ?? ''}
+        </ReactMarkdown>
+      </motion.div>
     </div>
   );
 }

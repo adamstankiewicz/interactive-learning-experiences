@@ -123,6 +123,39 @@ const EXAMPLES: { label: string; spec: ComposedSpec }[] = [
       ],
     },
   },
+  {
+    label: 'Inputs with knobs',
+    spec: {
+      kind: 'composed',
+      learningComponentId: null,
+      title: 'Fractions, estimated and explored',
+      components: [
+        { type: 'Group', id: 'root', children: ['e1', 'mo1'] },
+        {
+          type: 'Estimate',
+          id: 'e1',
+          prompt: 'What percent of a pizza is left if you eat **3/8** of it?',
+          min: 0,
+          max: 100,
+          unit: '%',
+          actual: 62.5,
+          feedback: 'Five of the eight equal slices remain — 5/8 is 62.5%.',
+        },
+        {
+          type: 'Model',
+          id: 'mo1',
+          prompt: 'Keep the numerator at 1 and change the denominator. What happens to the size of each piece?',
+          variable: { name: 'denominator', options: ['2', '4', '8', '16'] },
+          outcomes: [
+            { option: '2', text: '**1/2** — the whole splits into 2 big pieces. Each piece is half of everything.' },
+            { option: '4', text: '**1/4** — 4 equal pieces now. Each piece is half as big as before.' },
+            { option: '8', text: '**1/8** — 8 slim pieces. More pieces means each one shrinks.' },
+            { option: '16', text: '**1/16** — 16 tiny slivers. A bigger denominator always means smaller pieces.' },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default function ComposedDemoPage() {

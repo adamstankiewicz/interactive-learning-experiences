@@ -24,41 +24,54 @@ import { registerWidgetGenerator } from '@/lib/widgets/types';
 const authoringNode = z.object({
   id: z.string().describe('Short lowercase slug, unique in the list.'),
   type: z.string().describe('One of: Text, Callout, Group, Reveal, Sequence.'),
-  text: z.string().nullable().describe('Text and Callout: the markdown content.'),
-  variant: z.string().nullable().describe('Text only: "caption" or null.'),
-  intent: z.string().nullable().describe('Callout only: "why", "tip", or "note".'),
-  label: z.string().nullable().describe('Callout only: short bold lead-in like "Why?".'),
-  children: z.array(z.string()).nullable().describe('Group and Sequence: ids of the children, in order.'),
+  text: z.string().nullish().describe('Text and Callout: the markdown content.'),
+  variant: z.string().nullish().describe('Text only: "caption" or null.'),
+  intent: z.string().nullish().describe('Callout only: "why", "tip", or "note".'),
+  label: z.string().nullish().describe('Callout only: short bold lead-in like "Why?".'),
+  children: z.array(z.string()).nullish().describe('Group and Sequence: ids of the children, in order.'),
   faces: z
     .array(z.object({ title: z.string(), child: z.string() }))
-    .nullable()
+    .nullish()
     .describe('Reveal only: exactly two faces, front then back.'),
-  prompt: z.string().nullable().describe('Check only: the question, markdown.'),
+  prompt: z.string().nullish().describe('Check only: the question, markdown.'),
   options: z
     .array(z.object({ text: z.string(), feedback: z.string() }))
-    .nullable()
+    .nullish()
     .describe('Check only: 2-4 options, each with one-sentence feedback.'),
-  answer: z.number().nullable().describe('Check only: zero-based index of the right option.'),
+  answer: z.number().nullish().describe('Check only: zero-based index of the right option.'),
   pairs: z
     .array(z.object({ left: z.string(), right: z.string() }))
-    .nullable()
+    .nullish()
     .describe('Match only: 2-6 pairs to connect.'),
   items: z
     .array(z.object({ text: z.string(), target: z.boolean(), feedback: z.string() }))
-    .nullable()
+    .nullish()
     .describe('Hunt only: 4-9 items, targets plus near-miss decoys, each with feedback.'),
+  min: z.number().nullish().describe('Estimate only: slider minimum.'),
+  max: z.number().nullish().describe('Estimate only: slider maximum.'),
+  unit: z.string().nullish().describe('Estimate only: display unit or null.'),
+  actual: z.number().nullish().describe('Estimate only: the real value, inside [min, max].'),
+  feedback: z.string().nullish().describe('Estimate only: one sentence of context for the reveal.'),
+  variable: z
+    .object({ name: z.string(), options: z.array(z.string()) })
+    .nullish()
+    .describe('Model only: the knob — name plus 2-6 ordered values.'),
+  outcomes: z
+    .array(z.object({ option: z.string(), text: z.string() }))
+    .nullish()
+    .describe('Model only: exactly one markdown outcome per option value.'),
   policy: z
     .object({
       order: z.string().describe('"linear" or "free"'),
       disclosure: z.string().describe('"gated" or "all"'),
       revealed: z.string().describe('"accumulate" or "replace"'),
     })
-    .nullable()
+    .nullish()
     .describe('Sequence only: how the children are traversed.'),
 });
 
 const composedAuthoring = z.object({
-  title: z.string().nullable().describe('Short student-facing activity title.'),
+  title: z.string().nullish().describe('Short student-facing activity title.'),
   components: z
     .array(authoringNode)
     .describe('Flat component list. Exactly one component must have id "root". 3–20 components. Set fields that do not apply to a node type to null.'),
@@ -95,6 +108,25 @@ export function canonicalizeNode(node: LooseNode): Record<string, unknown> {
       };
     case 'Match':
       return { type: 'Match', id: node.id, prompt: str(node.prompt) ?? text ?? '', pairs: Array.isArray(node.pairs) ? node.pairs : [] };
+    case 'Estimate':
+      return {
+        type: 'Estimate',
+        id: node.id,
+        prompt: str(node.prompt) ?? text ?? '',
+        min: typeof node.min === 'number' ? node.min : 0,
+        max: typeof node.max === 'number' ? node.max : 0,
+        unit: str(node.unit) ?? null,
+        actual: typeof node.actual === 'number' ? node.actual : (typeof node.value === 'number' ? node.value : NaN),
+        feedback: str(node.feedback) ?? '',
+      };
+    case 'Model':
+      return {
+        type: 'Model',
+        id: node.id,
+        prompt: str(node.prompt) ?? text ?? '',
+        variable: node.variable ?? { name: '', options: [] },
+        outcomes: Array.isArray(node.outcomes) ? node.outcomes : [],
+      };
     case 'Hunt':
       return { type: 'Hunt', id: node.id, prompt: str(node.prompt) ?? text ?? '', items: Array.isArray(node.items) ? node.items : [] };
     case 'Group':
@@ -143,6 +175,8 @@ registerWidgetGenerator({
         'Check {prompt, options: 2-4 of {text, feedback}, answer: index of the right one} — a self-check with instant feedback; nothing is recorded, it exists so the student retrieves instead of rereads;',
         'Match {prompt, pairs: 2-6 of {left, right}} — a matching game: left column in order, right column shuffled, student pairs them up with live progress;',
         'Hunt {prompt, items: 4-9 of {text, target, feedback}} — a find-them-all game: tap every target among near-miss decoys, instant feedback per tap;',
+        'Estimate {prompt, min, max, unit, actual, feedback} — the student commits a guess on a slider BEFORE seeing the real value, then sees both side by side; committing first is what makes the reveal stick;',
+        'Model {prompt, variable: {name, options: 2-6 ordered values}, outcomes: one {option, text} per value} — an explanation with a knob: the student sets the variable and watches your authored outcome change. Author every outcome yourself; numeric options render as a slider;',
         'Group {children: 2–6 ids, stacked top to bottom}; Reveal {faces: exactly two of {title, child} — front then back; the student taps to turn it over: prompt on the front, payoff on the back};',
         'Sequence {policy: {order: "linear"|"free", disclosure: "gated"|"all", revealed: "accumulate"|"replace"}, children: 2–8 ids in teaching order}.',
         'Pedagogy: retrieval beats rereading — mix interaction types: Check for one concrete question, Match for term-meaning or equivalent-pairs practice, Hunt for telling examples from non-examples, Reveal (prediction front, payoff back) over long explanations.',

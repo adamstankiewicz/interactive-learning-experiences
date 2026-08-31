@@ -40,3 +40,9 @@ export const CHECK = 'a2learn:Check';
  *  Hunt = discrimination (find every target among near-miss decoys). */
 export const MATCH = 'a2learn:Match';
 export const HUNT = 'a2learn:Hunt';
+/** Commit input: lock in an estimate before the reveal; compared by
+ *  juxtaposition, never judged, never transmitted (hypercorrection effect). */
+export const ESTIMATE = 'a2learn:Estimate';
+/** Parameter input: the value configures which authored outcome shows —
+ *  explanations with knobs. Outcomes are authored data, never formulas. */
+export const MODEL = 'a2learn:Model';

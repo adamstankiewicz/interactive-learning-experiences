@@ -162,3 +162,28 @@ describe('Match and Hunt structural rules', () => {
       { text: 'c', target: true, feedback: 'f' }] }))).toContainEqual(expect.stringContaining('decoy'));
   });
 });
+
+describe('Estimate and Model structural rules', () => {
+  const base = (extra: ComposedSpec['components'][number]): ComposedSpec => ({
+    kind: 'composed',
+    learningComponentId: null,
+    title: 'Inputs',
+    components: [{ type: 'Group', id: 'root', children: ['x'] }, extra],
+  });
+
+  it('accepts sound inputs and rejects broken ones', () => {
+    expect(compositionProblems(base({ type: 'Estimate', id: 'x', prompt: 'p', min: 0, max: 100, unit: '%', actual: 71, feedback: 'f' }))).toEqual([]);
+    expect(compositionProblems(base({ type: 'Estimate', id: 'x', prompt: 'p', min: 0, max: 100, unit: null, actual: 150, feedback: 'f' }))).toContainEqual(expect.stringContaining('inside the range'));
+    expect(compositionProblems(base({ type: 'Estimate', id: 'x', prompt: 'p', min: 5, max: 5, unit: null, actual: 5, feedback: 'f' }))).toContainEqual(expect.stringContaining('min < max'));
+
+    const model = (options: string[], outcomeKeys: string[]) =>
+      base({
+        type: 'Model', id: 'x', prompt: 'p',
+        variable: { name: 'denominator', options },
+        outcomes: outcomeKeys.map((o) => ({ option: o, text: `with ${o} parts` })),
+      });
+    expect(compositionProblems(model(['2', '4', '8'], ['2', '4', '8']))).toEqual([]);
+    expect(compositionProblems(model(['2', '4'], ['2']))).toContainEqual(expect.stringContaining('one authored outcome per option'));
+    expect(compositionProblems(model(['2', '4'], ['2', '8']))).toContainEqual(expect.stringContaining('one authored outcome per option'));
+  });
+});
