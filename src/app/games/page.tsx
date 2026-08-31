@@ -40,7 +40,7 @@ export default function GamesPage() {
   if (selectedGame !== 'menu' && currentGame) {
     const GameComponent = currentGame.component;
     return (
-      <div className="min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100">
+      <div className="light-surface min-h-dvh bg-background">
         <div className="mx-auto max-w-4xl p-6">
           <button
             onClick={() => setSelectedGame('menu')}
@@ -55,14 +55,14 @@ export default function GamesPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 px-6 py-12">
+    <div className="light-surface min-h-dvh bg-background px-6 py-12">
       <div className="mx-auto max-w-4xl">
         <motion.h1
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="mb-8 text-center text-5xl font-black tracking-tight text-slate-900"
         >
-          <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
+          <span>
             Game Break
           </span>
         </motion.h1>

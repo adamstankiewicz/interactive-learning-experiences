@@ -138,7 +138,7 @@ export default function LearnPage() {
   });
 
   return (
-    <div className="light-surface min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
+    <div className="light-surface min-h-dvh bg-background text-foreground">
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
         {!session && (
           <AnimatePresence mode="wait">
@@ -150,7 +150,7 @@ export default function LearnPage() {
               className="mt-12 text-center text-5xl font-black tracking-tight text-balance"
             >
               What do you want to{' '}
-              <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
+              <span>
                 learn?
               </span>
             </motion.h1>
@@ -171,7 +171,7 @@ export default function LearnPage() {
                   ? { repeat: Infinity, duration: 1.6 }
                   : { type: 'spring', stiffness: 300, damping: 14 }
               }
-              className="flex size-36 flex-col items-center justify-center gap-1 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 text-white shadow-[0_8px_0_0_#6d28d9] transition-transform active:translate-y-1 active:shadow-[0_3px_0_0_#6d28d9] disabled:opacity-50"
+              className="flex size-36 flex-col items-center justify-center gap-1 rounded-full bg-primary text-primary-foreground shadow-[0_8px_0_0_var(--border)] transition-transform active:translate-y-1 active:shadow-[0_3px_0_0_var(--border)] disabled:opacity-50"
             >
               <span className="text-4xl">{busy ? '✨' : voice.listening ? '👂' : '🎤'}</span>
               <span className="text-sm font-black">

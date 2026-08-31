@@ -128,7 +128,7 @@ export function PathwayBuilder() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-gradient-to-br from-violet-100/80 via-pink-50/60 to-amber-50/70 dark:from-violet-950/50 dark:via-fuchsia-950/25 dark:to-amber-950/20">
+    <div className="flex min-h-dvh flex-col bg-background">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20">
         {!started && (
           <div className="pt-14">
@@ -136,10 +136,10 @@ export function PathwayBuilder() {
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="font-(family-name:--font-lexend) text-4xl font-black tracking-tight text-balance sm:text-5xl"
+              className="text-4xl font-bold tracking-tight text-balance sm:text-5xl"
             >
               Turn a topic into a lesson{" "}
-              <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent dark:from-violet-400 dark:to-pink-400">
+              <span>
                 students can do
               </span>
               .

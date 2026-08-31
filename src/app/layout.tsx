@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Lexend } from "next/font/google";
+import { Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
 import { cn } from "@/lib/utils";
@@ -16,16 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 /**
- * Registered globally (fonts load once, here) but applied only locally on
- * the pathway builder's own headings via `font-[family-name:var(--font-lexend)]`
- * — not wired into the shared `--font-heading` token, which the Pathways
- * dashboard, Roster, Upload, Nav, and the Crossword widget all still use.
- * Lexend specifically: it's a typeface engineered and studied for reading
- * proficiency, including K-12 classroom trials — an unusually literal fit
- * for a tool that builds reading/learning pathways, not a default pick.
+ * Reading passages are the one serif surface — student-facing prose renders
+ * in Source Serif 4 while every piece of chrome stays in the sans. Exposed
+ * as `--font-serif` via the theme so widgets reach it with `font-serif`.
  */
-const lexend = Lexend({
-  variable: "--font-lexend",
+const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
   subsets: ["latin"],
 });
 
@@ -39,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={cn(geistSans.variable, geistMono.variable, lexend.variable, 'h-full antialiased')}
+      className={cn(geistSans.variable, geistMono.variable, sourceSerif.variable, 'h-full antialiased')}
       suppressHydrationWarning
     >
       <head>

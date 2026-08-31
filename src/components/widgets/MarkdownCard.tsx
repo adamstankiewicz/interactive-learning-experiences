@@ -14,7 +14,8 @@ export function MarkdownCard({ spec, onComplete }: Props) {
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="mb-3 text-base font-semibold text-foreground">{spec.title}</h2>
 
-        <div className="flex flex-col gap-3 text-sm text-foreground leading-relaxed">
+        {/* Reading passages are the one serif surface; chrome stays sans. */}
+        <div className="flex flex-col gap-3 font-serif text-[17px] leading-[1.65] text-foreground">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
