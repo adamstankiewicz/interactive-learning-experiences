@@ -1,3 +1,5 @@
+import { fencedDetailBlock } from '@/lib/mcp/fence';
+
 /**
  * What the widget says back into the conversation it is sitting in.
  *
@@ -47,18 +49,30 @@ function isEmbedded(): boolean {
  * Repeats are dropped: a widget that re-renders, or a student who checks the
  * same answer twice, should not narrate itself twice into the transcript.
  */
-export function reportToConversation(text: string): void {
+export function reportToConversation(text: string, detail?: Record<string, unknown>): void {
   const message = text.trim();
-  if (!message || message === lastSent || !isEmbedded()) return;
+  if (!message || !isEmbedded()) return;
 
-  lastSent = message;
+  // Prose leads — it is what the model responds to. The optional structured
+  // block rides along for exact fields (the same convention the shell's
+  // completion reporter uses; the cap and over-long fence are mirrored there
+  // too, since the two files deliberately share a wire format, not code).
+  const content: { type: 'text'; text: string }[] = [{ type: 'text', text: message }];
+  const detailBlock = detail ? fencedDetailBlock(detail) : null;
+  if (detailBlock) content.push({ type: 'text', text: detailBlock });
+
+  // Dedupe on everything sent, not just the prose — identical sentences with
+  // different structured detail are different reports.
+  const dedupeKey = detailBlock ? `${message}\n${detailBlock}` : message;
+  if (dedupeKey === lastSent) return;
+  lastSent = dedupeKey;
 
   window.parent?.postMessage(
     {
       jsonrpc: '2.0',
       id: nextId++,
       method: 'ui/update-model-context',
-      params: { content: [{ type: 'text', text: message }] },
+      params: { content },
     },
     '*',
   );

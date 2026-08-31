@@ -1,9 +1,13 @@
 import { findActivities } from '@/lib/activities/find';
 import { scoreDraft } from '@/lib/draft-meter/score';
 import { scoreRequest } from '@/lib/draft-meter/schema';
+import { runPathway } from '@/lib/pathway/run';
+import { storageAdapter } from '@/lib/storage';
 import { buildWidget, WidgetBuildError, WIDGET_KINDS } from '@/lib/widgets/build';
 
-export const maxDuration = 60;
+// Long enough for `build_pathway` (~30s across five model calls), not just
+// the single-call `show_widget`.
+export const maxDuration = 120;
 
 /**
  * The MCP server, deployed with the app.
@@ -112,6 +116,16 @@ const INSTRUCTIONS = [
   'The widget renders itself — do not describe it in detail or restate its contents. Say what it',
   'is in a line, and let the student use it. When they finish, the widget tells you what they did,',
   'and that is the moment to respond to their work or offer the next thing.',
+  '',
+  'Two ways to teach a sequence — one pedagogy. The planned arc (activate prior knowledge →',
+  'model the idea → practice → check) is what makes a sequence teach, so keep it either way.',
+  'In a live conversation, YOU deliver that arc: sequence `show_widget` calls through those',
+  'stages, read the evidence each widget reports back, and let it set the pacing — linger,',
+  'remediate, or advance, but inside the arc rather than wandering. Calling `build_pathway`',
+  'first and using its returned plan as your spine is a fine way to start. When someone wants',
+  'a complete lesson to hand off (a teacher planning, a parent printing a link), call',
+  '`build_pathway` for the link itself: 4-6 sequenced activities against the verified standard.',
+  'It takes about half a minute; say so, then call it.',
 ].join('\n');
 
 const TOOL_DESCRIPTION = [
@@ -177,7 +191,10 @@ function tools(origin: string) {
             type: 'string',
             description: 'Optional. A Common Core or NGSS code if known; verified against the standards graph.',
           },
-          gradeHint: { type: 'string', description: 'Optional, e.g. "4th grade".' },
+          audienceHint: {
+            type: 'string',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". An unverified steer for standard selection, never a claim about the activity.',
+          },
           need: {
             type: 'string',
             description: 'Optional preference in plain words — "a game", "something they write", "a quick check".',
@@ -197,7 +214,14 @@ function tools(origin: string) {
             type: 'string',
             description: 'What the activity should be about, in plain words — "the Industrial Revolution", "comparing fractions". Enough on its own.',
           },
-          gradeHint: { type: 'string', description: 'Optional, e.g. "8th grade", "high school".' },
+          audienceHint: {
+            type: 'string',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". An unverified steer for standard selection, never a claim about the activity.',
+          },
+          gradeHint: {
+            type: 'string',
+            description: 'Deprecated alias for `audienceHint`, still accepted so callers written against the shipped tool keep working.',
+          },
           standardCode: {
             type: 'string',
             description: 'Optional. A Common Core or NGSS code, if you already know which one you want.',
@@ -211,6 +235,35 @@ function tools(origin: string) {
         required: [],
       },
       _meta: uiMeta(origin),
+    },
+    {
+      name: 'build_pathway',
+      title: 'Build a complete multi-step learning pathway',
+      description: [
+        'Plan and build a complete multi-step lesson — 4-6 sequenced activities against one',
+        'verified standard, with a share link a student opens to work through it (progress,',
+        'per-step evidence back to the teacher, automatic re-teach steps on struggle).',
+        '',
+        'Use this when someone wants a whole lesson or something to assign; use `show_widget`',
+        'when the student is here in the conversation and you will sequence activities yourself.',
+        '',
+        'This is the slow tool: about half a minute across several model calls. Tell the user',
+        'it is being built, then call it. The result includes the link and the plan summary.',
+      ].join('\n'),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            description: 'What the pathway teaches, in plain words — "comparing fractions", "the water cycle".',
+          },
+          audienceHint: {
+            type: 'string',
+            description: 'Optional. Who this is for, in plain words — "4th grade", "undergraduate intro stats", "new hires". An unverified steer for standard selection, never a claim about the activity.',
+          },
+        },
+        required: ['topic'],
+      },
     },
     {
       name: 'score_draft',
@@ -351,12 +404,21 @@ async function handle(message: RpcRequest, request: Request) {
         const args = (message.params?.arguments ?? {}) as {
           topic?: string;
           standardCode?: string;
-          gradeHint?: string;
+          audienceHint?: string;
           need?: string;
         };
 
         try {
-          const found = await findActivities(args);
+          // Named `audienceHint`, not `audience`, and the suffix is load-bearing:
+          // the manifest's `audience` is scheme-scoped and graph-derived, so
+          // reusing the bare name for unverified caller text would make one
+          // word mean two things across the same surface.
+          const found = await findActivities({
+            topic: args.topic,
+            standardCode: args.standardCode,
+            need: args.need,
+            gradeHint: args.audienceHint,
+          });
 
           const header = found.standard
             ? `${found.activities.length} activities for ${found.standard.code} — ${found.standard.description}` +
@@ -380,21 +442,121 @@ async function handle(message: RpcRequest, request: Request) {
         }
       }
 
+      if (message.params?.name === 'build_pathway') {
+        const args = (message.params?.arguments ?? {}) as { topic?: string; audienceHint?: string };
+        const topic = typeof args.topic === 'string' ? args.topic.trim() : '';
+        if (!topic) {
+          return ok(message.id, { content: [{ type: 'text', text: 'A topic is required.' }], isError: true });
+        }
+
+        try {
+          const run = await runPathway(topic, args.audienceHint?.trim() || undefined);
+
+          // Persistence is best-effort and separately guarded: a storage
+          // failure must not discard a pathway that took five model calls to
+          // build — the plan summary is still the answer, minus the link,
+          // with the real reason stated instead of a guess.
+          const adapter = storageAdapter();
+          let ownerId: string | null = null;
+          let sessionId: string | null = null;
+          let saveReason: string | null = null;
+          try {
+            // The session needs an owner the storage layer knows. MCP callers
+            // have no browser learner id, so one is minted per pathway; it is
+            // returned as ownerId because the edit endpoint gates on it — a
+            // caller that discards it can share the pathway but never edit it.
+            ownerId = await adapter.createStudent();
+            if (!ownerId) {
+              saveReason = 'storage declined to create an owner id';
+            } else {
+              sessionId = await adapter.persistSession({
+                studentId: ownerId,
+                topic,
+                gradeHint: args.audienceHint?.trim() || null,
+                anchor: run.anchor,
+                plan: run.plan,
+                stepWidgets: run.stepWidgets,
+                rejectedCodes: run.rejected,
+              });
+              if (!sessionId) saveReason = 'storage is not accepting writes';
+            }
+          } catch (saveError) {
+            saveReason = saveError instanceof Error ? saveError.message : 'unknown storage error';
+          }
+
+          const kindOf = (widget: unknown): string | null =>
+            widget && typeof widget === 'object' && 'kind' in widget && typeof widget.kind === 'string'
+              ? widget.kind
+              : null;
+
+          const steps = run.plan.steps.map((step, i) => {
+            const note = run.stepWidgetNotes[i];
+            return `${i + 1}. [${step.purpose}] ${step.title}${note ? ` — note: ${note}` : ''}`;
+          });
+          const verified = run.anchor.standard.verified
+            ? `verified against ${run.anchor.standard.sourceLabel}`
+            : 'no standard verified — this is an exploration pathway';
+          const summary = [
+            `Built "${run.plan.bigIdea}" — ${run.plan.steps.length} steps for ${run.anchor.standard.code} (${verified}).`,
+            ...steps,
+            sessionId
+              ? `Student link: ${origin}/learn/${sessionId}`
+              : `Not saved — ${saveReason ?? 'no reason recorded'}. The pathway above is complete; rebuilding is one call.`,
+            run.rejected.length > 0 ? `Rejected codes kept on record: ${run.rejected.join(', ')}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n');
+
+          return ok(message.id, {
+            content: [{ type: 'text', text: summary }],
+            structuredContent: {
+              sessionId,
+              url: sessionId ? `${origin}/learn/${sessionId}` : null,
+              /** Keep this to edit the pathway later — the edit API gates on it. */
+              ownerId,
+              standard: { code: run.anchor.standard.code, verified: run.anchor.standard.verified },
+              // The kind actually built per step — generation can substitute a
+              // fallback kind, and the plan's ask is reported only when it
+              // differs, so the caller never describes widgets that aren't there.
+              steps: run.plan.steps.map((step, i) => {
+                const builtKind = kindOf(run.stepWidgets[i]);
+                return {
+                  title: step.title,
+                  purpose: step.purpose,
+                  widgetKind: builtKind ?? step.widgetKind ?? null,
+                  ...(builtKind && step.widgetKind && builtKind !== step.widgetKind
+                    ? { plannedWidgetKind: step.widgetKind }
+                    : {}),
+                  ...(run.stepWidgetNotes[i] ? { note: run.stepWidgetNotes[i] } : {}),
+                };
+              }),
+              rejectedCodes: run.rejected,
+            },
+          });
+        } catch (error) {
+          const text = error instanceof Error ? error.message : 'Pathway generation failed.';
+          return ok(message.id, { content: [{ type: 'text', text }], isError: true });
+        }
+      }
+
       if (message.params?.name !== 'show_widget') {
         return fail(message.id, -32602, `Unknown tool: ${String(message.params?.name)}`);
       }
 
       const args = (message.params?.arguments ?? {}) as {
         topic?: string;
+        audienceHint?: string;
+        /** Deprecated alias for `audienceHint`; this tool shipped with it. */
         gradeHint?: string;
         standardCode?: string;
         kind?: string;
       };
+      const audienceHint = args.audienceHint ?? args.gradeHint;
 
       try {
         const built = await buildWidget({
           topic: args.topic,
-          gradeHint: args.gradeHint,
+          gradeHint: audienceHint,
           standardCode: args.standardCode,
           kind: args.kind,
         });
@@ -425,7 +587,7 @@ async function handle(message: RpcRequest, request: Request) {
 
         if (topic && (args.standardCode || args.kind)) {
           try {
-            const retry = await buildWidget({ topic, gradeHint: args.gradeHint });
+            const retry = await buildWidget({ topic, gradeHint: audienceHint });
             return ok(message.id, {
               content: [
                 {
