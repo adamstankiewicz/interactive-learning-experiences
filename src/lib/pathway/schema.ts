@@ -772,6 +772,43 @@ export type WritingWorkshopSpec = z.infer<typeof writingWorkshopSpec>;
 
 const composedChildId = z.string().describe('The id of another component in this composition.');
 
+/**
+ * The free-form tier: mechanics as data, never code. A composition may
+ * declare finite state (each variable an enumerated value list), any node
+ * may be conditionally visible on one of those values, an Action node
+ * mutates them, and Text interpolates them. The human-written interpreter
+ * is the only thing that executes — and because state is finite and
+ * declared, the structural gate can audit every reference, which is what
+ * separates a statechart from arbitrary code. Spelling follows A2UI's
+ * dataModel/actions semantics so free-form compositions project cleanly —
+ * and state is kept flat and JSON-Patch-friendly on purpose: AG-UI's
+ * STATE_SNAPSHOT/STATE_DELTA is the wire form for the day state is allowed
+ * to leave the widget. Local stays the default; sharing state through the
+ * AG-UI channel is an explicit opt-in that belongs to the #99 contract,
+ * same as every other value that crosses the boundary.
+ */
+const composedShowWhen = z
+  .object({
+    var: z.string().describe('A declared state variable.'),
+    equals: z.string().describe('Show this component only while the variable holds this value.'),
+  })
+  .nullish();
+
+const composedStateOp = z.object({
+  var: z.string().describe('A declared state variable.'),
+  set: z.string().nullish().describe('Set the variable to this declared value.'),
+  cycle: z.boolean().nullish().describe('Advance the variable to its next declared value, wrapping.'),
+});
+
+const composedAction = z.object({
+  type: z.literal('Action'),
+  id: z.string(),
+  label: z.string().describe('Button label, sentence case.'),
+  onTap: z.array(composedStateOp).describe('1-3 state changes applied in order.'),
+  showWhen: composedShowWhen,
+});
+
+
 const composedText = z.object({
   type: z.literal('Text'),
   id: z.string(),
@@ -780,6 +817,7 @@ const composedText = z.object({
     .enum(['body', 'caption'])
     .nullable()
     .describe('"caption" renders small and muted; null means body.'),
+  showWhen: composedShowWhen,
 });
 
 const composedCallout = z.object({
@@ -790,12 +828,14 @@ const composedCallout = z.object({
     .describe('"why" for reasoning behind an idea (elaborative), "tip" for strategy advice, "note" for anything else.'),
   label: z.string().describe('Short bold lead-in, e.g. "Why?" or "Tip:".'),
   text: z.string().describe('One or two sentences of markdown.'),
+  showWhen: composedShowWhen,
 });
 
 const composedGroup = z.object({
   type: z.literal('Group'),
   id: z.string(),
   children: z.array(composedChildId).describe('2–6 child ids, rendered top to bottom.'),
+  showWhen: composedShowWhen,
 });
 
 const composedReveal = z.object({
@@ -804,6 +844,7 @@ const composedReveal = z.object({
   faces: z
     .array(z.object({ title: z.string(), child: composedChildId }))
     .describe('Exactly 2 faces: front first, back second. The student taps to turn it over — put the prompt on the front and the payoff on the back.'),
+  showWhen: composedShowWhen,
 });
 
 const composedSequence = z.object({
@@ -815,6 +856,7 @@ const composedSequence = z.object({
     revealed: z.enum(['accumulate', 'replace']).describe('"accumulate" keeps passed items visible (worked examples); "replace" shows one at a time (decks).'),
   }),
   children: z.array(composedChildId).describe('2–8 item ids, in teaching order.'),
+  showWhen: composedShowWhen,
 });
 
 const composedCheck = z.object({
@@ -832,6 +874,7 @@ const composedCheck = z.object({
     )
     .describe('2-4 options, exactly one of them right.'),
   answer: z.number().int().describe('Zero-based index of the right option.'),
+  showWhen: composedShowWhen,
 });
 
 /**
@@ -850,6 +893,7 @@ const composedMatch = z.object({
   pairs: z
     .array(z.object({ left: z.string(), right: z.string() }))
     .describe('2-6 pairs. Left items show in order; right items are shuffled by the renderer.'),
+  showWhen: composedShowWhen,
 });
 
 const composedHunt = z.object({
@@ -865,6 +909,7 @@ const composedHunt = z.object({
       }),
     )
     .describe('4-9 items, mixing targets and near-miss decoys. At least one of each.'),
+  showWhen: composedShowWhen,
 });
 
 /**
@@ -884,6 +929,7 @@ const composedEstimate = z.object({
   unit: z.string().nullable().describe('Display unit, e.g. "%", "years", null for none.'),
   actual: z.number().describe('The real value, revealed after the student commits.'),
   feedback: z.string().describe('One sentence of context shown at the reveal.'),
+  showWhen: composedShowWhen,
 });
 
 const composedModel = z.object({
@@ -897,6 +943,7 @@ const composedModel = z.object({
   outcomes: z
     .array(z.object({ option: z.string(), text: z.string() }))
     .describe('One outcome per option, same values: the markdown shown when that value is selected. You must author every outcome — the renderer never computes.'),
+  showWhen: composedShowWhen,
 });
 
 /**
@@ -915,6 +962,7 @@ const composedComponent = z.discriminatedUnion('type', [
   composedHunt,
   composedEstimate,
   composedModel,
+  composedAction,
   composedCallout,
   composedGroup,
   composedReveal,
@@ -929,6 +977,16 @@ export const composedSpec = z.object({
   components: z
     .array(composedComponent)
     .describe('Flat component list. Exactly one component must have id "root" — usually a Group or Sequence that references the rest. 3–20 components.'),
+  state: z
+    .record(
+      z.string(),
+      z.object({
+        values: z.array(z.string()).describe('2-8 enumerated values this variable can hold.'),
+        initial: z.string().describe('The starting value — must be one of values.'),
+      }),
+    )
+    .nullish()
+    .describe('Optional finite state for free-form mechanics. Every value a variable can hold is declared here; Actions move between them, showWhen reads them, Text interpolates them as {varName}.'),
 });
 export type ComposedSpec = z.infer<typeof composedSpec>;
 
@@ -988,6 +1046,39 @@ export function compositionProblems(spec: ComposedSpec): string[] {
         !opts.every((o) => outcomeKeys.includes(o))
       ) {
         problems.push(`${c.id}: a Model needs 2+ options with exactly one authored outcome per option`);
+      }
+    }
+  }
+
+  const stateDefs = spec.state ?? {};
+  for (const [name, def] of Object.entries(stateDefs)) {
+    if (def.values.length < 2 || def.values.length > 8) problems.push(`state ${name}: declare 2-8 values`);
+    if (!def.values.includes(def.initial)) problems.push(`state ${name}: initial "${def.initial}" is not a declared value`);
+  }
+  const varOk = (name: string, value?: string | null) => {
+    const def = stateDefs[name];
+    if (!def) return `undeclared state variable "${name}"`;
+    if (value != null && !def.values.includes(value)) return `"${value}" is not a declared value of "${name}"`;
+    return null;
+  };
+  for (const c of spec.components) {
+    if (c.showWhen) {
+      const err = varOk(c.showWhen.var, c.showWhen.equals);
+      if (err) problems.push(`${c.id} showWhen: ${err}`);
+    }
+    if (c.type === 'Action') {
+      if (c.onTap.length === 0) problems.push(`${c.id}: an Action needs at least one state change`);
+      for (const op of c.onTap) {
+        const hasSet = op.set != null;
+        const hasCycle = op.cycle === true;
+        if (hasSet === hasCycle) problems.push(`${c.id}: each state change is exactly one of set or cycle`);
+        const err = varOk(op.var, op.set ?? undefined);
+        if (err) problems.push(`${c.id} onTap: ${err}`);
+      }
+    }
+    if ((c.type === 'Text' || c.type === 'Callout') && Object.keys(stateDefs).length > 0) {
+      for (const m of c.text.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)) {
+        if (!stateDefs[m[1]]) problems.push(`${c.id}: interpolates undeclared state variable "${m[1]}"`);
       }
     }
   }

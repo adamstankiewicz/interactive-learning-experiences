@@ -187,3 +187,43 @@ describe('Estimate and Model structural rules', () => {
     expect(compositionProblems(model(['2', '4'], ['2', '8']))).toContainEqual(expect.stringContaining('one authored outcome per option'));
   });
 });
+
+describe('free-form state layer structural rules', () => {
+  const machine = (over: Partial<ComposedSpec>): ComposedSpec => ({
+    kind: 'composed',
+    learningComponentId: null,
+    title: 'Machine',
+    state: { pieces: { values: ['0', '1', '2'], initial: '0' } },
+    components: [
+      { type: 'Group', id: 'root', children: ['count', 'add', 'done-note'] },
+      { type: 'Text', id: 'count', text: 'You have {pieces} pieces.', variant: null },
+      { type: 'Action', id: 'add', label: 'Add a piece', onTap: [{ var: 'pieces', cycle: true }] },
+      { type: 'Callout', id: 'done-note', intent: 'tip', label: 'Nice!', text: 'All there.', showWhen: { var: 'pieces', equals: '2' } },
+    ],
+    ...over,
+  });
+
+  it('accepts a sound machine', () => {
+    expect(compositionProblems(machine({}))).toEqual([]);
+  });
+
+  it('rejects undeclared variables wherever referenced', () => {
+    expect(compositionProblems(machine({ state: { other: { values: ['a', 'b'], initial: 'a' } } })))
+      .toEqual(expect.arrayContaining([
+        expect.stringContaining('interpolates undeclared state variable "pieces"'),
+        expect.stringContaining('showWhen: undeclared state variable "pieces"'),
+        expect.stringContaining('onTap: undeclared state variable "pieces"'),
+      ]));
+  });
+
+  it('rejects a bad initial, an out-of-set value, and a set+cycle op', () => {
+    expect(compositionProblems(machine({ state: { pieces: { values: ['0', '1', '2'], initial: '9' } } })))
+      .toContainEqual(expect.stringContaining('initial'));
+    const bad = machine({});
+    (bad.components[3] as { showWhen: { var: string; equals: string } }).showWhen = { var: 'pieces', equals: '99' };
+    expect(compositionProblems(bad)).toContainEqual(expect.stringContaining('not a declared value'));
+    const dual = machine({});
+    (dual.components[2] as { onTap: { var: string; set?: string; cycle?: boolean }[] }).onTap = [{ var: 'pieces', set: '1', cycle: true }];
+    expect(compositionProblems(dual)).toContainEqual(expect.stringContaining('exactly one of set or cycle'));
+  });
+});

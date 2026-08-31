@@ -34,10 +34,42 @@ type Props = {
 export function A2UISurfaceView({ surface, onAction }: Props) {
   const byId = new Map(surface.createSurface.components.map((c) => [c.id, c]));
 
+  // The free-form state layer: finite, declared variables from the surface's
+  // data model. The interpreter below is everything that ever executes —
+  // compositions author values, visibility conditions, and transitions as data.
+  const stateDefs = ((surface.createSurface.dataModel?.state ?? {}) as Record<
+    string,
+    { values: string[]; initial: string }
+  >);
+  const [stateVals, setStateVals] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(stateDefs).map(([k, d]) => [k, d.initial])),
+  );
+  const applyOps = (ops: { var: string; set?: string | null; cycle?: boolean | null }[]) => {
+    setStateVals((prev) => {
+      const next = { ...prev };
+      for (const op of ops) {
+        const def = stateDefs[op.var];
+        if (!def) continue;
+        if (op.set != null && def.values.includes(op.set)) next[op.var] = op.set;
+        else if (op.cycle) {
+          const i = def.values.indexOf(next[op.var] ?? def.initial);
+          next[op.var] = def.values[(i + 1) % def.values.length];
+        }
+      }
+      return next;
+    });
+  };
+  const interp = (text: string) =>
+    Object.keys(stateDefs).length === 0
+      ? text
+      : text.replace(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g, (m, name) => stateVals[name] ?? m);
+
   function render(id: string, seen: Set<string>): React.ReactNode {
     const component = byId.get(id);
     if (!component) return <Gap key={id} label={`missing component: ${id}`} />;
     if (seen.has(id)) return <Gap key={id} label={`circular reference: ${id}`} />;
+    const showWhen = component.showWhen as { var: string; equals: string } | undefined;
+    if (showWhen && stateVals[showWhen.var] !== showWhen.equals) return null;
     const path = new Set(seen).add(id);
 
     const children = () => childIds(component).map((childId) => render(childId, path));
@@ -126,7 +158,7 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
               disallowedElements={['a', 'img']}
               unwrapDisallowed
             >
-              {String(component.text ?? '')}
+              {interp(String(component.text ?? ''))}
             </ReactMarkdown>
           </div>
         );
@@ -252,6 +284,22 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
           />
         );
       }
+      case 'a2learn:Action': {
+        const ops = (Array.isArray(component.onTap) ? component.onTap : []) as {
+          var: string; set?: string | null; cycle?: boolean | null;
+        }[];
+        return (
+          <motion.button
+            key={id}
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => applyOps(ops)}
+            className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            {interp(String(component.label ?? ''))}
+          </motion.button>
+        );
+      }
       case 'a2learn:Estimate': {
         return (
           <EstimateView
@@ -299,7 +347,7 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
             ) : (
               <span className="[&_p]:inline">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['a', 'img']} unwrapDisallowed>
-                  {String(component.text ?? '')}
+                  {interp(String(component.text ?? ''))}
                 </ReactMarkdown>
               </span>
             )}

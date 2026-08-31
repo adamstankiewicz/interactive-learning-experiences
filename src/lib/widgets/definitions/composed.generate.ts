@@ -60,6 +60,14 @@ const authoringNode = z.object({
     .array(z.object({ option: z.string(), text: z.string() }))
     .nullish()
     .describe('Model only: exactly one markdown outcome per option value.'),
+  onTap: z
+    .array(z.object({ var: z.string(), set: z.string().nullish(), cycle: z.boolean().nullish() }))
+    .nullish()
+    .describe('Action only: 1-3 state changes — each sets a declared value or cycles to the next.'),
+  showWhen: z
+    .object({ var: z.string(), equals: z.string() })
+    .nullish()
+    .describe('Any component: show only while a declared state variable holds this value.'),
   policy: z
     .object({
       order: z.string().describe('"linear" or "free"'),
@@ -72,6 +80,10 @@ const authoringNode = z.object({
 
 const composedAuthoring = z.object({
   title: z.string().nullish().describe('Short student-facing activity title.'),
+  state: z
+    .record(z.string(), z.object({ values: z.array(z.string()), initial: z.string() }))
+    .nullish()
+    .describe('Optional finite state for free-form mechanics: variable name -> {values: 2-8 declared values, initial}.'),
   components: z
     .array(authoringNode)
     .describe('Flat component list. Exactly one component must have id "root". 3–20 components. Set fields that do not apply to a node type to null.'),
@@ -84,6 +96,12 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 
 /** One node, canonical field names — synonyms mapped, nothing invented. */
 export function canonicalizeNode(node: LooseNode): Record<string, unknown> {
+  const canonical = canonicalizeCore(node);
+  if (node.showWhen && typeof node.showWhen === 'object') canonical.showWhen = node.showWhen;
+  return canonical;
+}
+
+function canonicalizeCore(node: LooseNode): Record<string, unknown> {
   const text = str(node.text) ?? str(node.body) ?? str(node.content) ?? str(node.markdown);
 
   switch (node.type) {
@@ -129,6 +147,13 @@ export function canonicalizeNode(node: LooseNode): Record<string, unknown> {
       };
     case 'Hunt':
       return { type: 'Hunt', id: node.id, prompt: str(node.prompt) ?? text ?? '', items: Array.isArray(node.items) ? node.items : [] };
+    case 'Action':
+      return {
+        type: 'Action',
+        id: node.id,
+        label: str(node.label) ?? text ?? '',
+        onTap: Array.isArray(node.onTap) ? node.onTap : [],
+      };
     case 'Group':
       return { type: 'Group', id: node.id, children: Array.isArray(node.children) ? node.children : [] };
     case 'Reveal': {
@@ -182,6 +207,10 @@ registerWidgetGenerator({
         'Pedagogy: retrieval beats rereading — mix interaction types: Check for one concrete question, Match for term-meaning or equivalent-pairs practice, Hunt for telling examples from non-examples, Reveal (prediction front, payoff back) over long explanations.',
         'Sequence(linear, gated, accumulate) for walkthroughs where steps build on each other; Sequence(free, all, replace) for browsable card decks;',
         'a "why" Callout wherever reasoning deserves emphasis. Keep each Text under ~60 words — interaction density over prose density.',
+        'Free-form mechanics, when no component above fits the interaction you want: declare finite state at the top level (state: {varName: {values, initial}}),',
+        'then use Action {label, onTap: [{var, set: value} or {var, cycle: true}]} to change it, showWhen: {var, equals} on any component to conditionally show it,',
+        'and {varName} inside Text to display the current value. Every value a variable can ever hold must be declared — design the mechanic as a small state machine.',
+        'Reach for the named components first; go free-form only for a mechanic they cannot express.',
         'Structure rules: exactly one component has id "root" (usually a Group or Sequence); every referenced id exists in the list;',
         'ids are short lowercase slugs; 3–20 components total. Compose for the topic and audience you are given — do not imitate a quiz; nothing here measures.',
       ].join(' '),
@@ -195,6 +224,7 @@ registerWidgetGenerator({
       // fixates on the tree and forgets to name the activity.
       title: authored.title?.trim() || ctx.step.title,
       components: authored.components.map(canonicalizeNode),
+      ...(authored.state ? { state: authored.state } : {}),
     });
 
     const widget = parsed.success ? normalize(parsed.data) : null;

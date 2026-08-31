@@ -156,6 +156,42 @@ const EXAMPLES: { label: string; spec: ComposedSpec }[] = [
       ],
     },
   },
+  {
+    label: 'Free form',
+    spec: {
+      kind: 'composed',
+      learningComponentId: null,
+      title: 'Build three quarters',
+      state: { pieces: { values: ['0', '1', '2', '3'], initial: '0' } },
+      components: [
+        { type: 'Group', id: 'root', children: ['goal', 'count', 'add', 'partway', 'done'] },
+        {
+          type: 'Text',
+          id: 'goal',
+          text: 'A whole has **4 equal parts**. Add pieces until you are holding **3/4**.',
+          variant: null,
+        },
+        { type: 'Text', id: 'count', text: 'You are holding **{pieces}/4** of the whole.', variant: null },
+        { type: 'Action', id: 'add', label: 'Add a piece', onTap: [{ var: 'pieces', cycle: true }] },
+        {
+          type: 'Callout',
+          id: 'partway',
+          intent: 'note',
+          label: 'Halfway:',
+          text: '2/4 is the same amount as 1/2 — two names, one quantity.',
+          showWhen: { var: 'pieces', equals: '2' },
+        },
+        {
+          type: 'Callout',
+          id: 'done',
+          intent: 'tip',
+          label: 'There it is:',
+          text: '3/4 — three of the four equal parts. One more piece would make the whole.',
+          showWhen: { var: 'pieces', equals: '3' },
+        },
+      ],
+    },
+  },
 ];
 
 export default function ComposedDemoPage() {

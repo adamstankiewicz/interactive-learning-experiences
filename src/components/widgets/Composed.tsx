@@ -27,6 +27,12 @@ type Props = { spec: ComposedSpec; onComplete?: (correct: boolean) => void };
 const COMPLETE_ACTION = { event: { name: 'composed.completed' } };
 
 function toSurfaceComponent(component: ComposedComponent): A2UIComponent {
+  const base = mapComponent(component);
+  if ('showWhen' in component && component.showWhen) base.showWhen = component.showWhen;
+  return base;
+}
+
+function mapComponent(component: ComposedComponent): A2UIComponent {
   switch (component.type) {
     case 'Group':
       return { id: component.id, component: 'Column', children: component.children };
@@ -59,6 +65,8 @@ function toSurfaceComponent(component: ComposedComponent): A2UIComponent {
         variable: component.variable,
         outcomes: component.outcomes,
       };
+    case 'Action':
+      return { id: component.id, component: 'a2learn:Action', label: component.label, onTap: component.onTap };
     case 'Hunt':
       return { id: component.id, component: 'a2learn:Hunt', prompt: component.prompt, items: component.items };
     case 'Text':
@@ -101,6 +109,8 @@ export function Composed({ spec, onComplete }: Props) {
         surfaceId: `composed-${spec.learningComponentId ?? 'activity'}`,
         catalogId: A2LEARN_CATALOG_DRAFT,
         components,
+        // A2UI's own home for this: declared finite state rides the data model.
+        ...(spec.state ? { dataModel: { state: spec.state } } : {}),
       },
     };
     return { surface: message, hasSequence: Boolean(firstSequence) };
