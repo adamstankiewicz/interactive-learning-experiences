@@ -35,6 +35,7 @@ export type WalkthroughSession = {
  * button is shown.
  */
 const HAS_OWN_CTA = new Set([
+  'composed',
   'markdown-card',
   'flashcard',
   'step-reveal',

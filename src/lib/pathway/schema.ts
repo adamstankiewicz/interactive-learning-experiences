@@ -754,7 +754,360 @@ export const writingWorkshopSpec = z.object({
 
 export type WritingWorkshopSpec = z.infer<typeof writingWorkshopSpec>;
 
+// --- composed: an activity assembled from pedagogical primitives ---------
+
+/**
+ * The composed kind is the registry's generative escape hatch: instead of one
+ * fixed interaction, the model emits a flat tree of *pedagogical primitives*
+ * (issue #100 holds the vocabulary and its learning-science grounding) and
+ * human-written renderers draw it. Invariant 1 holds — this is data, validated
+ * here, never code. The v1 alphabet is deliberately verdict-free: nothing in
+ * it can measure, so a composed activity's `assesses` is false by
+ * construction (derived from the alphabet, not asserted). Verdict-carrying
+ * primitives (Check/Response) join only with the #99 evidence contract.
+ *
+ * Components reference each other by id in a flat list — the same shape A2UI
+ * surfaces use, so compositions project to the a2learn catalog verbatim.
+ */
+
+const composedChildId = z.string().describe('The id of another component in this composition.');
+
+/**
+ * The free-form tier: mechanics as data, never code. A composition may
+ * declare finite state (each variable an enumerated value list), any node
+ * may be conditionally visible on one of those values, an Action node
+ * mutates them, and Text interpolates them. The human-written interpreter
+ * is the only thing that executes — and because state is finite and
+ * declared, the structural gate can audit every reference, which is what
+ * separates a statechart from arbitrary code. Spelling follows A2UI's
+ * dataModel/actions semantics so free-form compositions project cleanly —
+ * and state is kept flat and JSON-Patch-friendly on purpose: AG-UI's
+ * STATE_SNAPSHOT/STATE_DELTA is the wire form for the day state is allowed
+ * to leave the widget. Local stays the default; sharing state through the
+ * AG-UI channel is an explicit opt-in that belongs to the #99 contract,
+ * same as every other value that crosses the boundary.
+ */
+const composedShowWhen = z
+  .object({
+    var: z.string().describe('A declared state variable.'),
+    equals: z.string().describe('Show this component only while the variable holds this value.'),
+  })
+  .nullish();
+
+const composedStateOp = z.object({
+  var: z.string().describe('A declared state variable.'),
+  set: z.string().nullish().describe('Set the variable to this declared value.'),
+  cycle: z.boolean().nullish().describe('Advance the variable to its next declared value, wrapping.'),
+});
+
+const composedAction = z.object({
+  type: z.literal('Action'),
+  id: z.string(),
+  label: z.string().describe('Button label, sentence case.'),
+  onTap: z.array(composedStateOp).describe('1-3 state changes applied in order.'),
+  showWhen: composedShowWhen,
+});
+
+
+const composedText = z.object({
+  type: z.literal('Text'),
+  id: z.string(),
+  text: z.string().describe('Markdown body text. Bold key terms; no headings, links, or images.'),
+  variant: z
+    .enum(['body', 'caption'])
+    .nullable()
+    .describe('"caption" renders small and muted; null means body.'),
+  showWhen: composedShowWhen,
+});
+
+const composedCallout = z.object({
+  type: z.literal('Callout'),
+  id: z.string(),
+  intent: z
+    .enum(['why', 'tip', 'note'])
+    .describe('"why" for reasoning behind an idea (elaborative), "tip" for strategy advice, "note" for anything else.'),
+  label: z.string().describe('Short bold lead-in, e.g. "Why?" or "Tip:".'),
+  text: z.string().describe('One or two sentences of markdown.'),
+  showWhen: composedShowWhen,
+});
+
+const composedGroup = z.object({
+  type: z.literal('Group'),
+  id: z.string(),
+  children: z.array(composedChildId).describe('2–6 child ids, rendered top to bottom.'),
+  showWhen: composedShowWhen,
+});
+
+const composedReveal = z.object({
+  type: z.literal('Reveal'),
+  id: z.string(),
+  faces: z
+    .array(z.object({ title: z.string(), child: composedChildId }))
+    .describe('Exactly 2 faces: front first, back second. The student taps to turn it over — put the prompt on the front and the payoff on the back.'),
+  showWhen: composedShowWhen,
+});
+
+const composedSequence = z.object({
+  type: z.literal('Sequence'),
+  id: z.string(),
+  policy: z.object({
+    order: z.enum(['linear', 'free']).describe('"linear" when items build on each other; "free" when they can be browsed.'),
+    disclosure: z.enum(['gated', 'all']).describe('"gated" holds each item back until the student advances — use for walkthroughs.'),
+    revealed: z.enum(['accumulate', 'replace']).describe('"accumulate" keeps passed items visible (worked examples); "replace" shows one at a time (decks).'),
+  }),
+  children: z.array(composedChildId).describe('2–8 item ids, in teaching order.'),
+  showWhen: composedShowWhen,
+});
+
+const composedCheck = z.object({
+  type: z.literal('Check'),
+  id: z.string(),
+  prompt: z.string().describe('The question, in markdown. One concrete thing to retrieve or apply.'),
+  options: z
+    .array(
+      z.object({
+        text: z.string().describe('The option as the student sees it.'),
+        feedback: z
+          .string()
+          .describe('Shown immediately when this option is picked — why it is or is not the one, one sentence.'),
+      }),
+    )
+    .describe('2-4 options, exactly one of them right.'),
+  answer: z.number().int().describe('Zero-based index of the right option.'),
+  showWhen: composedShowWhen,
+});
+
+/**
+ * Check is deliberately *local*: feedback renders in the widget and nothing
+ * leaves it — no verdict, no event, no evidence. It exists because retrieval
+ * beats rereading (the learner checks themself), not because anyone is
+ * measured; `assesses` on a composed activity stays false with Check in the
+ * alphabet. An answer that should count as evidence is the Response
+ * primitive, which waits for the #99 contract.
+ */
+
+const composedMatch = z.object({
+  type: z.literal('Match'),
+  id: z.string(),
+  prompt: z.string().describe('What matching means here, e.g. "Match each term to its meaning."'),
+  pairs: z
+    .array(z.object({ left: z.string(), right: z.string() }))
+    .describe('2-6 pairs. Left items show in order; right items are shuffled by the renderer.'),
+  showWhen: composedShowWhen,
+});
+
+const composedHunt = z.object({
+  type: z.literal('Hunt'),
+  id: z.string(),
+  prompt: z.string().describe('What to find, e.g. "Tap every fraction equivalent to 1/2."'),
+  items: z
+    .array(
+      z.object({
+        text: z.string(),
+        target: z.boolean().describe('True if this is one of the things to find.'),
+        feedback: z.string().describe('Shown when tapped — why it is or is not one, one sentence.'),
+      }),
+    )
+    .describe('4-9 items, mixing targets and near-miss decoys. At least one of each.'),
+  showWhen: composedShowWhen,
+});
+
+/**
+ * Match and Hunt are the stateful tier of the local alphabet: real game
+ * mechanics (selection state, progress, lockout on success) implemented
+ * entirely renderer-side. Like Check, nothing leaves the component — they
+ * exist for retrieval and discrimination practice, not measurement, and a
+ * composed activity's `assesses` stays false with them in play.
+ */
+
+const composedEstimate = z.object({
+  type: z.literal('Estimate'),
+  id: z.string(),
+  prompt: z.string().describe('What to estimate, e.g. "What fraction of Earth\'s water is drinkable?"'),
+  min: z.number().describe('Slider minimum.'),
+  max: z.number().describe('Slider maximum.'),
+  unit: z.string().nullable().describe('Display unit, e.g. "%", "years", null for none.'),
+  actual: z.number().describe('The real value, revealed after the student commits.'),
+  feedback: z.string().describe('One sentence of context shown at the reveal.'),
+  showWhen: composedShowWhen,
+});
+
+const composedModel = z.object({
+  type: z.literal('Model'),
+  id: z.string(),
+  prompt: z.string().describe('What the knob explores, e.g. "What happens as the denominator grows?"'),
+  variable: z.object({
+    name: z.string().describe('The variable the student sets, e.g. "denominator".'),
+    options: z.array(z.string()).describe('2-6 values in order. All-numeric values render as a slider; labels render as chips.'),
+  }),
+  outcomes: z
+    .array(z.object({ option: z.string(), text: z.string() }))
+    .describe('One outcome per option, same values: the markdown shown when that value is selected. You must author every outcome — the renderer never computes.'),
+  showWhen: composedShowWhen,
+});
+
+/**
+ * The two honest input roles (issue #100 round 4): Estimate is a *commit*
+ * input — the value exists to be locked in before a reveal, compared by
+ * juxtaposition, never judged, never transmitted. Model is a *parameter*
+ * input — the value configures which authored content shows. The model
+ * authors outcomes as data, never formulas: nothing model-written executes.
+ * The third role, inputs whose values leave the widget, is Response (#99).
+ */
+
+const composedComponent = z.discriminatedUnion('type', [
+  composedText,
+  composedCheck,
+  composedMatch,
+  composedHunt,
+  composedEstimate,
+  composedModel,
+  composedAction,
+  composedCallout,
+  composedGroup,
+  composedReveal,
+  composedSequence,
+]);
+export type ComposedComponent = z.infer<typeof composedComponent>;
+
+export const composedSpec = z.object({
+  kind: z.literal('composed'),
+  learningComponentId: z.string().nullable(),
+  title: z.string().describe('Short student-facing activity title.'),
+  components: z
+    .array(composedComponent)
+    .describe('Flat component list. Exactly one component must have id "root" — usually a Group or Sequence that references the rest. 3–20 components.'),
+  state: z
+    .record(
+      z.string(),
+      z.object({
+        values: z.array(z.string()).describe('2-8 enumerated values this variable can hold.'),
+        initial: z.string().describe('The starting value — must be one of values.'),
+      }),
+    )
+    .nullish()
+    .describe('Optional finite state for free-form mechanics. Every value a variable can hold is declared here; Actions move between them, showWhen reads them, Text interpolates them as {varName}.'),
+});
+export type ComposedSpec = z.infer<typeof composedSpec>;
+
+/**
+ * Structural rules the union cannot express (discriminated-union members must
+ * stay plain objects, and providers never see refinements anyway). The
+ * generator runs this before accepting a composition; the registry entry's
+ * schema runs it again at render time.
+ */
+export function compositionProblems(spec: ComposedSpec): string[] {
+  const problems: string[] = [];
+  const ids = new Set<string>();
+  for (const c of spec.components) {
+    if (ids.has(c.id)) problems.push(`duplicate component id: ${c.id}`);
+    ids.add(c.id);
+  }
+  if (!ids.has('root')) problems.push('no component with id "root"');
+
+  const childRefs = (c: ComposedComponent): string[] =>
+    c.type === 'Group' || c.type === 'Sequence'
+      ? c.children
+      : c.type === 'Reveal'
+        ? c.faces.map((f) => f.child)
+        : [];
+
+  for (const c of spec.components) {
+    for (const ref of childRefs(c)) {
+      if (!ids.has(ref)) problems.push(`${c.id} references missing component: ${ref}`);
+      if (ref === c.id) problems.push(`${c.id} references itself`);
+    }
+  }
+  if (spec.components.some((c) => c.type === 'Reveal' && c.faces.length !== 2)) {
+    problems.push('a Reveal must have exactly 2 faces');
+  }
+  for (const c of spec.components) {
+    if (c.type === 'Check' && (c.options.length < 2 || c.answer < 0 || c.answer >= c.options.length)) {
+      problems.push(`${c.id}: a Check needs 2+ options and an answer index inside them`);
+    }
+    if (c.type === 'Match' && c.pairs.length < 2) {
+      problems.push(`${c.id}: a Match needs 2+ pairs`);
+    }
+    if (
+      c.type === 'Hunt' &&
+      (c.items.length < 3 || !c.items.some((i) => i.target) || !c.items.some((i) => !i.target))
+    ) {
+      problems.push(`${c.id}: a Hunt needs 3+ items with at least one target and one decoy`);
+    }
+    if (c.type === 'Estimate' && (c.min >= c.max || c.actual < c.min || c.actual > c.max)) {
+      problems.push(`${c.id}: an Estimate needs min < max with the actual inside the range`);
+    }
+    if (c.type === 'Model') {
+      const opts = c.variable.options;
+      const outcomeKeys = c.outcomes.map((o) => o.option);
+      if (
+        opts.length < 2 ||
+        opts.length !== outcomeKeys.length ||
+        !opts.every((o) => outcomeKeys.includes(o))
+      ) {
+        problems.push(`${c.id}: a Model needs 2+ options with exactly one authored outcome per option`);
+      }
+    }
+  }
+
+  const stateDefs = spec.state ?? {};
+  for (const [name, def] of Object.entries(stateDefs)) {
+    if (def.values.length < 2 || def.values.length > 8) problems.push(`state ${name}: declare 2-8 values`);
+    if (!def.values.includes(def.initial)) problems.push(`state ${name}: initial "${def.initial}" is not a declared value`);
+  }
+  const varOk = (name: string, value?: string | null) => {
+    const def = stateDefs[name];
+    if (!def) return `undeclared state variable "${name}"`;
+    if (value != null && !def.values.includes(value)) return `"${value}" is not a declared value of "${name}"`;
+    return null;
+  };
+  for (const c of spec.components) {
+    if (c.showWhen) {
+      const err = varOk(c.showWhen.var, c.showWhen.equals);
+      if (err) problems.push(`${c.id} showWhen: ${err}`);
+    }
+    if (c.type === 'Action') {
+      if (c.onTap.length === 0) problems.push(`${c.id}: an Action needs at least one state change`);
+      for (const op of c.onTap) {
+        const hasSet = op.set != null;
+        const hasCycle = op.cycle === true;
+        if (hasSet === hasCycle) problems.push(`${c.id}: each state change is exactly one of set or cycle`);
+        const err = varOk(op.var, op.set ?? undefined);
+        if (err) problems.push(`${c.id} onTap: ${err}`);
+      }
+    }
+    if ((c.type === 'Text' || c.type === 'Callout') && Object.keys(stateDefs).length > 0) {
+      for (const m of c.text.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)) {
+        if (!stateDefs[m[1]]) problems.push(`${c.id}: interpolates undeclared state variable "${m[1]}"`);
+      }
+    }
+  }
+
+  // Cycle check: walk from root; a composition is a tree, not a graph.
+  const byId = new Map(spec.components.map((c) => [c.id, c]));
+  const visiting = new Set<string>();
+  const walk = (id: string): boolean => {
+    if (visiting.has(id)) return false;
+    visiting.add(id);
+    const node = byId.get(id);
+    const ok = !node || childRefs(node).every(walk);
+    visiting.delete(id);
+    return ok;
+  };
+  if (ids.has('root') && !walk('root')) problems.push('composition contains a reference cycle');
+
+  return problems;
+}
+
+/** The strict form — for the registry entry, where refinements are allowed. */
+export const composedSpecStrict = composedSpec.superRefine((spec, ctx) => {
+  for (const problem of compositionProblems(spec)) {
+    ctx.addIssue({ code: 'custom', message: problem });
+  }
+});
+
 export const widgetSpec = z.discriminatedUnion('kind', [
+  composedSpec,
   debateAiSpec,
   writingWorkshopSpec,
   fractionAreaModelSpec,
@@ -783,6 +1136,7 @@ export const learningOutcome = z.object({
 
 /** The widget kinds the registry can render. Keep in step with `widgetSpec`. */
 export const widgetKind = z.enum([
+  'composed',
   'fraction-area-model',
   'swiper-flashcard',
   'draft-meter',

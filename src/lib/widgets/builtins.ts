@@ -7,6 +7,7 @@
  * `builtins.generate.ts`. The `widgetSpec` union and `widgetKind` enum in
  * `pathway/schema.ts` still need it too — see CONTRIBUTING.md for the full list.
  */
+import '@/lib/widgets/definitions/composed';
 import '@/lib/widgets/definitions/fraction-area-model';
 import '@/lib/widgets/definitions/swiper-flashcard';
 import '@/lib/widgets/definitions/draft-meter';
