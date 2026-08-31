@@ -115,3 +115,28 @@ describe('canonicalizeNode', () => {
     expect(canonicalizeNode({ id: 'q', type: 'Quiz' })).toMatchObject({ type: 'Quiz' });
   });
 });
+
+describe('Check structural rules', () => {
+  const withCheck = (options: { text: string; feedback: string }[], answer: number): ComposedSpec => ({
+    kind: 'composed',
+    learningComponentId: null,
+    title: 'Check test',
+    components: [
+      { type: 'Group', id: 'root', children: ['q'] },
+      { type: 'Check', id: 'q', prompt: 'Which sphere is water?', options, answer },
+    ],
+  });
+  const two = [
+    { text: 'hydrosphere', feedback: 'water is the hydro- part' },
+    { text: 'geosphere', feedback: 'that is land and rock' },
+  ];
+
+  it('accepts a sound check', () => {
+    expect(compositionProblems(withCheck(two, 0))).toEqual([]);
+  });
+
+  it('rejects an out-of-range answer and a one-option check', () => {
+    expect(compositionProblems(withCheck(two, 5))).toContainEqual(expect.stringContaining('answer index'));
+    expect(compositionProblems(withCheck(two.slice(0, 1), 0))).toContainEqual(expect.stringContaining('2+ options'));
+  });
+});

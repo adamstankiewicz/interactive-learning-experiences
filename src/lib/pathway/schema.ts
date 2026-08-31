@@ -817,8 +817,35 @@ const composedSequence = z.object({
   children: z.array(composedChildId).describe('2–8 item ids, in teaching order.'),
 });
 
+const composedCheck = z.object({
+  type: z.literal('Check'),
+  id: z.string(),
+  prompt: z.string().describe('The question, in markdown. One concrete thing to retrieve or apply.'),
+  options: z
+    .array(
+      z.object({
+        text: z.string().describe('The option as the student sees it.'),
+        feedback: z
+          .string()
+          .describe('Shown immediately when this option is picked — why it is or is not the one, one sentence.'),
+      }),
+    )
+    .describe('2-4 options, exactly one of them right.'),
+  answer: z.number().int().describe('Zero-based index of the right option.'),
+});
+
+/**
+ * Check is deliberately *local*: feedback renders in the widget and nothing
+ * leaves it — no verdict, no event, no evidence. It exists because retrieval
+ * beats rereading (the learner checks themself), not because anyone is
+ * measured; `assesses` on a composed activity stays false with Check in the
+ * alphabet. An answer that should count as evidence is the Response
+ * primitive, which waits for the #99 contract.
+ */
+
 const composedComponent = z.discriminatedUnion('type', [
   composedText,
+  composedCheck,
   composedCallout,
   composedGroup,
   composedReveal,
@@ -866,6 +893,11 @@ export function compositionProblems(spec: ComposedSpec): string[] {
   }
   if (spec.components.some((c) => c.type === 'Reveal' && c.faces.length !== 2)) {
     problems.push('a Reveal must have exactly 2 faces');
+  }
+  for (const c of spec.components) {
+    if (c.type === 'Check' && (c.options.length < 2 || c.answer < 0 || c.answer >= c.options.length)) {
+      problems.push(`${c.id}: a Check needs 2+ options and an answer index inside them`);
+    }
   }
 
   // Cycle check: walk from root; a composition is a tree, not a graph.

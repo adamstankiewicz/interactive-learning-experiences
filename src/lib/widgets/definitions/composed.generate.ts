@@ -33,6 +33,12 @@ const authoringNode = z.object({
     .array(z.object({ title: z.string(), child: z.string() }))
     .nullable()
     .describe('Reveal only: exactly two faces, front then back.'),
+  prompt: z.string().nullable().describe('Check only: the question, markdown.'),
+  options: z
+    .array(z.object({ text: z.string(), feedback: z.string() }))
+    .nullable()
+    .describe('Check only: 2-4 options, each with one-sentence feedback.'),
+  answer: z.number().nullable().describe('Check only: zero-based index of the right option.'),
   policy: z
     .object({
       order: z.string().describe('"linear" or "free"'),
@@ -71,6 +77,14 @@ export function canonicalizeNode(node: LooseNode): Record<string, unknown> {
       const intent = ['why', 'tip', 'note'].includes(str(node.intent) ?? '') ? node.intent : 'note';
       return { type: 'Callout', id: node.id, intent, label: str(node.label) ?? '', text: text ?? '' };
     }
+    case 'Check':
+      return {
+        type: 'Check',
+        id: node.id,
+        prompt: str(node.prompt) ?? text ?? '',
+        options: Array.isArray(node.options) ? node.options : [],
+        answer: typeof node.answer === 'number' ? node.answer : -1,
+      };
     case 'Group':
       return { type: 'Group', id: node.id, children: Array.isArray(node.children) ? node.children : [] };
     case 'Reveal': {
@@ -114,10 +128,12 @@ registerWidgetGenerator({
         'Output a single JSON object with exactly two top-level keys: "title" (short student-facing activity title) and "components". No markdown fences, no commentary.',
         'Component types, each an object with "type" and "id" fields, referenced by id in a flat list:',
         'Text {text: markdown, variant: "caption" or null}; Callout {intent: "why"|"tip"|"note", label, text} — an emphasized box: "why" for the reasoning behind an idea, "tip" for strategy;',
+        'Check {prompt, options: 2-4 of {text, feedback}, answer: index of the right one} — a self-check with instant feedback; nothing is recorded, it exists so the student retrieves instead of rereads;',
         'Group {children: 2–6 ids, stacked top to bottom}; Reveal {faces: exactly two of {title, child} — front then back; the student taps to turn it over: prompt on the front, payoff on the back};',
         'Sequence {policy: {order: "linear"|"free", disclosure: "gated"|"all", revealed: "accumulate"|"replace"}, children: 2–8 ids in teaching order}.',
-        'Pedagogy: Sequence(linear, gated, accumulate) for walkthroughs where steps build on each other; Sequence(free, all, replace) for browsable card decks;',
-        'Reveal to provoke a prediction before showing an answer; a "why" Callout wherever reasoning deserves emphasis — asking why is how ideas stick.',
+        'Pedagogy: retrieval beats rereading — include a Check every 2-3 content nodes, and prefer Reveal (prediction on the front, payoff on the back) over long explanations.',
+        'Sequence(linear, gated, accumulate) for walkthroughs where steps build on each other; Sequence(free, all, replace) for browsable card decks;',
+        'a "why" Callout wherever reasoning deserves emphasis. Keep each Text under ~60 words — interaction density over prose density.',
         'Structure rules: exactly one component has id "root" (usually a Group or Sequence); every referenced id exists in the list;',
         'ids are short lowercase slugs; 3–20 components total. Compose for the topic and audience you are given — do not imitate a quiz; nothing here measures.',
       ].join(' '),

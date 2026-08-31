@@ -216,6 +216,20 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
           />
         );
       }
+      case 'a2learn:Check': {
+        const options = (Array.isArray(component.options) ? component.options : []) as {
+          text?: unknown;
+          feedback?: unknown;
+        }[];
+        return (
+          <CheckView
+            key={id}
+            prompt={String(component.prompt ?? '')}
+            answer={typeof component.answer === 'number' ? component.answer : -1}
+            options={options.map((o) => ({ text: String(o.text ?? ''), feedback: String(o.feedback ?? '') }))}
+          />
+        );
+      }
       case 'a2learn:Callout': {
         // Pedagogical emphasis with intent as data — the renderer maps
         // intent to its design language; unknown intents get the neutral box.
@@ -429,6 +443,66 @@ function GatedSequenceView({
           {finale.label}
         </button>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A self-check: pick, see immediately whether that was it and why, try again
+ * on a miss. Deliberately local — nothing leaves this component, because it
+ * exists for the learner's retrieval, not anyone's measurement. State is
+ * icon + word, never color alone.
+ */
+function CheckView({
+  prompt,
+  options,
+  answer,
+}: {
+  prompt: string;
+  options: { text: string; feedback: string }[];
+  answer: number;
+}) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const settled = picked === answer;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="text-base font-medium [&_p]:leading-relaxed">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={['a', 'img']} unwrapDisallowed>
+          {prompt}
+        </ReactMarkdown>
+      </div>
+      <div className="flex flex-col gap-2" role="group">
+        {options.map((option, i) => {
+          const isPicked = picked === i;
+          const revealed = isPicked || (settled && i === answer);
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={settled}
+              onClick={() => setPicked(i)}
+              className={`rounded-lg border px-4 py-2.5 text-left text-sm transition-colors ${
+                revealed && i === answer
+                  ? 'border-green-600/50 bg-green-50 dark:bg-green-950/30'
+                  : isPicked
+                    ? 'border-amber-500/60 bg-amber-50 dark:bg-amber-950/30'
+                    : 'border-border hover:border-muted-foreground/40'
+              } disabled:cursor-default`}
+            >
+              {option.text}
+              {isPicked && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {i === answer ? '✓ that\'s it — ' : '✗ not quite — '}
+                  {option.feedback}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {picked !== null && !settled && (
+        <p className="text-sm text-muted-foreground">Try another one — checking yourself is the point.</p>
+      )}
     </div>
   );
 }

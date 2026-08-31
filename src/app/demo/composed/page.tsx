@@ -25,7 +25,7 @@ const EXAMPLES: { label: string; spec: ComposedSpec }[] = [
           type: 'Sequence',
           id: 'root',
           policy: { order: 'linear', disclosure: 'gated', revealed: 'accumulate' },
-          children: ['s1', 's2', 's3'],
+          children: ['s1', 's2', 's3', 's4'],
         },
         { type: 'Group', id: 's1', children: ['s1-text', 's1-why'] },
         {
@@ -52,6 +52,17 @@ const EXAMPLES: { label: string; spec: ComposedSpec }[] = [
           id: 's3',
           text: 'So **5/6 > 2/6** — same-size pieces, more of them.',
           variant: null,
+        },
+        {
+          type: 'Check',
+          id: 's4',
+          prompt: 'Your turn: which is bigger, **3/8 or 5/8**?',
+          options: [
+            { text: '3/8', feedback: 'same-size eighths — three of them is fewer.' },
+            { text: '5/8', feedback: 'same-size pieces, more of them.' },
+            { text: "Can't tell", feedback: 'you can — the denominators match, so compare numerators.' },
+          ],
+          answer: 1,
         },
       ],
     },

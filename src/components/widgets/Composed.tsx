@@ -30,6 +30,14 @@ function toSurfaceComponent(component: ComposedComponent): A2UIComponent {
   switch (component.type) {
     case 'Group':
       return { id: component.id, component: 'Column', children: component.children };
+    case 'Check':
+      return {
+        id: component.id,
+        component: 'a2learn:Check',
+        prompt: component.prompt,
+        options: component.options,
+        answer: component.answer,
+      };
     case 'Text':
       return {
         id: component.id,

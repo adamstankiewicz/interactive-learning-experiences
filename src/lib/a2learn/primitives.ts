@@ -32,3 +32,6 @@ export type SequencePolicy = {
 export const SEQUENCE = 'a2learn:Sequence';
 export const REVEAL = 'a2learn:Reveal';
 export const CALLOUT = 'a2learn:Callout';
+/** Local self-check: options + instant feedback, nothing recorded — retrieval
+ *  practice for the learner, never measurement (that is Response, gated on #99). */
+export const CHECK = 'a2learn:Check';
