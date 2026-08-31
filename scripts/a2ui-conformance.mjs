@@ -28,11 +28,12 @@ import addFormats from 'ajv-formats';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// The spec files are fetched and checksum-pinned, not committed — see
-// spec/a2ui/manifest.json. Materialize them before anything reads them.
-const { ensureA2UISpec } = await import('./fetch-a2ui-spec.mjs');
-await ensureA2UISpec();
-const specDir = join(root, 'spec', 'a2ui', 'v1_0');
+// The spec schemas come from @a2ui/web_core — the A2UI project's own
+// publication, pinned exactly in package.json; the lockfile's integrity
+// hash is the checksum. Nothing of the upstream spec is committed here,
+// and our surfaces target the *released* revision, because interop is
+// with shipped renderers, not with the spec repo's HEAD.
+const specDir = join(root, 'node_modules', '@a2ui', 'web_core', 'src', 'v1_0', 'schemas');
 const fixtureDir = join(root, 'spec', 'a2learn', 'fixtures');
 const update = process.argv.includes('--update');
 

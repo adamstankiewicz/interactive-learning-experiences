@@ -52,10 +52,14 @@ export type A2UISurfaceMessage = {
  * registry's `assesses` flag — never asserted by the mapper.
  */
 function completedAction(kind: WidgetKind) {
+  // Deliberately the intersection of released and in-flight spec revisions:
+  // `name` + `context` only. The released schemas close the event object
+  // (additionalProperties: false), so anything extra — the newer spec's
+  // userMessage, for instance — breaks every shipped renderer. Prose for a
+  // model reader belongs to the MCP Apps channel, not this boundary.
   return {
     event: {
       name: `${A2LEARN_EVENT_PREFIX}widget_completed`,
-      userMessage: 'Finished the activity.',
       context: { kind },
     },
   };

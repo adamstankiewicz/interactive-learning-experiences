@@ -134,7 +134,6 @@
         "action": {
           "event": {
             "name": "a2learn.widget_completed",
-            "userMessage": "Finished the activity.",
             "context": {
               "kind": "step-reveal"
             }
