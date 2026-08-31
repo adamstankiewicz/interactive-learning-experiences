@@ -39,6 +39,14 @@ const authoringNode = z.object({
     .nullable()
     .describe('Check only: 2-4 options, each with one-sentence feedback.'),
   answer: z.number().nullable().describe('Check only: zero-based index of the right option.'),
+  pairs: z
+    .array(z.object({ left: z.string(), right: z.string() }))
+    .nullable()
+    .describe('Match only: 2-6 pairs to connect.'),
+  items: z
+    .array(z.object({ text: z.string(), target: z.boolean(), feedback: z.string() }))
+    .nullable()
+    .describe('Hunt only: 4-9 items, targets plus near-miss decoys, each with feedback.'),
   policy: z
     .object({
       order: z.string().describe('"linear" or "free"'),
@@ -85,6 +93,10 @@ export function canonicalizeNode(node: LooseNode): Record<string, unknown> {
         options: Array.isArray(node.options) ? node.options : [],
         answer: typeof node.answer === 'number' ? node.answer : -1,
       };
+    case 'Match':
+      return { type: 'Match', id: node.id, prompt: str(node.prompt) ?? text ?? '', pairs: Array.isArray(node.pairs) ? node.pairs : [] };
+    case 'Hunt':
+      return { type: 'Hunt', id: node.id, prompt: str(node.prompt) ?? text ?? '', items: Array.isArray(node.items) ? node.items : [] };
     case 'Group':
       return { type: 'Group', id: node.id, children: Array.isArray(node.children) ? node.children : [] };
     case 'Reveal': {
@@ -129,9 +141,11 @@ registerWidgetGenerator({
         'Component types, each an object with "type" and "id" fields, referenced by id in a flat list:',
         'Text {text: markdown, variant: "caption" or null}; Callout {intent: "why"|"tip"|"note", label, text} — an emphasized box: "why" for the reasoning behind an idea, "tip" for strategy;',
         'Check {prompt, options: 2-4 of {text, feedback}, answer: index of the right one} — a self-check with instant feedback; nothing is recorded, it exists so the student retrieves instead of rereads;',
+        'Match {prompt, pairs: 2-6 of {left, right}} — a matching game: left column in order, right column shuffled, student pairs them up with live progress;',
+        'Hunt {prompt, items: 4-9 of {text, target, feedback}} — a find-them-all game: tap every target among near-miss decoys, instant feedback per tap;',
         'Group {children: 2–6 ids, stacked top to bottom}; Reveal {faces: exactly two of {title, child} — front then back; the student taps to turn it over: prompt on the front, payoff on the back};',
         'Sequence {policy: {order: "linear"|"free", disclosure: "gated"|"all", revealed: "accumulate"|"replace"}, children: 2–8 ids in teaching order}.',
-        'Pedagogy: retrieval beats rereading — include a Check every 2-3 content nodes, and prefer Reveal (prediction on the front, payoff on the back) over long explanations.',
+        'Pedagogy: retrieval beats rereading — mix interaction types: Check for one concrete question, Match for term-meaning or equivalent-pairs practice, Hunt for telling examples from non-examples, Reveal (prediction front, payoff back) over long explanations.',
         'Sequence(linear, gated, accumulate) for walkthroughs where steps build on each other; Sequence(free, all, replace) for browsable card decks;',
         'a "why" Callout wherever reasoning deserves emphasis. Keep each Text under ~60 words — interaction density over prose density.',
         'Structure rules: exactly one component has id "root" (usually a Group or Sequence); every referenced id exists in the list;',

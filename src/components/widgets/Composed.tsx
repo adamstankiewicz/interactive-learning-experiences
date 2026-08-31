@@ -38,6 +38,10 @@ function toSurfaceComponent(component: ComposedComponent): A2UIComponent {
         options: component.options,
         answer: component.answer,
       };
+    case 'Match':
+      return { id: component.id, component: 'a2learn:Match', prompt: component.prompt, pairs: component.pairs };
+    case 'Hunt':
+      return { id: component.id, component: 'a2learn:Hunt', prompt: component.prompt, items: component.items };
     case 'Text':
       return {
         id: component.id,

@@ -140,3 +140,25 @@ describe('Check structural rules', () => {
     expect(compositionProblems(withCheck(two.slice(0, 1), 0))).toContainEqual(expect.stringContaining('2+ options'));
   });
 });
+
+describe('Match and Hunt structural rules', () => {
+  const base = (extra: ComposedSpec['components'][number]): ComposedSpec => ({
+    kind: 'composed',
+    learningComponentId: null,
+    title: 'Games',
+    components: [{ type: 'Group', id: 'root', children: ['g'] }, extra],
+  });
+
+  it('accepts sound games and rejects degenerate ones', () => {
+    expect(compositionProblems(base({ type: 'Match', id: 'g', prompt: 'p', pairs: [
+      { left: '1/2', right: '2/4' }, { left: '1/3', right: '2/6' }] }))).toEqual([]);
+    expect(compositionProblems(base({ type: 'Match', id: 'g', prompt: 'p', pairs: [
+      { left: 'a', right: 'b' }] }))).toContainEqual(expect.stringContaining('2+ pairs'));
+    expect(compositionProblems(base({ type: 'Hunt', id: 'g', prompt: 'p', items: [
+      { text: 'a', target: true, feedback: 'f' }, { text: 'b', target: false, feedback: 'f' },
+      { text: 'c', target: false, feedback: 'f' }] }))).toEqual([]);
+    expect(compositionProblems(base({ type: 'Hunt', id: 'g', prompt: 'p', items: [
+      { text: 'a', target: true, feedback: 'f' }, { text: 'b', target: true, feedback: 'f' },
+      { text: 'c', target: true, feedback: 'f' }] }))).toContainEqual(expect.stringContaining('decoy'));
+  });
+});

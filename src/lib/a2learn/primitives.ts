@@ -35,3 +35,8 @@ export const CALLOUT = 'a2learn:Callout';
 /** Local self-check: options + instant feedback, nothing recorded — retrieval
  *  practice for the learner, never measurement (that is Response, gated on #99). */
 export const CHECK = 'a2learn:Check';
+/** Stateful local mini-games — selection state and progress live entirely
+ *  renderer-side; nothing is recorded. Match = paired-associate retrieval,
+ *  Hunt = discrimination (find every target among near-miss decoys). */
+export const MATCH = 'a2learn:Match';
+export const HUNT = 'a2learn:Hunt';

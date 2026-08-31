@@ -89,6 +89,40 @@ const EXAMPLES: { label: string; spec: ComposedSpec }[] = [
       ],
     },
   },
+  {
+    label: 'Mini games',
+    spec: {
+      kind: 'composed',
+      learningComponentId: null,
+      title: 'Fraction games',
+      components: [
+        { type: 'Group', id: 'root', children: ['m1', 'h1'] },
+        {
+          type: 'Match',
+          id: 'm1',
+          prompt: 'Match each fraction to its equivalent.',
+          pairs: [
+            { left: '1/2', right: '4/8' },
+            { left: '1/3', right: '2/6' },
+            { left: '3/4', right: '6/8' },
+          ],
+        },
+        {
+          type: 'Hunt',
+          id: 'h1',
+          prompt: 'Tap every fraction equivalent to one half.',
+          items: [
+            { text: '2/4', target: true, feedback: 'two of four equal parts is half.' },
+            { text: '3/5', target: false, feedback: 'three fifths is more than half.' },
+            { text: '5/10', target: true, feedback: 'five of ten equal parts is half.' },
+            { text: '2/3', target: false, feedback: 'two thirds is more than half.' },
+            { text: '4/8', target: true, feedback: 'four of eight equal parts is half.' },
+            { text: '1/3', target: false, feedback: 'one third is less than half.' },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default function ComposedDemoPage() {

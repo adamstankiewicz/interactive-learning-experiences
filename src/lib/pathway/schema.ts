@@ -843,9 +843,43 @@ const composedCheck = z.object({
  * primitive, which waits for the #99 contract.
  */
 
+const composedMatch = z.object({
+  type: z.literal('Match'),
+  id: z.string(),
+  prompt: z.string().describe('What matching means here, e.g. "Match each term to its meaning."'),
+  pairs: z
+    .array(z.object({ left: z.string(), right: z.string() }))
+    .describe('2-6 pairs. Left items show in order; right items are shuffled by the renderer.'),
+});
+
+const composedHunt = z.object({
+  type: z.literal('Hunt'),
+  id: z.string(),
+  prompt: z.string().describe('What to find, e.g. "Tap every fraction equivalent to 1/2."'),
+  items: z
+    .array(
+      z.object({
+        text: z.string(),
+        target: z.boolean().describe('True if this is one of the things to find.'),
+        feedback: z.string().describe('Shown when tapped — why it is or is not one, one sentence.'),
+      }),
+    )
+    .describe('4-9 items, mixing targets and near-miss decoys. At least one of each.'),
+});
+
+/**
+ * Match and Hunt are the stateful tier of the local alphabet: real game
+ * mechanics (selection state, progress, lockout on success) implemented
+ * entirely renderer-side. Like Check, nothing leaves the component — they
+ * exist for retrieval and discrimination practice, not measurement, and a
+ * composed activity's `assesses` stays false with them in play.
+ */
+
 const composedComponent = z.discriminatedUnion('type', [
   composedText,
   composedCheck,
+  composedMatch,
+  composedHunt,
   composedCallout,
   composedGroup,
   composedReveal,
@@ -897,6 +931,15 @@ export function compositionProblems(spec: ComposedSpec): string[] {
   for (const c of spec.components) {
     if (c.type === 'Check' && (c.options.length < 2 || c.answer < 0 || c.answer >= c.options.length)) {
       problems.push(`${c.id}: a Check needs 2+ options and an answer index inside them`);
+    }
+    if (c.type === 'Match' && c.pairs.length < 2) {
+      problems.push(`${c.id}: a Match needs 2+ pairs`);
+    }
+    if (
+      c.type === 'Hunt' &&
+      (c.items.length < 3 || !c.items.some((i) => i.target) || !c.items.some((i) => !i.target))
+    ) {
+      problems.push(`${c.id}: a Hunt needs 3+ items with at least one target and one decoy`);
     }
   }
 

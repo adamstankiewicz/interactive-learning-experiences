@@ -230,6 +230,28 @@ export function A2UISurfaceView({ surface, onAction }: Props) {
           />
         );
       }
+      case 'a2learn:Match': {
+        const pairs = (Array.isArray(component.pairs) ? component.pairs : []) as { left?: unknown; right?: unknown }[];
+        return (
+          <MatchView
+            key={id}
+            prompt={String(component.prompt ?? '')}
+            pairs={pairs.map((p) => ({ left: String(p.left ?? ''), right: String(p.right ?? '') }))}
+          />
+        );
+      }
+      case 'a2learn:Hunt': {
+        const items = (Array.isArray(component.items) ? component.items : []) as {
+          text?: unknown; target?: unknown; feedback?: unknown;
+        }[];
+        return (
+          <HuntView
+            key={id}
+            prompt={String(component.prompt ?? '')}
+            items={items.map((i) => ({ text: String(i.text ?? ''), target: Boolean(i.target), feedback: String(i.feedback ?? '') }))}
+          />
+        );
+      }
       case 'a2learn:Callout': {
         // Pedagogical emphasis with intent as data — the renderer maps
         // intent to its design language; unknown intents get the neutral box.
@@ -503,6 +525,146 @@ function CheckView({
       {picked !== null && !settled && (
         <p className="text-sm text-muted-foreground">Try another one — checking yourself is the point.</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Match: tap a left item, then the right item you think pairs with it.
+ * A hit locks the pair with a check; a miss flashes and clears. The shuffle
+ * is deterministic per mount, progress is "n of N matched", and — like every
+ * local game primitive — nothing leaves the component.
+ */
+function MatchView({ prompt, pairs }: { prompt: string; pairs: { left: string; right: string }[] }) {
+  const [shuffled] = useState(() =>
+    pairs.map((_, i) => i).sort((a, b) => ((a * 7919 + 13) % 101) - ((b * 7919 + 13) % 101)),
+  );
+  const [selectedLeft, setSelectedLeft] = useState<number | null>(null);
+  const [matched, setMatched] = useState<Set<number>>(new Set());
+  const [missAt, setMissAt] = useState<number | null>(null);
+
+  const tryPair = (rightIdx: number) => {
+    if (selectedLeft === null || matched.has(rightIdx)) return;
+    if (rightIdx === selectedLeft) {
+      setMatched((prev) => new Set(prev).add(rightIdx));
+      setSelectedLeft(null);
+    } else {
+      setMissAt(rightIdx);
+      setTimeout(() => setMissAt(null), 500);
+    }
+  };
+
+  const complete = matched.size === pairs.length;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-base font-medium">{prompt}</p>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {matched.size} / {pairs.length} matched
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-2">
+          {pairs.map((pair, i) => (
+            <button
+              key={i}
+              type="button"
+              disabled={matched.has(i)}
+              onClick={() => setSelectedLeft(i)}
+              className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                matched.has(i)
+                  ? 'border-green-600/40 bg-green-50 text-muted-foreground dark:bg-green-950/30'
+                  : selectedLeft === i
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              {matched.has(i) ? '✓ ' : ''}{pair.left}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-col gap-2">
+          {shuffled.map((originalIdx) => (
+            <motion.button
+              key={originalIdx}
+              type="button"
+              disabled={matched.has(originalIdx)}
+              onClick={() => tryPair(originalIdx)}
+              animate={missAt === originalIdx ? { x: [0, -6, 6, -3, 0] } : {}}
+              transition={{ duration: 0.35 }}
+              className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                matched.has(originalIdx)
+                  ? 'border-green-600/40 bg-green-50 text-muted-foreground dark:bg-green-950/30'
+                  : missAt === originalIdx
+                    ? 'border-amber-500/60 bg-amber-50 dark:bg-amber-950/30'
+                    : 'border-border hover:border-muted-foreground/40'
+              } ${selectedLeft === null && !matched.has(originalIdx) ? 'opacity-70' : ''}`}
+            >
+              {matched.has(originalIdx) ? '✓ ' : ''}{pairs[originalIdx].right}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {complete
+          ? '✓ all matched — every pair retrieved.'
+          : selectedLeft === null
+            ? 'Tap an item on the left, then its match on the right.'
+            : 'Now tap its match on the right.'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Hunt: find every target among near-miss decoys. Each tap answers
+ * immediately — a target locks in with its feedback, a decoy flashes with
+ * why it is not one. Progress counts found targets; local state only.
+ */
+function HuntView({ prompt, items }: { prompt: string; items: { text: string; target: boolean; feedback: string }[] }) {
+  const [tapped, setTapped] = useState<Set<number>>(new Set());
+  const [lastTap, setLastTap] = useState<number | null>(null);
+  const targets = items.filter((i) => i.target).length;
+  const found = items.filter((i, idx) => i.target && tapped.has(idx)).length;
+  const complete = found === targets;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-base font-medium">{prompt}</p>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {found} / {targets} found
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item, i) => {
+          const isTapped = tapped.has(i);
+          return (
+            <motion.button
+              key={i}
+              type="button"
+              disabled={isTapped && item.target}
+              onClick={() => { setTapped((prev) => new Set(prev).add(i)); setLastTap(i); }}
+              animate={isTapped && !item.target && lastTap === i ? { x: [0, -6, 6, -3, 0] } : {}}
+              transition={{ duration: 0.35 }}
+              className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                isTapped && item.target
+                  ? 'border-green-600/50 bg-green-50 dark:bg-green-950/30'
+                  : isTapped
+                    ? 'border-amber-500/60 bg-amber-50 dark:bg-amber-950/30'
+                    : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              {isTapped ? (item.target ? '✓ ' : '✗ ') : ''}{item.text}
+            </motion.button>
+          );
+        })}
+      </div>
+      {lastTap !== null && tapped.has(lastTap) && (
+        <p className="text-sm text-muted-foreground">
+          {items[lastTap].target ? '✓ ' : '✗ '}{items[lastTap].feedback}
+        </p>
+      )}
+      {complete && <p className="text-sm text-muted-foreground">✓ found them all — that&apos;s the discrimination.</p>}
     </div>
   );
 }
