@@ -20,7 +20,8 @@
     "predev": "node mcp/build.mjs",
     "prebuild": "node mcp/build.mjs",
     "conformance": "node scripts/a2ui-conformance.mjs",
-    "conformance:update": "node scripts/a2ui-conformance.mjs --update"
+    "conformance:update": "node scripts/a2ui-conformance.mjs --update",
+    "mcp:inspect": "npx --yes @modelcontextprotocol/inspector@latest"
   },
   "dependencies": {
     "@ag-ui/core": "^0.0.58",

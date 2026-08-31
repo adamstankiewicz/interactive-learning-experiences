@@ -18,7 +18,7 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer as createHttpServer } from 'node:http';
 
-import { createServer } from './app.mjs';
+import { createServer } from './core.mjs';
 
 const PORT = Number(process.env.MCP_HTTP_PORT ?? 3300);
 
