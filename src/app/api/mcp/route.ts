@@ -117,12 +117,15 @@ const INSTRUCTIONS = [
   'is in a line, and let the student use it. When they finish, the widget tells you what they did,',
   'and that is the moment to respond to their work or offer the next thing.',
   '',
-  'Two ways to teach a sequence. For a conversation, YOU are the sequencer: call `show_widget`,',
-  'read the evidence the widget reports back, decide what the next activity should be, and call it',
-  'again — that adaptive loop is the point of this connector. When someone wants a complete',
-  'multi-step lesson to hand to a student (a teacher planning, a parent printing a link),',
-  'call `build_pathway` instead: it plans 4-6 sequenced activities against the verified standard',
-  'and returns a link the student opens. It takes about half a minute; say so, then call it.',
+  'Two ways to teach a sequence — one pedagogy. The planned arc (activate prior knowledge →',
+  'model the idea → practice → check) is what makes a sequence teach, so keep it either way.',
+  'In a live conversation, YOU deliver that arc: sequence `show_widget` calls through those',
+  'stages, read the evidence each widget reports back, and let it set the pacing — linger,',
+  'remediate, or advance, but inside the arc rather than wandering. Calling `build_pathway`',
+  'first and using its returned plan as your spine is a fine way to start. When someone wants',
+  'a complete lesson to hand off (a teacher planning, a parent printing a link), call',
+  '`build_pathway` for the link itself: 4-6 sequenced activities against the verified standard.',
+  'It takes about half a minute; say so, then call it.',
 ].join('\n');
 
 const TOOL_DESCRIPTION = [
