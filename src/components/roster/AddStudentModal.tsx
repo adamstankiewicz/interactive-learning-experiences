@@ -122,7 +122,7 @@ export function AddStudentModal({ existing, onClose, onSaved }: Props) {
       >
         <div className="sticky top-0 bg-white dark:bg-slate-900 px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {existing ? 'Edit Student' : 'Add Student'}
+            {existing ? 'Edit student' : 'Add student'}
           </h2>
           <button onClick={dismiss} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none">✕</button>
         </div>
@@ -242,7 +242,7 @@ export function AddStudentModal({ existing, onClose, onSaved }: Props) {
         <div className="sticky bottom-0 bg-white dark:bg-slate-900 px-6 pb-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
           <Button variant="ghost" onClick={dismiss} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : existing ? 'Save Changes' : 'Add Student'}
+            {saving ? 'Saving…' : existing ? 'Save changes' : 'Add student'}
           </Button>
         </div>
       </div>

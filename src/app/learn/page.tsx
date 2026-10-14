@@ -138,8 +138,8 @@ export default function LearnPage() {
   });
 
   return (
-    <div className="light-surface min-h-dvh bg-gradient-to-br from-violet-100 via-pink-100 to-amber-100 text-slate-900">
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center gap-6 px-5 py-10">
+    <div className="register-student min-h-dvh bg-background text-foreground">
+      <main className="mx-auto flex min-h-dvh max-w-235 flex-col items-center gap-6 px-5 py-10">
         {!session && (
           <AnimatePresence mode="wait">
             <motion.h1
@@ -149,10 +149,7 @@ export default function LearnPage() {
               transition={{ type: 'spring', stiffness: 260, damping: 18 }}
               className="mt-12 text-center text-5xl font-black tracking-tight text-balance"
             >
-              What do you want to{' '}
-              <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
-                learn?
-              </span>
+              What do you want to <span className="text-brand-text">learn?</span>
             </motion.h1>
           </AnimatePresence>
         )}
@@ -171,21 +168,21 @@ export default function LearnPage() {
                   ? { repeat: Infinity, duration: 1.6 }
                   : { type: 'spring', stiffness: 300, damping: 14 }
               }
-              className="flex size-36 flex-col items-center justify-center gap-1 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 text-white shadow-[0_8px_0_0_#6d28d9] transition-transform active:translate-y-1 active:shadow-[0_3px_0_0_#6d28d9] disabled:opacity-50"
+              className="flex size-36 flex-col items-center justify-center gap-1 rounded-full border-2 border-foreground bg-brand-fill text-foreground shadow-[0_8px_0_0_var(--brand-press)] transition-transform active:translate-y-1 active:shadow-[0_3px_0_0_var(--brand-press)] disabled:opacity-50 motion-reduce:transition-none"
             >
-              <span className="text-4xl">{busy ? '✨' : voice.listening ? '👂' : '🎤'}</span>
+              <span className="text-4xl">{busy ? '…' : voice.listening ? '●' : '🎤'}</span>
               <span className="text-sm font-black">
                 {busy ? 'Building' : voice.listening ? 'Listening' : 'Tap & talk'}
               </span>
             </motion.button>
 
             <div className="min-h-8 text-center">
-              {busy && <p className="text-lg font-bold text-violet-600">{BUILDING_LINES[line]}</p>}
+              {busy && <p className="text-lg font-bold text-brand-text">{BUILDING_LINES[line]}</p>}
               {!busy && voice.interim && (
-                <p className="text-lg font-bold text-violet-500 italic">&ldquo;{voice.interim}&rdquo;</p>
+                <p className="text-lg font-bold text-ink-2 italic">&ldquo;{voice.interim}&rdquo;</p>
               )}
               {!busy && (error || voice.error) && (
-                <p className="text-base font-bold text-rose-500">🙃 {voice.error ?? error}</p>
+                <p className="text-base font-bold text-destructive">⚠ {voice.error ?? error}</p>
               )}
             </div>
 
@@ -193,15 +190,15 @@ export default function LearnPage() {
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="w-full rounded-2xl border-4 border-violet-300 bg-white p-6 shadow-lg"
+                className="w-full rounded-2xl border border-foreground bg-card p-6 shadow-[6px_6px_0_rgba(31,25,21,.18)]"
               >
-                <p className="mb-2 text-sm font-bold text-violet-600">Did you say:</p>
-                <p className="mb-4 text-xl font-bold text-slate-900">&ldquo;{voiceCapture}&rdquo;</p>
+                <p className="mb-2 text-sm font-bold text-muted-foreground">Did you say:</p>
+                <p className="mb-4 text-xl font-bold">&ldquo;{voiceCapture}&rdquo;</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => void build(voiceCapture)}
-                    className="flex-1 rounded-xl bg-emerald-500 py-3 font-black text-white shadow-[0_4px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857]"
+                    className="flex-1 rounded-xl border border-foreground bg-brand-fill py-3 font-heading font-black text-foreground shadow-[0_4px_0_0_var(--brand-press)] active:translate-y-1 active:shadow-[0_2px_0_0_var(--brand-press)]"
                   >
                     ✓ Yes, let&apos;s go!
                   </button>
@@ -232,12 +229,12 @@ export default function LearnPage() {
                   onChange={(event) => setTyped(event.target.value)}
                   placeholder={voice.supported ? '…or type it here' : 'Type what you want to learn'}
                   maxLength={200}
-                  className="min-w-0 flex-1 rounded-2xl border-4 border-violet-200 bg-white px-5 py-3 font-semibold outline-none placeholder:text-violet-300 focus:border-violet-400"
+                  className="min-w-0 flex-1 rounded-2xl border border-border bg-card px-5 py-3 font-semibold placeholder:text-muted-foreground focus:border-foreground"
                 />
                 <button
                   type="submit"
                   disabled={busy || typed.trim().length < 3}
-                  className="shrink-0 rounded-2xl bg-emerald-500 px-6 font-black text-white shadow-[0_5px_0_0_#047857] active:translate-y-1 active:shadow-[0_2px_0_0_#047857] disabled:opacity-40"
+                  className="shrink-0 rounded-2xl border border-foreground bg-brand-fill px-6 font-heading font-black text-foreground shadow-[0_5px_0_0_var(--brand-press)] active:translate-y-1 active:shadow-[0_2px_0_0_var(--brand-press)] disabled:opacity-40"
                 >
                   Go!
                 </button>

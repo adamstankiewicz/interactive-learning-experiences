@@ -156,7 +156,7 @@ export default function DrawTheCurveDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Draw the Curve</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Draw the curve</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Shape the line by dragging its points, then see the real one drawn over your guess. Checked
           on shape, not numbers — so a story&apos;s tension arc works the same way a motion graph does.

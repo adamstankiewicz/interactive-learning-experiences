@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { PathwayPreview, type PathwayPreviewData } from '@/components/pathways/PathwayPreview';
 import type { PathwayPlan } from '@/lib/pathway/schema';
-import { widgetSpec } from '@/lib/pathway/schema';
-import type { SessionStudentRow } from '@/lib/storage/types';
+import type { SessionStudentRow, StepOutcome } from '@/lib/storage/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,12 +53,119 @@ function AccuracyBar({ correct, attempts }: { correct: number; attempts: number 
   );
 }
 
+/**
+ * The per-step evidence strip (design 1e): one cell per plan step. Verified
+ * fill = first try, warning edge = needed attempts, error = still wrong,
+ * sunk = not reached (which also covers events recorded before stepIndex was
+ * persisted — the strip never guesses). Each cell carries its word in the
+ * tooltip and for screen readers.
+ */
+const STRIP_CELL: Record<StepOutcome, { className: string; label: string }> = {
+  'first-try': { className: 'bg-verified', label: 'first try' },
+  attempts: { className: 'border border-warning-edge bg-warning-tint', label: 'needed attempts' },
+  wrong: { className: 'bg-destructive', label: 'still wrong' },
+  unreached: { className: 'bg-sunk', label: 'not reached' },
+};
+
+function StepStrip({ strip }: { strip: StepOutcome[] }) {
+  if (strip.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <span className="flex items-center gap-1">
+      {strip.map((outcome, index) => (
+        <span
+          key={`${index}-${outcome}`}
+          role="img"
+          aria-label={`Step ${index + 1}: ${STRIP_CELL[outcome].label}`}
+          title={`Step ${index + 1}: ${STRIP_CELL[outcome].label}`}
+          className={`h-3 w-4 ${STRIP_CELL[outcome].className}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function StepStripLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+      {(Object.keys(STRIP_CELL) as StepOutcome[]).map((outcome) => (
+        <span key={outcome} className="flex items-center gap-1.5">
+          <span aria-hidden="true" className={`h-2.5 w-3.5 ${STRIP_CELL[outcome].className}`} />
+          {STRIP_CELL[outcome].label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The report's four figures (design 1e): opens, completed, completion %, and
+ * remediations — the last in the warning colour, because it is the number
+ * that asks for the teacher's attention. Remediations are counted as widgets
+ * the server injected beyond the plan's own steps.
+ */
+function ReportFigures({
+  rows,
+  childSessions,
+}: {
+  rows: SessionStudentRow[] | null;
+  childSessions: ChildSession[] | null;
+}) {
+  const opens = rows?.length ?? null;
+  const completed = rows ? rows.filter((row) => row.completed).length : null;
+  const completion =
+    opens != null && completed != null && opens > 0
+      ? `${Math.round((completed / opens) * 100)}%`
+      : null;
+  const remediations = childSessions
+    ? childSessions.reduce(
+        (sum, child) =>
+          sum +
+          Math.max(0, Object.keys(child.stepWidgets).length - (child.plan?.steps.length ?? 0)),
+        0,
+      )
+    : null;
+
+  const figures: { label: string; value: string; warning?: boolean }[] = [
+    { label: 'Opens', value: opens != null ? String(opens) : '—' },
+    { label: 'Completed', value: completed != null ? String(completed) : '—' },
+    { label: 'Completion', value: completion ?? '—' },
+    {
+      label: 'Remediations',
+      value: remediations != null ? String(remediations) : '—',
+      warning: remediations != null && remediations > 0,
+    },
+  ];
+
+  return (
+    <div className="mb-6 grid grid-cols-2 border border-border bg-card sm:grid-cols-4">
+      {figures.map((figure) => (
+        <div
+          key={figure.label}
+          className="border-b border-r border-border p-3.5 last:border-r-0 sm:border-b-0 nth-2:border-r-0 sm:nth-2:border-r"
+        >
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {figure.label}
+          </p>
+          <p
+            className={`mt-1 font-heading text-[26px] font-bold tabular-nums ${
+              figure.warning ? 'text-warning' : 'text-foreground'
+            }`}
+          >
+            {figure.warning && <span aria-hidden>⚠ </span>}
+            {figure.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatusBadge({ completed }: { completed: boolean }) {
   return (
-    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${completed
-      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-      : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}`}>
-      {completed ? 'Completed' : 'In Progress'}
+    <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${completed
+      ? 'border-verified-edge bg-verified-tint text-verified'
+      : 'border-warning-edge bg-warning-tint text-warning'}`}>
+      {completed ? '✓ Completed' : 'In progress'}
     </span>
   );
 }
@@ -81,11 +187,15 @@ function PerformanceTable({ rows, children }: { rows: SessionStudentRow[]; child
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="border-b border-border px-4 py-2">
+        <StepStripLegend />
+      </div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-accent/50">
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Student</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Steps</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Accuracy</th>
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Attempts</th>
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Hints</th>
@@ -103,6 +213,7 @@ function PerformanceTable({ rows, children }: { rows: SessionStudentRow[]; child
                   : <span className="font-mono text-xs text-muted-foreground">{row.studentId.slice(0, 12)}…</span>}
               </td>
               <td className="px-4 py-3"><StatusBadge completed={row.completed} /></td>
+              <td className="px-4 py-3"><StepStrip strip={row.stepStrip} /></td>
               <td className="px-4 py-3"><AccuracyBar correct={row.correctCount} attempts={row.attempts} /></td>
               <td className="px-4 py-3 text-right tabular-nums">{row.attempts}</td>
               <td className="px-4 py-3 text-right tabular-nums">{row.hintsUsed || '—'}</td>
@@ -196,11 +307,9 @@ function TabBar({ tabs, active, onChange }: { tabs: string[]; active: string; on
 
 export function SessionReportPage({
   sessionId,
-  topic,
   parentPreview,
 }: {
   sessionId: string;
-  topic: string;
   parentPreview: PathwayPreviewData | null;
 }) {
   const [tab, setTab] = useState<'Performance' | 'Students' | 'Preview'>('Performance');
@@ -237,6 +346,7 @@ export function SessionReportPage({
 
   return (
     <div>
+      <ReportFigures rows={reportRows} childSessions={children} />
       <TabBar tabs={tabs} active={tab} onChange={(t) => setTab(t as typeof tab)} />
 
       {tab === 'Performance' && (

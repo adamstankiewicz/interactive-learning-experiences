@@ -6,28 +6,28 @@ import { WidgetThumb } from '@/components/demo/WidgetThumb';
 const WIDGETS = [
   {
     slug: 'fraction-area-model',
-    name: 'Fraction Area Model',
+    name: 'Fraction area model',
     description:
       'Partition a whole into equal parts and select segments to build a target fraction. Supports bar and circle representations with equivalent-fraction detection.',
     tags: ['fractions', 'visual', 'manipulative'],
   },
   {
     slug: 'swiper-flashcard',
-    name: 'Swiper Flashcard',
+    name: 'Swiper flashcard',
     description:
       'Swipe a card up or down to answer a question or sort a statement into a category. Supports drag gestures and emits a completion event with per-card results.',
     tags: ['flashcards', 'true/false', 'sorting'],
   },
   {
     slug: 'draft-meter',
-    name: 'Draft Meter',
+    name: 'Draft meter',
     description:
       'Write a short response and one line scores how strong the argument is, from a live model call on a debounce. Optionally supplies a source passage, so "evidence" means citing the text.',
     tags: ['writing', 'argument', 'live scoring'],
   },
   {
     slug: 'draw-the-curve',
-    name: 'Draw the Curve',
+    name: 'Draw the curve',
     description:
       'Shape a line by dragging its points to predict how something changes, then see the real curve drawn over your guess. Checked on shape rather than numbers, so a story arc works the same way a motion graph does.',
     tags: ['predict-then-reveal', 'any subject', 'chart'],
@@ -41,28 +41,28 @@ const WIDGETS = [
   },
   {
     slug: 'writing-workshop',
-    name: 'Writing Workshop',
+    name: 'Writing workshop',
     description:
       'Long-form writing — essay, lab report, research proposal, short story — reviewed only when the student asks, and marked up on the sentences themselves with a note on each.',
     tags: ['long-form', 'on demand', 'annotation'],
   },
   {
     slug: 'find-the-flaw',
-    name: 'Find the Flaw',
+    name: 'Find the flaw',
     description:
       'A worked example with one deliberate mistake — a solution, an experiment, an argument, an explanation. The student finds the step where it goes wrong, then diagnoses why. Checked locally, so there is no wait.',
     tags: ['error analysis', 'any subject', 'metacognition'],
   },
   {
     slug: 'defend-claim',
-    name: 'Defend a Claim',
+    name: 'Defend a claim',
     description:
       'Take a side on a contestable historical claim, defend it from two conflicting sources, then request feedback and revise. Every reading answers with a counterargument. Typed or dictated. History, grade 7+.',
     tags: ['history', 'argument', 'voice', 'revision'],
   },
   {
     slug: 'timeline-builder',
-    name: 'Timeline Builder',
+    name: 'Timeline builder',
     description:
       'Drag historical events from a bank into labeled period zones on a horizontal timeline. Supports 3–5 zones with per-event correctness feedback.',
     tags: ['history', 'sequencing', 'timeline'],
@@ -90,20 +90,20 @@ const WIDGETS = [
   },
   {
     slug: 'narrated-card',
-    name: 'Narrated Card',
+    name: 'Narrated card',
     description:
       'Reads content aloud using the browser\'s text-to-speech engine, revealing each sentence as it is spoken. Steps stack up as they complete.',
     tags: ['audio', 'narration', 'accessibility'],
   },
   {
     slug: 'step-reveal',
-    name: 'Step Reveal',
+    name: 'Step reveal',
     description: 'Walk through a concept or worked example one step at a time. Each step stacks up so students can follow the full chain of reasoning.',
     tags: ['worked example', 'step-by-step', 'reasoning'],
   },
   {
     slug: 'markdown-card',
-    name: 'Markdown Card',
+    name: 'Markdown card',
     description:
       'Renders LLM-generated markdown as a clean reading card — headings, bold, bullets, blockquotes, and an optional tip callout. Used to re-teach a concept a student is struggling with.',
     tags: ['reading', 'remediation', 'markdown'],

@@ -118,7 +118,7 @@ export default function DefendClaimDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Defend a Claim</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Defend a claim</h1>
         <p className="mt-2 text-muted-foreground">
           Take a side on a claim historians argue about, defend it from the sources, then ask for
           feedback and revise. Nothing is judged until you press the button — and every reading

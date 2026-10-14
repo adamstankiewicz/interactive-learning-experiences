@@ -44,7 +44,7 @@ export default function FractionAreaModelDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Fraction Area Model</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Fraction area model</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Partition a whole into equal parts and select segments to build a target fraction.
           Switch denominator choices to explore equivalent forms.

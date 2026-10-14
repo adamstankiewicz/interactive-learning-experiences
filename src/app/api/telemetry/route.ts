@@ -42,7 +42,14 @@ export async function POST(request: Request) {
         learningComponentId: event.learningComponentId,
         elapsedMs: event.elapsedMs,
         correct: event.correct,
-        payload: truncate(event.payload),
+        // stepIndex rides inside payload — the interactions table has no
+        // column for it, and the report's per-step evidence strip reads it
+        // back out. Dropping it here is what made per-step reporting
+        // impossible before.
+        payload:
+          event.stepIndex != null
+            ? { ...truncate(event.payload), stepIndex: event.stepIndex }
+            : truncate(event.payload),
       })),
     );
   } catch (error) {

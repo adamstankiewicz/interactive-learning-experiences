@@ -50,7 +50,7 @@ function StatusBadge({ completed }: { completed: boolean }) {
           : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
       }`}
     >
-      {completed ? 'Completed' : 'In Progress'}
+      {completed ? 'Completed' : 'In progress'}
     </span>
   );
 }

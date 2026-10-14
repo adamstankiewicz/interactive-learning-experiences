@@ -1,6 +1,7 @@
 import { supabaseAdmin, supabaseConfigured } from '@/lib/supabase/client';
 import type { Assignment, RosterStudent } from '@/lib/roster/types';
 import { EMPTY_PROFILE, studentProfile, type StudentProfile } from '@/lib/student/schema';
+import { buildStepStrip } from '@/lib/storage/types';
 import type {
   InteractionEvent,
   MasteryRollupRow,
@@ -358,7 +359,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
 
     let query = supabaseAdmin()
       .from('pathway_sessions')
-      .select('id, topic, standard_code, grade_hint, completion_count, created_at, session_opens(count)')
+      .select('id, topic, standard_code, grade_hint, completion_count, created_at, steps:plan->steps, session_opens(count)')
       .order('created_at', { ascending: false })
       .limit(limit);
     const childIds = [...childIdSet];
@@ -395,6 +396,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
       const kids = childrenByParent.get(pid) ?? [];
       const childCompletionsTotal = kids.reduce((s, cid) => s + (childCompletionById.get(cid) ?? 0), 0);
       const childOpensTotal = kids.reduce((s, cid) => s + (childOpenCount.get(cid) ?? 0), 0);
+      const steps = (Array.isArray(row.steps) ? row.steps : []) as { widgetKind?: string }[];
       return {
         id: pid,
         topic: String(row.topic),
@@ -403,6 +405,8 @@ export const supabaseStorageAdapter: StorageAdapter = {
         openCount: Number((row.session_opens as unknown as { count: number }[])?.[0]?.count ?? 0) + childOpensTotal,
         completionCount: Number(row.completion_count ?? 0) + childCompletionsTotal,
         createdAt: String(row.created_at),
+        stepCount: steps.length,
+        activityKinds: [...new Set(steps.map((step) => step.widgetKind).filter((k): k is string => Boolean(k)))],
       };
     });
   },
@@ -454,7 +458,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
     const allSessionIds = [sessionId, ...childSessionIds];
     const { data: interactionRows, error: interactionError } = await supabaseAdmin()
       .from('interactions')
-      .select('student_id, event_type, correct, elapsed_ms')
+      .select('student_id, event_type, correct, elapsed_ms, stepIndex:payload->stepIndex')
       .in('session_id', allSessionIds);
     // Every number in the report comes from these rows, so a failure here is a
     // wrong report rather than an empty one.
@@ -465,14 +469,24 @@ export const supabaseStorageAdapter: StorageAdapter = {
     const byStudent = new Map<string, {
       attempts: number; correctCount: number; hintsUsed: number;
       elapsedMs: number[]; lastSeenAt: string;
+      perStep: Map<number, { right: boolean; wrong: boolean }>;
     }>();
 
     for (const row of interactionRows ?? []) {
       const sid = String(row.student_id);
-      const entry = byStudent.get(sid) ?? { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date(0).toISOString() };
+      const entry = byStudent.get(sid) ?? { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date(0).toISOString(), perStep: new Map<number, { right: boolean; wrong: boolean }>() };
       if (row.correct !== null) entry.attempts += 1;
       if (row.correct === true) entry.correctCount += 1;
       if (row.event_type === 'hint_requested') entry.hintsUsed += 1;
+      if (row.event_type === 'widget_completed' && row.stepIndex != null) {
+        const stepIndex = Number(row.stepIndex);
+        if (Number.isFinite(stepIndex)) {
+          const cell = entry.perStep.get(stepIndex) ?? { right: false, wrong: false };
+          if (row.correct === true) cell.right = true;
+          if (row.correct === false) cell.wrong = true;
+          entry.perStep.set(stepIndex, cell);
+        }
+      }
       if (row.elapsed_ms != null) entry.elapsedMs.push(Number(row.elapsed_ms));
       entry.lastSeenAt = new Date().toISOString();
       byStudent.set(sid, entry);
@@ -481,13 +495,13 @@ export const supabaseStorageAdapter: StorageAdapter = {
     // Include roster students from child assignments even with no interactions yet.
     for (const [anonId] of anonToRoster) {
       if (!byStudent.has(anonId)) {
-        byStudent.set(anonId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date().toISOString() });
+        byStudent.set(anonId, { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date().toISOString(), perStep: new Map<number, { right: boolean; wrong: boolean }>() });
       }
     }
 
     // Include session owner even with no interactions.
     if (sessionRow && !byStudent.has(String(sessionRow.student_id))) {
-      byStudent.set(String(sessionRow.student_id), { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date().toISOString() });
+      byStudent.set(String(sessionRow.student_id), { attempts: 0, correctCount: 0, hintsUsed: 0, elapsedMs: [], lastSeenAt: new Date().toISOString(), perStep: new Map<number, { right: boolean; wrong: boolean }>() });
     }
 
     const stepCount = (sessionRow?.plan as { steps?: unknown[] } | null)?.steps?.length ?? 0;
@@ -507,6 +521,7 @@ export const supabaseStorageAdapter: StorageAdapter = {
         completed: stepCount > 0 && row.attempts >= stepCount,
         medianElapsedMs: median,
         lastSeenAt: row.lastSeenAt,
+        stepStrip: buildStepStrip(stepCount, row.perStep),
       };
     });
   },

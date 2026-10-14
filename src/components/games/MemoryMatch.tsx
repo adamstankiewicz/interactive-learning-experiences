@@ -93,7 +93,7 @@ export function MemoryMatch({ onComplete }: { onComplete?: () => void }) {
   return (
     <div className="flex min-h-[500px] flex-col items-center gap-6 p-6">
       <div className="text-center">
-        <h2 className="mb-2 text-3xl font-black text-violet-600">Memory Match</h2>
+        <h2 className="mb-2 text-3xl font-black text-violet-600">Memory match</h2>
         <p className="text-lg font-bold text-slate-600">
           Moves: {moves} | Matched: {matchedPairs}/{EMOJI_PAIRS.length}
         </p>

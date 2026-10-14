@@ -118,7 +118,7 @@ export default function WritingWorkshopDemo() {
         >
           <span aria-hidden="true">←</span> Widget gallery
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Writing Workshop</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Writing workshop</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Long-form writing, marked up when <em>you</em> ask. Nothing watches while you draft — then
           the read comes back on the sentences themselves, underlined where they work and where they

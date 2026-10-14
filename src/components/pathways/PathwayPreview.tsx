@@ -259,10 +259,10 @@ const PURPOSE_LABEL: Record<string, string> = {
 };
 
 const PURPOSE_COLOR: Record<string, string> = {
-  activate: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-  model: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
-  practice: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  check: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+  activate: 'bg-(--purpose-activate-bg) text-(--purpose-activate-fg)',
+  model: 'bg-(--purpose-model-bg) text-(--purpose-model-fg)',
+  practice: 'bg-(--purpose-practice-bg) text-(--purpose-practice-fg)',
+  check: 'bg-(--purpose-check-bg) text-(--purpose-check-fg)',
 };
 
 export type PathwayPreviewData = {
